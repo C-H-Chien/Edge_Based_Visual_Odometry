@@ -12,6 +12,7 @@
 
 #include "definitions.h"
 #include "Frame.h"
+#include "utility.h"
 
 // =======================================================================================================
 // class Dataset: Fetch data from dataset specified in the configuration file
@@ -47,6 +48,7 @@ private:
     std::string Dataset_Path;
     std::string Sequence_Name;
     Eigen::Matrix3d Calib;
+    Eigen::Matrix3d Inverse_Calib;
     bool has_Depth;
 
     std::fstream stream_Associate_File;
@@ -55,6 +57,11 @@ private:
     std::vector<std::string> Depth_Path_List;
     std::vector<std::string> Img_Time_Stamps;
 
+    cv::Mat grad_Depth_xi_;
+    cv::Mat grad_Depth_eta_;
+    cv::Mat Gx_2d, Gy_2d;
+
+    Utility::Ptr utility_tool = nullptr;
 };
 
 #endif

@@ -10,6 +10,7 @@
 #include <Eigen/Geometry>
 
 #include "Frame.h"
+#include "utility.h"
 
 // =====================================================================================================================
 // class Pipeline: visual odometry pipeline 
@@ -21,10 +22,10 @@
 //> Chiang-Heng Chien (chiang-heng_chien@brown.edu)
 // ======================================================================================================================
 
-//> States of the visual odometry pipeline
-enum class PipelineStatus { STATE_INITIALIZATION, \
-                            STATE_GET_AND_MATCH_SIFT, \
-                            STATE_REL_POSE_ESTIMATION };
+//> status of the visual odometry pipeline
+enum class PipelineStatus { STATUS_INITIALIZATION, \
+                            STATUS_GET_AND_MATCH_SIFT, \
+                            STATUS_ESTIMATE_RELATIVE_POSE };
 
 //> Defined operator used to create a rank-ordered list of feature correspondences
 struct less_than_Eucl_Dist {
@@ -69,16 +70,22 @@ private:
      * Estimate relative poses
      * @return true if success
      */
+    //bool ();
+
+    /**
+     * Estimate relative poses
+     * @return true if success
+     */
     bool get_Relative_Pose();
 
     //> Status of the Visual Odometry Pipeline
-    PipelineStatus status_ = PipelineStatus::STATE_INITIALIZATION;
+    PipelineStatus status_ = PipelineStatus::STATUS_INITIALIZATION;
 
     //> Pointers to the Frame class
     Frame::Ptr Current_Frame  = nullptr;
     Frame::Ptr Previous_Frame = nullptr;
 
-    
+    Utility::Ptr utility_tool = nullptr;
 };
 
 

@@ -4,6 +4,7 @@ set (control_sources
         Frame.cpp
         Dataset.cpp
         Pipeline.cpp
+        utility.cpp
 )
 
 add_library( lems_vo_slam ${control_sources} )

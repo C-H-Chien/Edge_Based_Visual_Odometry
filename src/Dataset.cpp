@@ -27,6 +27,7 @@ Dataset::Dataset(YAML::Node config_map)
     : config_file(config_map) 
 {
     Calib = Eigen::Matrix3d::Identity();
+    Inverse_Calib = Eigen::Matrix3d::Identity();
 
     //> Parse data from the yaml file
 	Dataset_Path = config_file["dataset_dir"].as<std::string>();
@@ -38,9 +39,19 @@ Dataset::Dataset(YAML::Node config_map)
 	Calib(0,2) = config_file["camera.cx"].as<double>();
 	Calib(1,2) = config_file["camera.cy"].as<double>();
 
+    Inverse_Calib(0,0) = 1.0 / Calib(0,0);
+    Inverse_Calib(1,1) = 1.0 / Calib(1,1);
+    Inverse_Calib(0,2) = -Calib(0,2) / Calib(0,0);
+    Inverse_Calib(1,2) = -Calib(1,2) / Calib(1,1);
+
     Total_Num_Of_Imgs = 0;
     Current_Frame_Index = 0;
     has_Depth = false;
+
+    //> Used in GDC filter
+    Gx_2d = cv::Mat::ones(GAUSSIAN_KERNEL_WINDOW_LENGTH, GAUSSIAN_KERNEL_WINDOW_LENGTH, CV_64F);
+    Gy_2d = cv::Mat::ones(GAUSSIAN_KERNEL_WINDOW_LENGTH, GAUSSIAN_KERNEL_WINDOW_LENGTH, CV_64F);
+    utility_tool->get_dG_2D(Gx_2d, Gy_2d, 4*DEPTH_GRAD_GAUSSIAN_SIGMA, DEPTH_GRAD_GAUSSIAN_SIGMA);   
 }
 
 bool Dataset::Init_Fetch_Data() {
@@ -97,18 +108,30 @@ Frame::Ptr Dataset::get_Next_Frame() {
             return nullptr;
         }
         //> Scale down by the factor of 5000 (according to the TUM-RGBD dataset)
-        depth_Map.convertTo(depth_Map, CV_32F, 5000);
+        depth_Map.convertTo(depth_Map, CV_64F);
+        depth_Map /= 5000.0;
     }
 
     //> Create a new frame from the Frame class
     auto new_frame = Frame::Create_Frame();
     new_frame->Image = gray_Image;
     if (has_Depth) new_frame->Depth = depth_Map;
-    new_frame->fx = Calib(0,0);
-    new_frame->fy = Calib(1,1);
-    new_frame->cx = Calib(0,2);
-    new_frame->cy = Calib(1,2);
+    new_frame->K = Calib;
+    new_frame->inv_K = Inverse_Calib;
     new_frame->ID = Current_Frame_Index;
+
+    //> Get depth gradients for the GDC filter
+    grad_Depth_eta_ = cv::Mat::ones(depth_Map.rows, depth_Map.cols, CV_64F);
+    grad_Depth_xi_  = cv::Mat::ones(depth_Map.rows, depth_Map.cols, CV_64F);
+    cv::filter2D( depth_Map, grad_Depth_xi_,  depth_Map.depth(), Gx_2d );
+    cv::filter2D( depth_Map, grad_Depth_eta_, depth_Map.depth(), Gy_2d );
+
+    //> Not sure why the results are opposite in sign. Multiply by -1 to rectify.
+    grad_Depth_xi_  *= (-1);
+    grad_Depth_eta_ *= (-1);
+
+    new_frame->grad_Depth_eta = grad_Depth_eta_;
+    new_frame->grad_Depth_xi  = grad_Depth_xi_;
 
     Current_Frame_Index++;
 

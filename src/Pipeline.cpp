@@ -7,7 +7,7 @@
 #include <Eigen/Dense>
 #include "Pipeline.h"
 #include "definitions.h"
-#include "utility.h"
+
 
 // =====================================================================================================================
 // class Pipeline: visual odometry pipeline 
@@ -21,6 +21,7 @@
 // ======================================================================================================================
 
 Pipeline::Pipeline() {
+
     //> Set zeros
     Num_Of_SIFT_Features = 0;
     Num_Of_Good_Feature_Matches = 0;
@@ -31,18 +32,22 @@ bool Pipeline::Add_Frame(Frame::Ptr frame) {
     Current_Frame = frame;
 
     switch (status_) {
-        case PipelineStatus::STATE_INITIALIZATION:
+        case PipelineStatus::STATUS_INITIALIZATION:
             //> Initialization: extract SIFT features on the first frame
-            LOG_STATES("STATE_INITIALIZATION");
+            LOG_STATUS("STATUS_INITIALIZATION");
             Num_Of_SIFT_Features = get_Features();
             break;
-        case PipelineStatus::STATE_GET_AND_MATCH_SIFT:
+        case PipelineStatus::STATUS_GET_AND_MATCH_SIFT:
             //> Extract and match SIFT features of the current frame with the previous frame
-            LOG_STATES("STATE_GET_AND_MATCH_SIFT");
+            LOG_STATUS("STATUS_GET_AND_MATCH_SIFT");
             Num_Of_SIFT_Features = get_Features();
             Num_Of_Good_Feature_Matches = get_Feature_Correspondences();
             break;
-        //case PipelineStatus::STATE_
+        //case PipelineStatus::STATUS_GDC_FILTER:
+        //    break;
+        case PipelineStatus::STATUS_ESTIMATE_RELATIVE_POSE:
+            get_Relative_Pose();
+            break;
     }
 
     //> Swap the frame
@@ -70,8 +75,8 @@ int Pipeline::get_Features() {
     Current_Frame->SIFT_Locations = SIFT_Keypoints;
     Current_Frame->SIFT_Descriptors = SIFT_KeyPoint_Descriptors;
 
-    //> Change to the next state
-    status_ = PipelineStatus::STATE_GET_AND_MATCH_SIFT;
+    //> Change to the next status
+    status_ = PipelineStatus::STATUS_GET_AND_MATCH_SIFT;
     
     return SIFT_Keypoints.size();
 }
@@ -95,7 +100,8 @@ int Pipeline::get_Feature_Correspondences() {
     //> Sort the matches based on their matching score (Euclidean distances of feature descriptors)
     std::sort( Good_Matches.begin(), Good_Matches.end(), less_than_Eucl_Dist() );
 
-    //> Push back the match feature locations of the previous and current frames
+    //> Push back the "valid" match feature locations of the previous and current frames
+    std::vector< std::pair<int, int> > Valid_Good_Matches_Index;
     for (int fi = 0; fi < Good_Matches.size(); fi++) {
         cv::DMatch f = Good_Matches[fi];
 
@@ -103,27 +109,53 @@ int Pipeline::get_Feature_Correspondences() {
         cv::Point2d previous_pt = Previous_Frame->SIFT_Locations[f.queryIdx].pt;
         cv::Point2d current_pt = Current_Frame->SIFT_Locations[f.trainIdx].pt;
 
+        //> Rule out points unable to do bilinear interpolation
+        if (previous_pt.x < 1 || previous_pt.y < 1 || current_pt.x < 1 || current_pt.y < 1) continue;
+        if (previous_pt.x > (Current_Frame->Image.cols-1) || previous_pt.y > (Current_Frame->Image.rows-1) \
+         || current_pt.x > (Current_Frame->Image.cols-1) || current_pt.y > (Current_Frame->Image.rows-1)) 
+            continue;
+
+        double previous_depth = utility_tool->Bilinear_Interpolation(Previous_Frame, previous_pt);
+        double current_depth = utility_tool->Bilinear_Interpolation(Current_Frame, current_pt);
+
         Eigen::Vector3d Previous_Match_Location = {previous_pt.x, previous_pt.y, 1.0};
         Eigen::Vector3d Current_Match_Location = {current_pt.x, current_pt.y, 1.0};
+        Eigen::Vector3d Previous_Match_gamma = Previous_Frame->inv_K * Previous_Match_Location;
+        Eigen::Vector3d Current_Match_gamma = Current_Frame->inv_K * Current_Match_Location;
 
-        Previous_Frame->SIFT_Match_Locations.push_back(Previous_Match_Location);
-        Current_Frame->SIFT_Match_Locations.push_back(Current_Match_Location);
+        //> 2D-3D matches of the previous and current frames
+        Previous_Frame->SIFT_Match_Locations_Pixels.push_back(Previous_Match_Location);
+        Current_Frame->SIFT_Match_Locations_Pixels.push_back(Current_Match_Location);
+        Previous_Frame->Gamma.push_back(previous_depth * Previous_Match_gamma);
+        Current_Frame->Gamma.push_back(current_depth * Current_Match_gamma);
+
+        //> Push back indices of valid feature matches
+        Valid_Good_Matches_Index.push_back(std::make_pair(f.queryIdx, f.trainIdx));
     }
 
 #if OPENCV_DISPLAY_CORRESPONDENCES
-    IO_TOOLS::Display_Feature_Correspondences(Previous_Frame->Image, Current_Frame->Image, \
-                                    Previous_Frame->SIFT_Locations, Current_Frame->SIFT_Locations, \
-                                    Good_Matches ) ;
+    utility_tool->Display_Feature_Correspondences(Previous_Frame->Image, Current_Frame->Image, \
+                                                   Previous_Frame->SIFT_Locations, Current_Frame->SIFT_Locations, \
+                                                   Good_Matches ) ;
 #endif
 
     //> Get 3D matches
+    //std::string ty = UTILITY_TOOLS::cvMat_Type( Current_Frame->Depth.type() );
+    //printf("Depth Image: %s %dx%d \n", ty.c_str(), Current_Frame->Depth.cols, Current_Frame->Depth.rows );
+    //std::cout << Current_Frame->Depth.at<float>(320, 240) << std::endl;
 
+    //> Change to the next status
+    status_ = PipelineStatus::STATUS_ESTIMATE_RELATIVE_POSE;
 
+    return Valid_Good_Matches_Index.size();
+}
 
-    //> Change to the next state
-    //status_ = PipelineStatus::STATE_GET_AND_MATCH_SIFT;
-
-    return Good_Matches.size();
+bool Pipeline::get_Relative_Pose() {
+    
+    //> Compute gradient rho at (xi, eta) for all valid good matches of the current frame
+    for (int i = 0; i < Valid_Good_Matches_Index.size(); i++) {
+        utility_tool->Bilinear_Interpolation(Current_Frame, );
+    }
 }
 
 #endif

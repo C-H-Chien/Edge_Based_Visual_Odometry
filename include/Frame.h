@@ -38,12 +38,6 @@ public:
     //> Destructor
     //> TODO
 
-    //> Identification of frames
-    double fx;
-    double fy;
-    double cx;
-    double cy;
-
     static std::shared_ptr<Frame> Create_Frame();
 
     //> Information of a frame
@@ -51,6 +45,8 @@ public:
     cv::Mat Depth;                              //> depth image
     Eigen::Matrix3d Rot;                        //> rotation matrix
     Eigen::Vector3d Transl;                     //> translation vector
+    Eigen::Matrix3d K;                          //> Calibration matrix
+    Eigen::Matrix3d inv_K;                      //> Inverse of Calibration matrix
     unsigned long ID = 0;                       //> frame id
     unsigned long KeyFrame_ID = 0;              //> keyframe id, if we have keyframe selection strategy
     bool is_KeyFrame = false;                   //> whether the frame is a keyframe or not
@@ -58,9 +54,14 @@ public:
     
     std::vector<cv::KeyPoint> SIFT_Locations;               //> a list of SIFT feature locations, used for matching
     cv::Mat SIFT_Descriptors;                               //> a list of SIFT feature descriptors used for matching
-    std::vector<Eigen::Vector3d> SIFT_Match_Locations;    //> a list of SIFT homogeneous locations
+    std::vector<Eigen::Vector3d> SIFT_Match_Locations_Pixels;    //> a list of SIFT homogeneous locations in pixels
+    //std::vector<Eigen::Vector3d> SIFT_Match_Locations_Meters;    //> a list of SIFT homogeneous locations in meters
     std::vector<bool> is_SIFT_Outlier;              //> whether the corresponding SIFT list index is an outlier or not
     std::vector<Eigen::Vector3d> Gamma;             //> 3D points arise from the depth map
+
+    //> Used in GDF filter
+    cv::Mat grad_Depth_xi;
+    cv::Mat grad_Depth_eta;
     
 private:
     

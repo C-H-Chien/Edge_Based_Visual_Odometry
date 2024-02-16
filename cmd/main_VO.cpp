@@ -46,19 +46,24 @@ int main(int argc, char **argv) {
 	//> Setup the dataset class pointer
 	Dataset::Ptr dataset_ = Dataset::Ptr(new Dataset(config_map));
     CHECK_EQ(dataset_->Init_Fetch_Data(), true);
+	std::cout << "Total Number of Images in the Dataset Sequence: " << dataset_->Total_Num_Of_Imgs << std::endl;
 
-	Frame::Ptr new_frame = dataset_->get_Next_Frame();
-	if (new_frame == nullptr) std::cerr << "ERROR: failed to fetch a frame." << std::endl;
-
+	//> Pointers to the classes
+	Frame::Ptr new_frame;
 	Pipeline::Ptr vo_sys = Pipeline::Ptr(new Pipeline);
-	bool success = vo_sys->Add_Frame(new_frame);
 
-	//std::cout << vo_sys->status_ << std::endl;
-	std::cout << "Number of SIFT Features: " << vo_sys->Num_Of_SIFT_Features << std::endl;
+	//for (int fi = 0; fi < Total_Num_Of_Imgs; fi++) {
+	for (int fi = 0; fi < 2; fi++) {
+		
+		//> Fetch the information of the next frame
+		new_frame = dataset_->get_Next_Frame();
+		if (new_frame == nullptr) LOG_ERROR("failed to fetch a frame");
 
-	new_frame = dataset_->get_Next_Frame();
-	success = vo_sys->Add_Frame(new_frame);
-	std::cout << vo_sys->Num_Of_Good_Feature_Matches << std::endl;
+		//vo_sys = Pipeline::Ptr(new Pipeline);
+		bool success = vo_sys->Add_Frame(new_frame);
+		std::cout << "Number of SIFT Features: " << vo_sys->Num_Of_SIFT_Features << std::endl;
+	}
+	
 	
 
 	return 0;
