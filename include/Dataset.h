@@ -60,6 +60,7 @@ private:
     cv::Mat grad_Depth_xi_;
     cv::Mat grad_Depth_eta_;
     cv::Mat Gx_2d, Gy_2d;
+    cv::Mat Small_Patch_Radius_Map;
 
     Utility::Ptr utility_tool = nullptr;
 };

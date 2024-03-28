@@ -30,6 +30,10 @@
 #define LOWES_RATIO                     (0.8)        //> Suggested in Lowe's paper
 #define K_IN_KNN_MATCHING               (2)
 
+//> GCC Filter
+#define ACTIVATE_GCC                    (true)
+#define GCC_PATCH_HALF_SIZE             (3)          //> 3 pixels for r(\gamma_0) map
+
 //> Print outs
-#define LOG_STATUS(status_)             printf("\033[1;35mSTATUS: %s\033[0m\n", status_);
-#define LOG_ERROR(err_msg)              printf("\033[1;31mERROR: %s\033[0m\n", err_msg );
+#define LOG_STATUS(status_)             printf("\033[1;35mSTATUS: %s\033[0m\n", std::string(status_).c_str());
+#define LOG_ERROR(err_msg)              printf("\033[1;31mERROR: %s\033[0m\n", std::string(err_msg).c_str() );

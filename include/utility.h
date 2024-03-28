@@ -42,6 +42,9 @@ public:
                                          std::vector<cv::KeyPoint> KeyPoint1, std::vector<cv::KeyPoint> KeyPoint2, \
                                          std::vector<cv::DMatch> Good_Matches );
     std::string cvMat_Type(int type);
+
+    template<typename T>
+    T Uniform_Random_Number_Generator(T range_from, T range_to);
 };
 
 #endif

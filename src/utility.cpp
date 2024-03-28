@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
+#include <random>
 #include <fstream>
 #include <opencv2/opencv.hpp>
 #include <Eigen/Core>
@@ -117,6 +118,15 @@ std::string Utility::cvMat_Type(int type) {
   r += (chans+'0');
 
   return r;
+}
+
+template<typename T>
+T Utility::Uniform_Random_Number_Generator(T range_from, T range_to) {
+  
+  std::random_device                  rand_dev;
+  std::mt19937                        generator(rand_dev());
+  std::uniform_int_distribution<T>    distr(range_from, range_to);
+  return distr(generator);
 }
 
 #endif

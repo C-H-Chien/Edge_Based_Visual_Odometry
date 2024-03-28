@@ -43,8 +43,6 @@ bool Pipeline::Add_Frame(Frame::Ptr frame) {
             Num_Of_SIFT_Features = get_Features();
             Num_Of_Good_Feature_Matches = get_Feature_Correspondences();
             break;
-        //case PipelineStatus::STATUS_GDC_FILTER:
-        //    break;
         case PipelineStatus::STATUS_ESTIMATE_RELATIVE_POSE:
             get_Relative_Pose();
             break;
@@ -151,11 +149,14 @@ int Pipeline::get_Feature_Correspondences() {
 }
 
 bool Pipeline::get_Relative_Pose() {
+
+    //> Randomly pick 3 points from Num_Of_Good_Feature_Matches
+    unsigned Sample_Indices[3] = {0, 0, 0};
+    for (int i = 0; i < 3; i++) 
+        Sample_Indices[i] = utility_tool->Uniform_Random_Number_Generator<int>(0, Num_Of_Good_Feature_Matches-1);
+
     
-    //> Compute gradient rho at (xi, eta) for all valid good matches of the current frame
-    for (int i = 0; i < Valid_Good_Matches_Index.size(); i++) {
-        utility_tool->Bilinear_Interpolation(Current_Frame, );
-    }
+    
 }
 
 #endif
