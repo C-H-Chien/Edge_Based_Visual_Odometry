@@ -1,9 +1,11 @@
 # Visual Odometry / SLAM Pipeline Research @Brown University
+This repository is still under development. 
 (c) Chiang-Heng Chien (chiang-heng_chien@brown.edu)
 
 ## Dependencies
 * Eigen 3.X
-* yaml-cpp
+* OpenCV 4.X
+* yaml-cpp (see its [official page](https://github.com/jbeder/yaml-cpp))
 * glog
 * gflags
 
@@ -22,3 +24,6 @@ Under the ``bin`` folder, do
 ./main_VO --config_file=../config/tum.yaml
 ```
 where the configuration file can be customized. See ``.yaml`` files under the ``config`` folder for more information.
+
+## Functionalities
+Relative pose estimation from a RGB-D sequence, with geometric correspondence consistency (GCC) filter to speedup and stablize the RANSAC process.
