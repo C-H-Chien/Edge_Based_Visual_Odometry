@@ -5,6 +5,7 @@ set (control_sources
         Dataset.cpp
         Pipeline.cpp
         utility.cpp
+        MotionTracker.cpp
 )
 
 add_library( lems_vo_slam ${control_sources} )

@@ -7,6 +7,9 @@
 //> Use for the TUM type dataset
 #define ASSOCIATION_FILE_NAME           std::string("associate.txt")
 
+//> Generic definitions
+#define RANSAC_NUM_OF_ITERATIONS        (1)
+
 //> Geometric Depth Consistency
 #define TOP_N_RANK_ORDERED_LIST         (100)
 

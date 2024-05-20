@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
-#include <random>
 #include <fstream>
 #include <opencv2/opencv.hpp>
 #include <Eigen/Core>
@@ -64,22 +63,17 @@ void Utility::get_dG_2D(cv::Mat &Gx_2d, cv::Mat &Gy_2d, int w, double sigma) {
   }
 }
 
-double Utility::Bilinear_Interpolation(Frame::Ptr Frame, cv::Point2d P) {
+double Utility::get_Interpolated_Depth( Frame::Ptr Frame, cv::Point2d P ) {
+  return Bilinear_Interpolation< float >( Frame->Depth, P );
+}
 
-  //> y2 Q12--------Q22
-  //      |          |
-  //      |    P     |
-  //      |          |
-  //  y1 Q11--------Q21
-  //      x1         x2
-  cv::Point2d Q12 (floor(P.x), floor(P.y));
-  cv::Point2d Q22 (ceil(P.x), floor(P.y));
-  cv::Point2d Q11 (floor(P.x), ceil(P.y));
-  cv::Point2d Q21 (ceil(P.x), ceil(P.y));
-
-  double f_x_y1 = ((Q21.x-P.x)/(Q21.x-Q11.x))*Frame->Depth.at<float>(Q11.y, Q11.x) + ((P.x-Q11.x)/(Q21.x-Q11.x))*Frame->Depth.at<float>(Q21.y, Q21.x);
-  double f_x_y2 = ((Q21.x-P.x)/(Q21.x-Q11.x))*Frame->Depth.at<float>(Q12.y, Q12.x) + ((P.x-Q11.x)/(Q21.x-Q11.x))*Frame->Depth.at<float>(Q22.y, Q22.x);
-  return ((Q12.y-P.y)/(Q12.y-Q11.y))*f_x_y1 + ((P.y-Q11.y)/(Q12.y-Q11.y))*f_x_y2;
+double Utility::get_Interpolated_Gradient_Depth( Frame::Ptr Frame, cv::Point2d P, std::string grad_Direction ) {
+  if (grad_Direction == "xi")       return Bilinear_Interpolation< float >( Frame->grad_Depth_xi,  P );
+  else if (grad_Direction == "eta") return Bilinear_Interpolation< float >( Frame->grad_Depth_eta, P );
+  else {
+    LOG_ERROR("Invalid gradient direction tag at uitlity::get_Interpolated_Gradient_Depth function!");
+    return 0.0;
+  }
 }
 
 //> Display images and features via OpenCV
@@ -120,13 +114,13 @@ std::string Utility::cvMat_Type(int type) {
   return r;
 }
 
-template<typename T>
-T Utility::Uniform_Random_Number_Generator(T range_from, T range_to) {
+// template<typename T>
+// T Utility::Uniform_Random_Number_Generator(T range_from, T range_to) {
   
-  std::random_device                  rand_dev;
-  std::mt19937                        generator(rand_dev());
-  std::uniform_int_distribution<T>    distr(range_from, range_to);
-  return distr(generator);
-}
+//   std::random_device                  rand_dev;
+//   std::mt19937                        generator(rand_dev());
+//   std::uniform_int_distribution<T>    distr(range_from, range_to);
+//   return distr(generator);
+// }
 
 #endif

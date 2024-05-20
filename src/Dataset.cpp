@@ -9,6 +9,8 @@
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <glog/logging.h>
+#include <time.h>
+#include <sys/time.h>
 
 #include "Dataset.h"
 #include "definitions.h"
@@ -23,8 +25,7 @@
 //> Chiang-Heng Chien (chiang-heng_chien@brown.edu)
 // =======================================================================================================
 
-Dataset::Dataset(YAML::Node config_map)
-    : config_file(config_map) 
+Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(config_map), compute_grad_depth(use_GCC_filter)
 {
     Calib = Eigen::Matrix3d::Identity();
     Inverse_Calib = Eigen::Matrix3d::Identity();
@@ -48,13 +49,15 @@ Dataset::Dataset(YAML::Node config_map)
     Current_Frame_Index = 0;
     has_Depth = false;
 
-    //> Used in GCC filter
-    // (1) Gaussian filter in x and y direction
-    Gx_2d = cv::Mat::ones(GAUSSIAN_KERNEL_WINDOW_LENGTH, GAUSSIAN_KERNEL_WINDOW_LENGTH, CV_64F);
-    Gy_2d = cv::Mat::ones(GAUSSIAN_KERNEL_WINDOW_LENGTH, GAUSSIAN_KERNEL_WINDOW_LENGTH, CV_64F);
-    utility_tool->get_dG_2D(Gx_2d, Gy_2d, 4*DEPTH_GRAD_GAUSSIAN_SIGMA, DEPTH_GRAD_GAUSSIAN_SIGMA); 
-    //> (2) Small patch associated to point \gamma_0
-    Small_Patch_Radius_Map = cv::Mat::ones(2*GCC_PATCH_HALF_SIZE+1, 2*GCC_PATCH_HALF_SIZE+1, CV_64F);
+    //> Using GCC filter
+    if (compute_grad_depth) {
+        // (1) Gaussian filter in x and y direction
+        Gx_2d = cv::Mat::ones(GAUSSIAN_KERNEL_WINDOW_LENGTH, GAUSSIAN_KERNEL_WINDOW_LENGTH, CV_64F);
+        Gy_2d = cv::Mat::ones(GAUSSIAN_KERNEL_WINDOW_LENGTH, GAUSSIAN_KERNEL_WINDOW_LENGTH, CV_64F);
+        utility_tool->get_dG_2D(Gx_2d, Gy_2d, 4*DEPTH_GRAD_GAUSSIAN_SIGMA, DEPTH_GRAD_GAUSSIAN_SIGMA); 
+        //> (2) Small patch associated to point \gamma_0
+        Small_Patch_Radius_Map = cv::Mat::ones(2*GCC_PATCH_HALF_SIZE+1, 2*GCC_PATCH_HALF_SIZE+1, CV_64F);
+    }
 }
 
 bool Dataset::Init_Fetch_Data() {
@@ -123,18 +126,32 @@ Frame::Ptr Dataset::get_Next_Frame() {
     new_frame->inv_K = Inverse_Calib;
     new_frame->ID = Current_Frame_Index;
 
-    //> Get depth gradients for the GDC filter
-    grad_Depth_eta_ = cv::Mat::ones(depth_Map.rows, depth_Map.cols, CV_64F);
-    grad_Depth_xi_  = cv::Mat::ones(depth_Map.rows, depth_Map.cols, CV_64F);
-    cv::filter2D( depth_Map, grad_Depth_xi_,  depth_Map.depth(), Gx_2d );
-    cv::filter2D( depth_Map, grad_Depth_eta_, depth_Map.depth(), Gy_2d );
+    //> Using GCC filter
+    if (compute_grad_depth) {
 
-    //> Not sure why the results are opposite in sign. Multiply by -1 to rectify.
-    grad_Depth_xi_  *= (-1);
-    grad_Depth_eta_ *= (-1);
+        struct timeval tStart_gradient_depth;
+        struct timeval tEnd_gradient_dpeth;
+        unsigned long time_gradient_depth;
 
-    new_frame->grad_Depth_eta = grad_Depth_eta_;
-    new_frame->grad_Depth_xi  = grad_Depth_xi_;
+        gettimeofday(&tStart_gradient_depth, NULL);
+        //> Get depth gradients for the GDC filter
+        grad_Depth_eta_ = cv::Mat::ones(depth_Map.rows, depth_Map.cols, CV_64F);
+        grad_Depth_xi_  = cv::Mat::ones(depth_Map.rows, depth_Map.cols, CV_64F);
+        cv::filter2D( depth_Map, grad_Depth_xi_,  depth_Map.depth(), Gx_2d );
+        cv::filter2D( depth_Map, grad_Depth_eta_, depth_Map.depth(), Gy_2d );
+
+        gettimeofday(&tEnd_gradient_dpeth, NULL);
+        time_gradient_depth = ((tEnd_gradient_dpeth.tv_sec * 1000000) + tEnd_gradient_dpeth.tv_usec) - ((tStart_gradient_depth.tv_sec * 1000000) + tStart_gradient_depth.tv_usec);
+        printf("Time spent on computing gradient depths: %Lf (ms)\n", (long double)time_gradient_depth/1000.0);
+
+        //> Not sure why the results are opposite in sign. Multiply by -1 to rectify.
+        grad_Depth_xi_  *= (-1);
+        grad_Depth_eta_ *= (-1);
+
+        new_frame->grad_Depth_eta = grad_Depth_eta_;
+        new_frame->grad_Depth_xi  = grad_Depth_xi_;
+        new_frame->need_depth_grad = true;
+    }
 
     Current_Frame_Index++;
 

@@ -43,8 +43,10 @@ public:
     //> Information of a frame
     cv::Mat Image;                              //> gray image
     cv::Mat Depth;                              //> depth image
-    Eigen::Matrix3d Rot;                        //> rotation matrix
-    Eigen::Vector3d Transl;                     //> translation vector
+    Eigen::Matrix3d Rel_Rot;                    //> relative rotation matrix
+    Eigen::Vector3d Rel_Transl;                 //> relative translation vector
+    Eigen::Matrix3d Abs_Rot;                    //> absolute rotation matrix
+    Eigen::Vector3d Abs_Transl;                 //> absolute translation vector
     Eigen::Matrix3d K;                          //> Calibration matrix
     Eigen::Matrix3d inv_K;                      //> Inverse of Calibration matrix
     unsigned long ID = 0;                       //> frame id
@@ -55,13 +57,14 @@ public:
     std::vector<cv::KeyPoint> SIFT_Locations;               //> a list of SIFT feature locations, used for matching
     cv::Mat SIFT_Descriptors;                               //> a list of SIFT feature descriptors used for matching
     std::vector<Eigen::Vector3d> SIFT_Match_Locations_Pixels;    //> a list of SIFT homogeneous locations in pixels
-    //std::vector<Eigen::Vector3d> SIFT_Match_Locations_Meters;    //> a list of SIFT homogeneous locations in meters
     std::vector<bool> is_SIFT_Outlier;              //> whether the corresponding SIFT list index is an outlier or not
     std::vector<Eigen::Vector3d> Gamma;             //> 3D points arise from the depth map
 
-    //> Used in GDF filter
+    //> Used in GCC filter
+    bool need_depth_grad = false;
     cv::Mat grad_Depth_xi;
     cv::Mat grad_Depth_eta;
+    std::vector< std::pair<double, double>> gradient_Depth_at_Features;
     
 private:
     

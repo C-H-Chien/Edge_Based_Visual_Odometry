@@ -30,7 +30,7 @@ public:
     //> Allow this class to be accessed as a pointer
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
     typedef std::shared_ptr<Dataset> Ptr;
-    Dataset(YAML::Node);
+    Dataset(YAML::Node, bool);
 
     //> Read data from dataset, e.g. image list, depth list, etc.
     bool Init_Fetch_Data();
@@ -57,6 +57,7 @@ private:
     std::vector<std::string> Depth_Path_List;
     std::vector<std::string> Img_Time_Stamps;
 
+    bool compute_grad_depth = false;
     cv::Mat grad_Depth_xi_;
     cv::Mat grad_Depth_eta_;
     cv::Mat Gx_2d, Gy_2d;

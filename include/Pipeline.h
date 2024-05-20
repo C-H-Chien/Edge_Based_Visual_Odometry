@@ -11,6 +11,7 @@
 
 #include "Frame.h"
 #include "utility.h"
+#include "MotionTracker.h"
 
 // =====================================================================================================================
 // class Pipeline: visual odometry pipeline 
@@ -67,25 +68,19 @@ private:
     int get_Feature_Correspondences();
 
     /**
-     * Estimate relative poses
-     * @return true if success
+     * Estimate camera poses
+     * @return true if success (defined as having sufficient number of inliers)
      */
-    //bool ();
-
-    /**
-     * Estimate relative poses
-     * @return true if success
-     */
-    bool get_Relative_Pose();
+    bool track_Camera_Motion();
 
     //> Status of the Visual Odometry Pipeline
     PipelineStatus status_ = PipelineStatus::STATUS_INITIALIZATION;
 
-    //> Pointers to the Frame class
+    //> Pointers to the classes
     Frame::Ptr Current_Frame  = nullptr;
     Frame::Ptr Previous_Frame = nullptr;
-
     Utility::Ptr utility_tool = nullptr;
+    MotionTracker::Ptr Camera_Motion_Estimate = nullptr;
 };
 
 

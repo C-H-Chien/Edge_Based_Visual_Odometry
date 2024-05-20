@@ -21,7 +21,7 @@
 // =======================================================================================================
 
 Frame::Frame(long id, double time_stamp, Eigen::Matrix3d Rotation, Eigen::Vector3d Translation, cv::Mat Img)
-    :ID(id), time_stamp(time_stamp), Rot(Rotation), Transl(Translation), Image(Img)
+    :ID(id), time_stamp(time_stamp), Abs_Rot(Rotation), Abs_Transl(Translation), Image(Img)
 {
 
 }

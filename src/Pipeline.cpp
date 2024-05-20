@@ -13,8 +13,8 @@
 // class Pipeline: visual odometry pipeline 
 //
 // ChangeLogs
-//    Chien  23-01-17    Initially created.
-//    Chien  23-01-18    Add (SIFT) feature detection, matching, and creating a rank-order list of correspondences
+//    Chien  24-01-17    Initially created.
+//    Chien  24-01-18    Add (SIFT) feature detection, matching, and creating a rank-order list of correspondences
 //
 //> (c) LEMS, Brown University
 //> Chiang-Heng Chien (chiang-heng_chien@brown.edu)
@@ -44,7 +44,7 @@ bool Pipeline::Add_Frame(Frame::Ptr frame) {
             Num_Of_Good_Feature_Matches = get_Feature_Correspondences();
             break;
         case PipelineStatus::STATUS_ESTIMATE_RELATIVE_POSE:
-            get_Relative_Pose();
+            track_Camera_Motion();
             break;
     }
 
@@ -113,8 +113,8 @@ int Pipeline::get_Feature_Correspondences() {
          || current_pt.x > (Current_Frame->Image.cols-1) || current_pt.y > (Current_Frame->Image.rows-1)) 
             continue;
 
-        double previous_depth = utility_tool->Bilinear_Interpolation(Previous_Frame, previous_pt);
-        double current_depth = utility_tool->Bilinear_Interpolation(Current_Frame, current_pt);
+        double previous_depth = utility_tool->get_Interpolated_Depth(Previous_Frame, previous_pt);
+        double current_depth  = utility_tool->get_Interpolated_Depth(Current_Frame,  current_pt );
 
         Eigen::Vector3d Previous_Match_Location = {previous_pt.x, previous_pt.y, 1.0};
         Eigen::Vector3d Current_Match_Location = {current_pt.x, current_pt.y, 1.0};
@@ -129,12 +129,24 @@ int Pipeline::get_Feature_Correspondences() {
 
         //> Push back indices of valid feature matches
         Valid_Good_Matches_Index.push_back(std::make_pair(f.queryIdx, f.trainIdx));
+
+        //> Calculate gradient depth at corresponding feature locations, if required
+        if (Current_Frame->need_depth_grad) {
+            //> Current frame features
+            double grad_x = utility_tool->get_Interpolated_Gradient_Depth( Current_Frame, current_pt, "xi" );
+            double grad_y = utility_tool->get_Interpolated_Gradient_Depth( Current_Frame, current_pt, "eta" );
+            Current_Frame->gradient_Depth_at_Features.push_back( std::make_pair(grad_x, grad_y) );
+            //> Previous frame features
+            grad_x = utility_tool->get_Interpolated_Gradient_Depth( Previous_Frame, previous_pt, "xi" );
+            grad_y = utility_tool->get_Interpolated_Gradient_Depth( Previous_Frame, previous_pt, "eta" );
+            Previous_Frame->gradient_Depth_at_Features.push_back( std::make_pair(grad_x, grad_y) );
+        }
     }
 
 #if OPENCV_DISPLAY_CORRESPONDENCES
     utility_tool->Display_Feature_Correspondences(Previous_Frame->Image, Current_Frame->Image, \
-                                                   Previous_Frame->SIFT_Locations, Current_Frame->SIFT_Locations, \
-                                                   Good_Matches ) ;
+                                                  Previous_Frame->SIFT_Locations, Current_Frame->SIFT_Locations, \
+                                                  Good_Matches ) ;
 #endif
 
     //> Get 3D matches
@@ -148,15 +160,14 @@ int Pipeline::get_Feature_Correspondences() {
     return Valid_Good_Matches_Index.size();
 }
 
-bool Pipeline::get_Relative_Pose() {
+bool Pipeline::track_Camera_Motion() {
 
-    //> Randomly pick 3 points from Num_Of_Good_Feature_Matches
-    unsigned Sample_Indices[3] = {0, 0, 0};
-    for (int i = 0; i < 3; i++) 
-        Sample_Indices[i] = utility_tool->Uniform_Random_Number_Generator<int>(0, Num_Of_Good_Feature_Matches-1);
-
-    
-    
+    if (Current_Frame->need_depth_grad) {
+        //> estimate camera relative pose with depth prior
+        Camera_Motion_Estimate->get_Relative_Pose(Current_Frame, Previous_Frame, true);
+    }
+    return true;
 }
+
 
 #endif

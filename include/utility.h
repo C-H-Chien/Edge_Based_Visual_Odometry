@@ -6,6 +6,7 @@
 #include <fstream>
 #include <iostream>
 #include <string.h>
+#include <random>
 #include <vector>
 #include <opencv2/features2d.hpp>
 #include <opencv2/core.hpp>
@@ -36,15 +37,40 @@ public:
     typedef std::shared_ptr<Utility> Ptr;
 
     Utility();
+    double get_Interpolated_Depth( Frame::Ptr Frame, cv::Point2d P );
+    double get_Interpolated_Gradient_Depth( Frame::Ptr Frame, cv::Point2d P, std::string grad_Direction );
     void get_dG_2D(cv::Mat &Gx_2d, cv::Mat &Gy_2d, int w, double sigma);
-    double Bilinear_Interpolation(Frame::Ptr Frame, cv::Point2d P);
     void Display_Feature_Correspondences(cv::Mat Img1, cv::Mat Img2, \
                                          std::vector<cv::KeyPoint> KeyPoint1, std::vector<cv::KeyPoint> KeyPoint2, \
                                          std::vector<cv::DMatch> Good_Matches );
     std::string cvMat_Type(int type);
 
+    template< typename T >
+    double Bilinear_Interpolation(cv::Mat meshGrid, cv::Point2d P) {
+
+    //> y2 Q12--------Q22
+    //      |          |
+    //      |    P     |
+    //      |          |
+    //  y1 Q11--------Q21
+    //      x1         x2
+    cv::Point2d Q12 (floor(P.x), floor(P.y));
+    cv::Point2d Q22 (ceil(P.x), floor(P.y));
+    cv::Point2d Q11 (floor(P.x), ceil(P.y));
+    cv::Point2d Q21 (ceil(P.x), ceil(P.y));
+
+    double f_x_y1 = ((Q21.x-P.x)/(Q21.x-Q11.x))*meshGrid.at< T >(Q11.y, Q11.x) + ((P.x-Q11.x)/(Q21.x-Q11.x))*meshGrid.at< T >(Q21.y, Q21.x);
+    double f_x_y2 = ((Q21.x-P.x)/(Q21.x-Q11.x))*meshGrid.at< T >(Q12.y, Q12.x) + ((P.x-Q11.x)/(Q21.x-Q11.x))*meshGrid.at< T >(Q22.y, Q22.x);
+    return ((Q12.y-P.y)/(Q12.y-Q11.y))*f_x_y1 + ((P.y-Q11.y)/(Q12.y-Q11.y))*f_x_y2;
+    }
+
     template<typename T>
-    T Uniform_Random_Number_Generator(T range_from, T range_to);
+    T Uniform_Random_Number_Generator(T range_from, T range_to) {
+        std::random_device                  rand_dev;
+        std::mt19937                        generator(rand_dev());
+        std::uniform_int_distribution<T>    distr(range_from, range_to);
+        return distr(generator);
+    }
 };
 
 #endif

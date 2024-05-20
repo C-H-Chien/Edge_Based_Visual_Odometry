@@ -15,13 +15,13 @@
 // main_VO: main function for LEMS VO pipeline
 //
 // ChangeLogs
-//    Chien  23-01-16    Initially built on top of Hongyi's LEMS Visual Odometry framework.
+//    Chien  24-01-16    Initially built on top of Hongyi's LEMS Visual Odometry framework.
 //
 //> (c) LEMS, Brown University
 //> Chiang-Heng Chien (chiang-heng_chien@brown.edu)
 // =======================================================================================================
 
-//> usage: sudo ./main_VO --config_file=../config/tum.yaml
+//> usage: (Under the bin file) sudo ./main_VO --config_file=../config/tum.yaml
 
 //> Define default values for the input argument
 DEFINE_string(config_file, "../config/tum.yaml", "config file path");
@@ -43,8 +43,10 @@ int main(int argc, char **argv) {
 		std::cerr << "File does not exist!" << std::endl;
 	}
 
+	bool use_GCC_filter = true;
+
 	//> Setup the dataset class pointer
-	Dataset::Ptr dataset_ = Dataset::Ptr(new Dataset(config_map));
+	Dataset::Ptr dataset_ = Dataset::Ptr(new Dataset(config_map, use_GCC_filter));
     CHECK_EQ(dataset_->Init_Fetch_Data(), true);
 	std::cout << "Total Number of Images in the Dataset Sequence: " << dataset_->Total_Num_Of_Imgs << std::endl;
 
@@ -63,6 +65,7 @@ int main(int argc, char **argv) {
 		bool success = vo_sys->Add_Frame(new_frame);
 		std::cout << "Number of SIFT Features: " << vo_sys->Num_Of_SIFT_Features << std::endl;
 	}
+	
 	
 	
 
