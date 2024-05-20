@@ -96,6 +96,7 @@ Frame::Ptr Dataset::get_Next_Frame() {
     
     //> Read the image
     std::string Current_Image_Path = Img_Path_List[Current_Frame_Index];
+    std::cout << "Image path: " << Current_Image_Path << std::endl;
     cv::Mat gray_Image = cv::imread(Current_Image_Path, cv::IMREAD_GRAYSCALE);
     if (gray_Image.data == nullptr) {
         std::cerr << "ERROR: Cannot find image at index " << Current_Frame_Index << std::endl;
@@ -107,6 +108,7 @@ Frame::Ptr Dataset::get_Next_Frame() {
     cv::Mat depth_Map;
     if (has_Depth) {
         std::string Current_Depth_Path = Depth_Path_List[Current_Frame_Index];
+        std::cout << "Depth path: " << Current_Depth_Path << std::endl;
         depth_Map = cv::imread(Current_Depth_Path, cv::IMREAD_ANYDEPTH);
         if (depth_Map.data == nullptr) {
             std::cerr << "ERROR: Cannot find depth map at index " << Current_Frame_Index << std::endl;

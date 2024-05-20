@@ -16,6 +16,7 @@
 #include <Eigen/Dense>
 
 #include "definitions.h"
+#include "Frame.h"
 
 // =====================================================================================================================
 // UTILITY_TOOLS: useful functions for debugging, writing data to files, displaying images, etc.
@@ -64,13 +65,18 @@ public:
     return ((Q12.y-P.y)/(Q12.y-Q11.y))*f_x_y1 + ((P.y-Q11.y)/(Q12.y-Q11.y))*f_x_y2;
     }
 
-    template<typename T>
-    T Uniform_Random_Number_Generator(T range_from, T range_to) {
-        std::random_device                  rand_dev;
-        std::mt19937                        generator(rand_dev());
-        std::uniform_int_distribution<T>    distr(range_from, range_to);
-        return distr(generator);
-    }
+    //template<typename T>
+    //T Uniform_Random_Number_Generator(T range_from, T range_to) {
+    // int Uniform_Random_Number_Generator(int range_from, int range_to) {
+    //     std::cout << "CP1" << std::endl;
+    //     std::random_device                                          rand_dev;
+    //     std::cout << "CP2" << std::endl;
+    //     std::mt19937                                                rng(rand_dev());
+    //     std::cout << "CP3" << std::endl;
+    //     std::uniform_int_distribution<std::mt19937::result_type>    distr(range_from, range_to);
+    //     std::cout << "CP4" << std::endl;
+    //     return distr(rng);
+    // }
 };
 
 #endif

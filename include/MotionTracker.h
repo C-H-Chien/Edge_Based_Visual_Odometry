@@ -48,6 +48,13 @@ public:
 
 private:
     
+    template<typename T>
+    T Uniform_Random_Number_Generator(T range_from, T range_to) {
+        std::random_device                                          rand_dev;
+        std::mt19937                                                rng(rand_dev());
+        std::uniform_int_distribution<std::mt19937::result_type>    distr(range_from, range_to);
+        return distr(rng);
+    }
 
     //> Pointers to the classes
     Utility::Ptr utility_tool = nullptr;

@@ -31,22 +31,28 @@ bool Pipeline::Add_Frame(Frame::Ptr frame) {
     //> Set the frame pointer
     Current_Frame = frame;
 
-    switch (status_) {
-        case PipelineStatus::STATUS_INITIALIZATION:
-            //> Initialization: extract SIFT features on the first frame
-            LOG_STATUS("STATUS_INITIALIZATION");
-            Num_Of_SIFT_Features = get_Features();
-            break;
-        case PipelineStatus::STATUS_GET_AND_MATCH_SIFT:
-            //> Extract and match SIFT features of the current frame with the previous frame
-            LOG_STATUS("STATUS_GET_AND_MATCH_SIFT");
-            Num_Of_SIFT_Features = get_Features();
-            Num_Of_Good_Feature_Matches = get_Feature_Correspondences();
-            break;
-        case PipelineStatus::STATUS_ESTIMATE_RELATIVE_POSE:
-            track_Camera_Motion();
-            break;
-    }
+    do {
+        switch (status_) {
+            case PipelineStatus::STATUS_INITIALIZATION:
+                //> Initialization: extract SIFT features on the first frame
+                LOG_STATUS("INITIALIZATION");
+                Num_Of_SIFT_Features = get_Features();
+                send_control_to_main = true;
+                break;
+            case PipelineStatus::STATUS_GET_AND_MATCH_SIFT:
+                //> Extract and match SIFT features of the current frame with the previous frame
+                LOG_STATUS("GET_AND_MATCH_SIFT");
+                Num_Of_SIFT_Features = get_Features();
+                Num_Of_Good_Feature_Matches = get_Feature_Correspondences();
+                send_control_to_main = false;
+                break;
+            case PipelineStatus::STATUS_ESTIMATE_RELATIVE_POSE:
+                LOG_STATUS("ESTIMATE_RELATIVE_POSE");
+                track_Camera_Motion();
+                send_control_to_main = true;
+                break;
+        }
+    } while ( !send_control_to_main );
 
     //> Swap the frame
     Previous_Frame = Current_Frame;
@@ -162,9 +168,10 @@ int Pipeline::get_Feature_Correspondences() {
 
 bool Pipeline::track_Camera_Motion() {
 
+    std::cout << "Need depth gradient? " << Current_Frame->need_depth_grad << std::endl;
     if (Current_Frame->need_depth_grad) {
         //> estimate camera relative pose with depth prior
-        Camera_Motion_Estimate->get_Relative_Pose(Current_Frame, Previous_Frame, true);
+        Camera_Motion_Estimate->get_Relative_Pose(Current_Frame, Previous_Frame, Num_Of_Good_Feature_Matches, true);
     }
     return true;
 }

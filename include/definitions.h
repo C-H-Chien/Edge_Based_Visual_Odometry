@@ -38,5 +38,7 @@
 #define GCC_PATCH_HALF_SIZE             (3)          //> 3 pixels for r(\gamma_0) map
 
 //> Print outs
-#define LOG_STATUS(status_)             printf("\033[1;35mSTATUS: %s\033[0m\n", std::string(status_).c_str());
-#define LOG_ERROR(err_msg)              printf("\033[1;31mERROR: %s\033[0m\n", std::string(err_msg).c_str() );
+#define LOG_STATUS(status_)             printf("\033[1;35m[STATUS] %s\033[0m\n", std::string(status_).c_str());
+#define LOG_ERROR(err_msg)              printf("\033[1;31m[ERROR] %s\033[0m\n", std::string(err_msg).c_str() );
+#define LOG_TEST(test_msg)              printf("\033[1;30m[TEST] %s\033[0m\n", std::string(test_msg).c_str())
+

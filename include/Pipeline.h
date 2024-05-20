@@ -50,6 +50,17 @@ public:
     //> get the pipeline status
     PipelineStatus get_Status() const { return status_; }
 
+    //> Print pipeline status
+    std::string print_Status() const {
+        if      (status_ == PipelineStatus::STATUS_INITIALIZATION)          return std::string("STATUS_INITIALIZATION");
+        else if (status_ == PipelineStatus::STATUS_GET_AND_MATCH_SIFT)      return std::string("STATUS_GET_AND_MATCH_SIFT");
+        else if (status_ == PipelineStatus::STATUS_ESTIMATE_RELATIVE_POSE)  return std::string("STATUS_ESTIMATE_RELATIVE_POSE");
+        LOG_ERROR("[Developer Error] Need to apend status string in print_Status() function!");
+    }
+
+    //> Interact with the main function
+    bool send_control_to_main = true;
+
     //> For now these member variables are used for dubugging purposes
     int Num_Of_SIFT_Features;
     int Num_Of_Good_Feature_Matches;
