@@ -49,34 +49,21 @@ public:
     template< typename T >
     double Bilinear_Interpolation(cv::Mat meshGrid, cv::Point2d P) {
 
-    //> y2 Q12--------Q22
-    //      |          |
-    //      |    P     |
-    //      |          |
-    //  y1 Q11--------Q21
-    //      x1         x2
-    cv::Point2d Q12 (floor(P.x), floor(P.y));
-    cv::Point2d Q22 (ceil(P.x), floor(P.y));
-    cv::Point2d Q11 (floor(P.x), ceil(P.y));
-    cv::Point2d Q21 (ceil(P.x), ceil(P.y));
+        //> y2 Q12--------Q22
+        //      |          |
+        //      |    P     |
+        //      |          |
+        //  y1 Q11--------Q21
+        //      x1         x2
+        cv::Point2d Q12 (floor(P.x), floor(P.y));
+        cv::Point2d Q22 (ceil(P.x), floor(P.y));
+        cv::Point2d Q11 (floor(P.x), ceil(P.y));
+        cv::Point2d Q21 (ceil(P.x), ceil(P.y));
 
-    double f_x_y1 = ((Q21.x-P.x)/(Q21.x-Q11.x))*meshGrid.at< T >(Q11.y, Q11.x) + ((P.x-Q11.x)/(Q21.x-Q11.x))*meshGrid.at< T >(Q21.y, Q21.x);
-    double f_x_y2 = ((Q21.x-P.x)/(Q21.x-Q11.x))*meshGrid.at< T >(Q12.y, Q12.x) + ((P.x-Q11.x)/(Q21.x-Q11.x))*meshGrid.at< T >(Q22.y, Q22.x);
-    return ((Q12.y-P.y)/(Q12.y-Q11.y))*f_x_y1 + ((P.y-Q11.y)/(Q12.y-Q11.y))*f_x_y2;
+        double f_x_y1 = ((Q21.x-P.x)/(Q21.x-Q11.x))*meshGrid.at< T >(Q11.y, Q11.x) + ((P.x-Q11.x)/(Q21.x-Q11.x))*meshGrid.at< T >(Q21.y, Q21.x);
+        double f_x_y2 = ((Q21.x-P.x)/(Q21.x-Q11.x))*meshGrid.at< T >(Q12.y, Q12.x) + ((P.x-Q11.x)/(Q21.x-Q11.x))*meshGrid.at< T >(Q22.y, Q22.x);
+        return ((Q12.y-P.y)/(Q12.y-Q11.y))*f_x_y1 + ((P.y-Q11.y)/(Q12.y-Q11.y))*f_x_y2;
     }
-
-    //template<typename T>
-    //T Uniform_Random_Number_Generator(T range_from, T range_to) {
-    // int Uniform_Random_Number_Generator(int range_from, int range_to) {
-    //     std::cout << "CP1" << std::endl;
-    //     std::random_device                                          rand_dev;
-    //     std::cout << "CP2" << std::endl;
-    //     std::mt19937                                                rng(rand_dev());
-    //     std::cout << "CP3" << std::endl;
-    //     std::uniform_int_distribution<std::mt19937::result_type>    distr(range_from, range_to);
-    //     std::cout << "CP4" << std::endl;
-    //     return distr(rng);
-    // }
 };
 
 #endif

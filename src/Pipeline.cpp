@@ -44,6 +44,7 @@ bool Pipeline::Add_Frame(Frame::Ptr frame) {
                 LOG_STATUS("GET_AND_MATCH_SIFT");
                 Num_Of_SIFT_Features = get_Features();
                 Num_Of_Good_Feature_Matches = get_Feature_Correspondences();
+                std::cout << "Number of good feature correspondences: " << Num_Of_Good_Feature_Matches << std::endl;
                 send_control_to_main = false;
                 break;
             case PipelineStatus::STATUS_ESTIMATE_RELATIVE_POSE:
@@ -119,25 +120,25 @@ int Pipeline::get_Feature_Correspondences() {
          || current_pt.x > (Current_Frame->Image.cols-1) || current_pt.y > (Current_Frame->Image.rows-1)) 
             continue;
 
-        double previous_depth = utility_tool->get_Interpolated_Depth(Previous_Frame, previous_pt);
-        double current_depth  = utility_tool->get_Interpolated_Depth(Current_Frame,  current_pt );
-
         Eigen::Vector3d Previous_Match_Location = {previous_pt.x, previous_pt.y, 1.0};
         Eigen::Vector3d Current_Match_Location = {current_pt.x, current_pt.y, 1.0};
-        Eigen::Vector3d Previous_Match_gamma = Previous_Frame->inv_K * Previous_Match_Location;
-        Eigen::Vector3d Current_Match_gamma = Current_Frame->inv_K * Current_Match_Location;
-
-        //> 2D-3D matches of the previous and current frames
-        Previous_Frame->SIFT_Match_Locations_Pixels.push_back(Previous_Match_Location);
-        Current_Frame->SIFT_Match_Locations_Pixels.push_back(Current_Match_Location);
-        Previous_Frame->Gamma.push_back(previous_depth * Previous_Match_gamma);
-        Current_Frame->Gamma.push_back(current_depth * Current_Match_gamma);
-
-        //> Push back indices of valid feature matches
-        Valid_Good_Matches_Index.push_back(std::make_pair(f.queryIdx, f.trainIdx));
 
         //> Calculate gradient depth at corresponding feature locations, if required
         if (Current_Frame->need_depth_grad) {
+
+            //> Check if the depth value is valid or not
+            if ( Previous_Frame->Depth.at<double>( round(previous_pt.y), round(previous_pt.x) ) - 0.0 < EPSILON ) 
+                continue;
+            
+            if ( Current_Frame->Depth.at<double>( round(current_pt.y), round(current_pt.x) ) - 0.0 < EPSILON ) 
+                continue;
+
+            double previous_depth = utility_tool->get_Interpolated_Depth(Previous_Frame, previous_pt);
+            double current_depth  = utility_tool->get_Interpolated_Depth(Current_Frame,  current_pt );
+
+            Eigen::Vector3d Previous_Match_gamma = Previous_Frame->inv_K * Previous_Match_Location;
+            Eigen::Vector3d Current_Match_gamma = Current_Frame->inv_K * Current_Match_Location;
+
             //> Current frame features
             double grad_x = utility_tool->get_Interpolated_Gradient_Depth( Current_Frame, current_pt, "xi" );
             double grad_y = utility_tool->get_Interpolated_Gradient_Depth( Current_Frame, current_pt, "eta" );
@@ -146,7 +147,17 @@ int Pipeline::get_Feature_Correspondences() {
             grad_x = utility_tool->get_Interpolated_Gradient_Depth( Previous_Frame, previous_pt, "xi" );
             grad_y = utility_tool->get_Interpolated_Gradient_Depth( Previous_Frame, previous_pt, "eta" );
             Previous_Frame->gradient_Depth_at_Features.push_back( std::make_pair(grad_x, grad_y) );
+
+            Previous_Frame->Gamma.push_back(previous_depth * Previous_Match_gamma);
+            Current_Frame->Gamma.push_back(current_depth * Current_Match_gamma);
         }
+
+        //> 2D-3D matches of the previous and current frames
+        Previous_Frame->SIFT_Match_Locations_Pixels.push_back(Previous_Match_Location);
+        Current_Frame->SIFT_Match_Locations_Pixels.push_back(Current_Match_Location);
+        
+        //> Push back indices of valid feature matches
+        Valid_Good_Matches_Index.push_back(std::make_pair(f.queryIdx, f.trainIdx));
     }
 
 #if OPENCV_DISPLAY_CORRESPONDENCES

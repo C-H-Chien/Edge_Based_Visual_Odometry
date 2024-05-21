@@ -64,12 +64,12 @@ void Utility::get_dG_2D(cv::Mat &Gx_2d, cv::Mat &Gy_2d, int w, double sigma) {
 }
 
 double Utility::get_Interpolated_Depth( Frame::Ptr Frame, cv::Point2d P ) {
-  return Bilinear_Interpolation< float >( Frame->Depth, P );
+  return Bilinear_Interpolation< double >( Frame->Depth, P );
 }
 
 double Utility::get_Interpolated_Gradient_Depth( Frame::Ptr Frame, cv::Point2d P, std::string grad_Direction ) {
-  if (grad_Direction == "xi")       return Bilinear_Interpolation< float >( Frame->grad_Depth_xi,  P );
-  else if (grad_Direction == "eta") return Bilinear_Interpolation< float >( Frame->grad_Depth_eta, P );
+  if (grad_Direction == "xi")       return Bilinear_Interpolation< double >( Frame->grad_Depth_xi,  P );
+  else if (grad_Direction == "eta") return Bilinear_Interpolation< double >( Frame->grad_Depth_eta, P );
   else {
     LOG_ERROR("Invalid gradient direction tag at uitlity::get_Interpolated_Gradient_Depth function!");
     return 0.0;

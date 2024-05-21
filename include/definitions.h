@@ -1,6 +1,6 @@
 //> Macro definitions
 
-#define REPO_PATH                       std::string("/home/chchien/BrownU/research/LEMS_VO_SLAM/Chien_Version/")
+#define REPO_PATH                       std::string("/home/chchien/BrownU/research/LEMS_VO_SLAM/")
 #define OUTPUT_WRITE_PATH               std::string("Output_Results/")
 #define OUTPUT_DATA_TYPE                std::string("TUM")  //> Either TUM or KITTI
 
@@ -9,6 +9,7 @@
 
 //> Generic definitions
 #define RANSAC_NUM_OF_ITERATIONS        (1)
+#define EPSILON                         (1e-12)
 
 //> Geometric Depth Consistency
 #define TOP_N_RANK_ORDERED_LIST         (100)
@@ -38,7 +39,9 @@
 #define GCC_PATCH_HALF_SIZE             (3)          //> 3 pixels for r(\gamma_0) map
 
 //> Print outs
+#define LOG_INFO(info_msg)              printf("\033[1;32m[INFO] %s\033[0m\n", std::string(info_msg).c_str());
 #define LOG_STATUS(status_)             printf("\033[1;35m[STATUS] %s\033[0m\n", std::string(status_).c_str());
 #define LOG_ERROR(err_msg)              printf("\033[1;31m[ERROR] %s\033[0m\n", std::string(err_msg).c_str() );
-#define LOG_TEST(test_msg)              printf("\033[1;30m[TEST] %s\033[0m\n", std::string(test_msg).c_str())
+#define LOG_TEST(test_msg)              printf("\033[1;30m[TEST] %s\033[0m\n", std::string(test_msg).c_str());
+#define LOG_FILE_ERROR(err_msg)         printf("\033[1;31m[ERROR] File %s not found!\033[0m\n", std::string(err_msg).c_str() );
 
