@@ -25,24 +25,41 @@ bool MotionTracker::get_Relative_Pose( Frame::Ptr Curr_Frame, Frame::Ptr Prev_Fr
 
     //> RANSAC loop
     for (unsigned iter = 0; iter < RANSAC_NUM_OF_ITERATIONS; iter++) {
+        
         //> 1) Hypothesis formulation
-        //> Randomly pick 3 points from Num_Of_Good_Feature_Matches passed by Pipeline.cpp
         int Sample_Indices[3] = {0, 0, 0};
-        for (int i = 0; i < 3; i++) {
-            //int index = utility_tool->Uniform_Random_Number_Generator<int>(0, Num_Of_Good_Feature_Matches-1);
-            Sample_Indices[i] = Uniform_Random_Number_Generator< int >(0, Num_Of_Good_Feature_Matches-1);
-        }
-
+        do {
+            //> Randomly pick 3 points from Num_Of_Good_Feature_Matches passed by Pipeline.cpp
+            for (int i = 0; i < 3; i++) {
+                //int index = utility_tool->Uniform_Random_Number_Generator<int>(0, Num_Of_Good_Feature_Matches-1);
+                Sample_Indices[i] = Uniform_Random_Number_Generator< int >(0, Num_Of_Good_Feature_Matches-1);
+            }
+        while ( (Sample_Indices[0] != Sample_Indices[1]) && (Sample_Indices[0] != Sample_Indices[2]) && (Sample_Indices[1] != Sample_Indices[2]) )
+        
         if (use_GCC_filter) {
             double gcc_dist_forward, gcc_dist_backward;
-            //> Make Sample_Indices[0] as the anchor index and the other two as picked index
+           
+            //> GCC 1st round: make Sample_Indices[0] as the anchor index and the *second* as the picked index
             gcc_dist_forward  = get_GCC_dist( Curr_Frame, Prev_Frame, Sample_Indices[0], Sample_Indices[1] );
             gcc_dist_backward = get_GCC_dist( Prev_Frame, Curr_Frame, Sample_Indices[0], Sample_Indices[1] );
+
+            if (gcc_dist_forward < GCC_2D_THRESH && gcc_dist_backward < GCC_2D_THRESH) {
+                //> GCC 2nd round: make Sample_Indices[0] as the anchor index and the *third* as the picked index
+                gcc_dist_forward  = get_GCC_dist( Curr_Frame, Prev_Frame, Sample_Indices[0], Sample_Indices[2] );
+                gcc_dist_backward = get_GCC_dist( Prev_Frame, Curr_Frame, Sample_Indices[0], Sample_Indices[2] );
+
+                if (gcc_dist_forward < GCC_2D_THRESH && gcc_dist_backward < GCC_2D_THRESH) {}
+                else {
+                    continue;
+                }
+            }
+            else {
+                continue;
+            }
         }
         
-        
         //> 2) Hypothesis support measurement
-
+        
     }
     
 

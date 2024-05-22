@@ -11,8 +11,8 @@
 #define RANSAC_NUM_OF_ITERATIONS        (1)
 #define EPSILON                         (1e-12)
 
-//> Geometric Depth Consistency
-#define TOP_N_RANK_ORDERED_LIST         (100)
+//> Geometric Correspondence Consistency
+#define GCC_2D_THRESH                   (3)     //> pixels
 
 #define DEPTH_GRAD_GAUSSIAN_SIGMA       (3)
 #define GAUSSIAN_KERNEL_WINDOW_LENGTH   (2*4*DEPTH_GRAD_GAUSSIAN_SIGMA+1)
