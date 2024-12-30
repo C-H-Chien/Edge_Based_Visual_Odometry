@@ -38,7 +38,7 @@ struct less_than_Eucl_Dist {
 class Pipeline {
 
 public:
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+    //EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
     typedef std::shared_ptr<Pipeline> Ptr;
 
     //> Constructor (nothing special)

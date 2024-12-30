@@ -175,14 +175,24 @@ int Pipeline::get_Feature_Correspondences() {
     status_ = PipelineStatus::STATUS_ESTIMATE_RELATIVE_POSE;
 
     return Valid_Good_Matches_Index.size();
-}
+} //> End of get_Feature_Correspondences
 
 bool Pipeline::track_Camera_Motion() {
 
-    std::cout << "Need depth gradient? " << Current_Frame->need_depth_grad << std::endl;
+    // std::cout << "Need depth gradient? " << Current_Frame->need_depth_grad << std::endl;
+    Camera_Motion_Estimate = std::shared_ptr<MotionTracker>(new MotionTracker());
     if (Current_Frame->need_depth_grad) {
-        //> estimate camera relative pose with depth prior
-        Camera_Motion_Estimate->get_Relative_Pose(Current_Frame, Previous_Frame, Num_Of_Good_Feature_Matches, true);
+
+        //> Estimate camera relative pose with depth prior
+        Camera_Motion_Estimate->get_Relative_Pose_from_RANSAC(Current_Frame, Previous_Frame, Num_Of_Good_Feature_Matches, true);
+
+        std::cout << "GDC-RANSAC Estimation:" << std::endl;
+        std::cout << "- Rotation:" << std::endl;
+        std::cout << Camera_Motion_Estimate->Final_Rel_Rot << std::endl;
+        std::cout << "- Translation:" << std::endl;
+        std::cout << Camera_Motion_Estimate->Final_Rel_Transl << std::endl;
+        double inlier_ratio = (double)(Camera_Motion_Estimate->Final_Num_Of_Inlier_Support) / (double)(Num_Of_Good_Feature_Matches);
+        std::cout << "Number of Supporting Inliers:" << Camera_Motion_Estimate->Final_Num_Of_Inlier_Support << "(" << inlier_ratio << "%)" << std::endl;
     }
     return true;
 }

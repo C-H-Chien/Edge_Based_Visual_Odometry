@@ -56,7 +56,7 @@ public:
     
     std::vector<cv::KeyPoint> SIFT_Locations;               //> a list of SIFT feature locations, used for matching
     cv::Mat SIFT_Descriptors;                               //> a list of SIFT feature descriptors used for matching
-    std::vector<Eigen::Vector3d> SIFT_Match_Locations_Pixels;    //> a list of SIFT homogeneous locations in pixels
+    std::vector<Eigen::Vector3d> SIFT_Match_Locations_Pixels;    //> a list of SIFT homogeneous locations in pixels. Indices are aligned with the 3D-2D correspondences.
     std::vector<bool> is_SIFT_Outlier;              //> whether the corresponding SIFT list index is an outlier or not
     std::vector<Eigen::Vector3d> Gamma;             //> 3D points arise from the depth map
 

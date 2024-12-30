@@ -35,16 +35,32 @@ public:
     //> 
 
     /**
-     * Estimate relative poses
-     * @return true if success
+     * Estimate relative poses in a RANSAC scheme
+     * @return None
      */
-    bool get_Relative_Pose( Frame::Ptr Curr_Frame, Frame::Ptr Prev_Frame, int Num_Of_Good_Feature_Matches, bool use_GCC_filter = false );
+    void get_Relative_Pose_from_RANSAC( Frame::Ptr Curr_Frame, Frame::Ptr Prev_Frame, int Num_Of_Good_Feature_Matches, bool use_GCC_filter = false );
+
+    /**
+     * Estimate relative rotation and translation from 3 points
+     * @return None
+     */
+    void get_Relative_Pose_by_Three_Points_Alignment( Frame::Ptr Curr_Frame, Frame::Ptr Prev_Frame, int Sample_Indices[3] );
 
     /**
      * Geometric Correspondence Consistency (GCC) filter acting in the observation space
      * @return d as distance from point to curve in pixels
      */
     double get_GCC_dist( Frame::Ptr Curr_Frame, Frame::Ptr Prev_Frame, int anchor_index, int picked_index );
+
+    /**
+     * Verify Pose Hypothesis by reprojecting 3D points from previous frame to current frame
+     * @return Number of inliers supporting the pose hypothesis
+     */
+    int get_Hypothesis_Support_Reproject_from_3D_Points( Frame::Ptr Curr_Frame, Frame::Ptr Prev_Frame );
+
+    Eigen::Matrix3d Final_Rel_Rot;
+    Eigen::Vector3d Final_Rel_Transl;    
+    int Final_Num_Of_Inlier_Support;
 
 private:
     
@@ -58,6 +74,9 @@ private:
 
     //> Pointers to the classes
     Utility::Ptr utility_tool = nullptr;
+
+    Eigen::Matrix3d Estimated_Rel_Rot;
+    Eigen::Vector3d Estimated_Rel_Transl;
 };
 
 

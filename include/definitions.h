@@ -8,11 +8,12 @@
 #define ASSOCIATION_FILE_NAME           std::string("associate.txt")
 
 //> Generic definitions
-#define RANSAC_NUM_OF_ITERATIONS        (1)
+#define RANSAC_NUM_OF_ITERATIONS        (500)
 #define EPSILON                         (1e-12)
+#define REPROJ_ERROR_THRESH             (2)         //> in pixels
 
 //> Geometric Correspondence Consistency
-#define GCC_2D_THRESH                   (3)     //> pixels
+#define GCC_2D_THRESH                   (1)     //> pixels
 
 #define DEPTH_GRAD_GAUSSIAN_SIGMA       (3)
 #define GAUSSIAN_KERNEL_WINDOW_LENGTH   (2*4*DEPTH_GRAD_GAUSSIAN_SIGMA+1)

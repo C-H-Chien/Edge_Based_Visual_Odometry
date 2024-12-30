@@ -5,7 +5,7 @@ This repository is still under development.
 ## Dependencies
 * Eigen 3.X
 * OpenCV 4.X
-* yaml-cpp (see its [official page](https://github.com/jbeder/yaml-cpp))
+* [yaml-cpp](https://github.com/jbeder/yaml-cpp) (used to parse data from the dataset config file)
 * glog
 * gflags
 
@@ -23,7 +23,7 @@ Under the ``bin`` folder, do
 ```bash
 ./main_VO --config_file=../config/tum.yaml
 ```
-where the configuration file can be customized. See ``.yaml`` files under the ``config`` folder for more information.
+where the configuration file can be customized depending on the dataset in use. See ``.yaml`` files under the ``config`` folder for more information. If no ``--config_file`` input argument is given, the default value will be used which is defined in ``cmd/main_VO.cpp``.
 
 ## Functionalities
 Relative pose estimation from a RGB-D sequence, with geometric correspondence consistency (GCC) filter to speedup and stablize the RANSAC process.
