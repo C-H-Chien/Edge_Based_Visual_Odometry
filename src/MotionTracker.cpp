@@ -47,29 +47,6 @@ void MotionTracker::get_Relative_Pose_from_RANSAC(
         }
         while ( (Sample_Indices[0] == Sample_Indices[1]) && (Sample_Indices[0] == Sample_Indices[2]) && (Sample_Indices[1] == Sample_Indices[2]) );
 
-        if (use_GCC_filter) {
-            double gcc_dist_forward, gcc_dist_backward;
-           
-            //> GCC 1st round: make Sample_Indices[0] as the anchor index and the *second* as the picked index
-            gcc_dist_forward  = get_GCC_dist( Curr_Frame, Prev_Frame, Sample_Indices[0], Sample_Indices[1] );
-            gcc_dist_backward = get_GCC_dist( Prev_Frame, Curr_Frame, Sample_Indices[0], Sample_Indices[1] );
-
-            if (gcc_dist_forward < GCC_2D_THRESH && gcc_dist_backward < GCC_2D_THRESH) {
-                //> GCC 2nd round: make Sample_Indices[0] as the anchor index and the *third* as the picked index
-                gcc_dist_forward  = get_GCC_dist( Curr_Frame, Prev_Frame, Sample_Indices[0], Sample_Indices[2] );
-                gcc_dist_backward = get_GCC_dist( Prev_Frame, Curr_Frame, Sample_Indices[0], Sample_Indices[2] );
-
-                //> When anchor point to the second and third picked points both satisfy GCC constraint, go to hypothesis support measurement
-                if (gcc_dist_forward < GCC_2D_THRESH && gcc_dist_backward < GCC_2D_THRESH) {}
-                else {
-                    continue;
-                }
-            }
-            else {
-                continue;
-            }
-        }
-
         //> Estimate relative rotation (Rel_Rot) and translation (Rel_Transl) by aligning two point clouds
         get_Relative_Pose_by_Three_Points_Alignment( Curr_Frame, Prev_Frame, Sample_Indices );
         
@@ -82,26 +59,6 @@ void MotionTracker::get_Relative_Pose_from_RANSAC(
             Max_Num_of_Inlier_Support   = Num_Of_Inlier_Support;
         }
     }
-}
-
-double MotionTracker::get_GCC_dist( Frame::Ptr Curr_Frame, Frame::Ptr Prev_Frame, int anchor_index, int picked_index ) {
-
-    //> View 1 is previous frame, view 2 is current frame
-    double phi_view1 = (Prev_Frame->Gamma[ anchor_index ] - Prev_Frame->Gamma[ picked_index ]).norm();
-    double phi_view2 = (Curr_Frame->Gamma[ anchor_index ] - Curr_Frame->Gamma[ picked_index ]).norm();
-    Eigen::Vector3d gamma_view2   = Prev_Frame->inv_K * Curr_Frame->SIFT_Match_Locations_Pixels[ picked_index ];
-    Eigen::Vector3d gamma_0_view2 = Prev_Frame->inv_K * Curr_Frame->SIFT_Match_Locations_Pixels[ anchor_index ];
-
-    double rho_0 = (Curr_Frame->Gamma[ anchor_index ])(2);
-    double rho_p = (Curr_Frame->Gamma[ picked_index ])(2);
-
-    double gradient_phi_xi  = 2*(rho_p*(gamma_view2.norm()*gamma_view2.norm()) + rho_0*(gamma_view2.dot(gamma_0_view2))) * Curr_Frame->gradient_Depth_at_Features[ picked_index ].first \
-                            + 2*rho_p*( (1.0/Curr_Frame->K(0,0))*(rho_p*gamma_view2(0) - rho_0*gamma_0_view2(0)) );
-    double gradient_phi_eta = 2*(rho_p*(gamma_view2.norm()*gamma_view2.norm()) + rho_0*(gamma_view2.dot(gamma_0_view2))) * Curr_Frame->gradient_Depth_at_Features[ picked_index ].second \
-                            + 2*rho_p*( (1.0/Curr_Frame->K(1,1))*(rho_p*gamma_view2(1) - rho_0*gamma_0_view2(1)) );
-
-    double gradient_phi = sqrt(gradient_phi_xi*gradient_phi_xi + gradient_phi_eta*gradient_phi_eta);
-    return fabs(phi_view1 - phi_view2) / gradient_phi;
 }
 
 void MotionTracker::get_Relative_Pose_by_Three_Points_Alignment( Frame::Ptr Curr_Frame, Frame::Ptr Prev_Frame, int Sample_Indices[3] ) {

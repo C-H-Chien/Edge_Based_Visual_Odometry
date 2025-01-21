@@ -47,12 +47,6 @@ public:
     void get_Relative_Pose_by_Three_Points_Alignment( Frame::Ptr Curr_Frame, Frame::Ptr Prev_Frame, int Sample_Indices[3] );
 
     /**
-     * Geometric Correspondence Consistency (GCC) filter acting in the observation space
-     * @return d as distance from point to curve in pixels
-     */
-    double get_GCC_dist( Frame::Ptr Curr_Frame, Frame::Ptr Prev_Frame, int anchor_index, int picked_index );
-
-    /**
      * Verify Pose Hypothesis by reprojecting 3D points from previous frame to current frame
      * @return Number of inliers supporting the pose hypothesis
      */
