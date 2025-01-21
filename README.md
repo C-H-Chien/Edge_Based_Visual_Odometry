@@ -6,7 +6,7 @@ This repository is an internal research project at LEMS lab, Brown University. I
 * Eigen 3.X or beyond
 * OpenCV 4.X with opencv_contrib (feature detection and matching depends on opencv_contrib)
 * [yaml-cpp](https://github.com/jbeder/yaml-cpp) (used to parse data from the dataset config file)
-* glog (Optional; if not used, comment the [macro definition](https://github.com/C-H-Chien/Edge_Based_Visual_Odometry/blob/55bb7cba10cef12bf177b05b091fd6ddb47415e2/include/definitions.h#L2) in ``include/definitions.h`` or set it as false, and the ``find_package`` in the ``CMakeLists.txt`` file.)
+* glog (Optional; if not used, comment the [macro definition](https://github.com/C-H-Chien/Edge_Based_Visual_Odometry/blob/main/include/definitions.h#L2) in ``include/definitions.h`` or set it as false, and the ``find_package`` in the ``CMakeLists.txt`` file.)
 
 ## Build and Compile
 Follow the standard build and compilation, namely, 
