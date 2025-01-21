@@ -186,7 +186,7 @@ bool Pipeline::track_Camera_Motion() {
         //> Estimate camera relative pose with depth prior
         Camera_Motion_Estimate->get_Relative_Pose_from_RANSAC(Current_Frame, Previous_Frame, Num_Of_Good_Feature_Matches, true);
 
-        std::cout << "GDC-RANSAC Estimation:" << std::endl;
+        std::cout << "RANSAC Estimation:" << std::endl;
         std::cout << "- Rotation:" << std::endl;
         std::cout << Camera_Motion_Estimate->Final_Rel_Rot << std::endl;
         std::cout << "- Translation:" << std::endl;
