@@ -26,9 +26,6 @@ FIND_PACKAGE(CSparse REQUIRED)
 
 #> If you have ceres installed, you already have the following dependencies
 FIND_PACKAGE(Glog REQUIRED)
-FIND_PACKAGE(Glog REQUIRED)
-#FIND_PACKAGE(GTest REQUIRED)
-FIND_PACKAGE(GFlags REQUIRED)
 FIND_PACKAGE(CSparse REQUIRED)
 FIND_PACKAGE(yaml-cpp REQUIRED)
 
