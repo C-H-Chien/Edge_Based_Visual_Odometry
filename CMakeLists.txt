@@ -22,7 +22,7 @@ FIND_PACKAGE(Eigen3 REQUIRED)
 FIND_PACKAGE(OpenCV REQUIRED)
 FIND_PACKAGE(Ceres REQUIRED)
 FIND_PACKAGE(OpenMP REQUIRED)
-FIND_PACKAGE(CSparse REQUIRED)
+#FIND_PACKAGE(CSparse REQUIRED)
 
 #> If you have ceres installed, you already have the following dependencies
 FIND_PACKAGE(Glog REQUIRED)
@@ -53,7 +53,7 @@ set(THIRD_PARTY_LIBS
         ${GFLAGS_LIBRARIES}
         pthread
         ${CSPARSE_LIBRARY}
-        /usr/local/lib/libyaml-cpp.so
+        /usr/local/lib/libyaml-cpp.so 
         )
 
 enable_testing()
