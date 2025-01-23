@@ -377,7 +377,7 @@ int main(int argc, char **argv) {
     std::cout << Rel_Transl << std::endl;
 
     //> [TEST] GDC constraint computation
-    std::string test_data_path = "/home/chchien/BrownU/research/LEMS_VO_SLAM/test/test_data/";
+    std::string test_data_path = "../test/test_data/";
     test_Data_Reader data_reader(test_data_path);
     data_reader.read_3D_and_2D_point_correspondences();
     data_reader.read_gradient_rhos();
