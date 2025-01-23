@@ -56,6 +56,7 @@ public:
         else if (status_ == PipelineStatus::STATUS_GET_AND_MATCH_SIFT)      return std::string("STATUS_GET_AND_MATCH_SIFT");
         else if (status_ == PipelineStatus::STATUS_ESTIMATE_RELATIVE_POSE)  return std::string("STATUS_ESTIMATE_RELATIVE_POSE");
         LOG_ERROR("[Developer Error] Need to apend status string in print_Status() function!");
+        return std::string("STATUS_UNKNOWN");
     }
 
     //> Interact with the main function

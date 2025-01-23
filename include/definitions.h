@@ -1,7 +1,7 @@
 //> Macro definitions
 #define USE_GLOGS                       (false)
 
-#define REPO_PATH                       std::string("/home/chchien/BrownU/research/Edge_Based_Visual_Odometry/")
+#define REPO_PATH                       std::string("/Users/saulll./Desktop/Edge-Based Visual Odometry/")
 #define OUTPUT_WRITE_PATH               std::string("Output_Results/")
 #define OUTPUT_DATA_TYPE                std::string("TUM")  //> Either TUM or KITTI
 
@@ -23,6 +23,9 @@
 #define OPENCV_DISPLAY_FEATURES         (false)
 #define OPENCV_DISPLAY_CORRESPONDENCES  (false)
 
+#define ACTIVATE_GCC (true)
+#define GCC_PATCH_HALF_SIZE (3)
+
 //> SIFT parameters
 #define SIFT_NFEATURES                  (0)
 #define SIFT_NOCTAVE_LAYERS             (4)
@@ -32,9 +35,6 @@
 
 #define LOWES_RATIO                     (0.8)        //> Suggested in Lowe's paper
 #define K_IN_KNN_MATCHING               (2)
-
-#define ACTIVATE_GCC                    (true)
-#define GCC_PATCH_HALF_SIZE             (3)          //> 3 pixels for r(\gamma_0) map
 
 //> Print outs
 #define LOG_INFO(info_msg)              printf("\033[1;32m[INFO] %s\033[0m\n", std::string(info_msg).c_str());

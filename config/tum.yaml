@@ -1,6 +1,6 @@
 %YAML:1.0
 #> Dataset
-dataset_dir: /home/chchien/datasets/TUM-RGBD/
+dataset_dir: /Users/saulll./Desktop/Edge-Based Visual Odometry/datasets/TUM-RGBD/
 sequence_name: rgbd_dataset_freiburg1_desk/
 dataset_type: tum
 

@@ -22,7 +22,7 @@ FIND_PACKAGE(Eigen3 REQUIRED)
 FIND_PACKAGE(OpenCV REQUIRED)
 FIND_PACKAGE(Ceres REQUIRED)
 FIND_PACKAGE(OpenMP REQUIRED)
-#FIND_PACKAGE(CSparse REQUIRED)
+FIND_PACKAGE(CSparse REQUIRED)
 
 #> If you have ceres installed, you already have the following dependencies
 FIND_PACKAGE(Glog REQUIRED)
@@ -47,13 +47,14 @@ set(THIRD_PARTY_LIBS
         ${OpenCV_LIBS}
         ${Eigen_LIBS}
         ${Sophus_LIBRARIES}
-        ${Pangolin_LIBRARIES} GL GLU GLEW
+        #${Pangolin_LIBRARIES} GL GLU GLEW (FOR LINUX)
+        ${Pangolin_LIBRARIES} "-framework OpenGL" "-framework GLUT" ${GLEW_LIBRARIES} #(FOR MACOS)
         #${GTEST_BOTH_LIBRARIES}
         ${GLOG_LIBRARIES}
         ${GFLAGS_LIBRARIES}
         pthread
-        ${CSPARSE_LIBRARY}
-        /usr/local/lib/libyaml-cpp.so 
+        ${CSparse_LIBRARY}
+        /usr/local/lib/libyaml-cpp.so
         )
 
 enable_testing()
