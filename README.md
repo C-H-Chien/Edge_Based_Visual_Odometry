@@ -30,7 +30,7 @@ where the configuration file can be customized depending on the dataset in use. 
 There is also a ``./test_functions`` executive file which runs the ``test/test_functions.cpp`` and is used to test and verify some functionalities of the C++ implementation.
 
 ## Notes
-Make sure that the path of your YAML-CPP header files matches the path in the ``CMakeLists.txt``. See this line.
+Make sure that the path of your YAML-CPP header files matches the path in the ``CMakeLists.txt``. See [this line](https://github.com/C-H-Chien/Edge_Based_Visual_Odometry/blob/main/CMakeLists.txt#L43).
 
 ## Authors
 Saul Lopez Lucas (saul_lopez_lucas@brown.edu) <br />

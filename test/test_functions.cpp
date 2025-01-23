@@ -291,7 +291,7 @@ int main(int argc, char **argv) {
 
     //> [TEST] Depth map
     cv::Mat depth_Map;
-    std::string Current_Depth_Path = std::string("/Users/saulll./Desktop/Edge-Based Visual Odometry/datasets/TUM-RGBD/rgbd_dataset_freiburg1_desk/depth/1305031453.374112.png");
+    std::string Current_Depth_Path = std::string("/home/chchien/datasets/TUM-RGBD/rgbd_dataset_freiburg1_desk/depth/1305031453.374112.png");
     depth_Map = cv::imread(Current_Depth_Path, cv::IMREAD_ANYDEPTH);
     if (depth_Map.data == nullptr) std::cerr << "ERROR: Cannot find depth map " << Current_Depth_Path << std::endl;
     //> Scale down by the factor of 5000 (according to the TUM-RGBD dataset)
@@ -377,7 +377,7 @@ int main(int argc, char **argv) {
     std::cout << Rel_Transl << std::endl;
 
     //> [TEST] GDC constraint computation
-    std::string test_data_path = "/home/chchien/BrownU/research/LEMS_VO_SLAM/test/test_data/";
+    std::string test_data_path = "../test/test_data/";
     test_Data_Reader data_reader(test_data_path);
     data_reader.read_3D_and_2D_point_correspondences();
     data_reader.read_gradient_rhos();
