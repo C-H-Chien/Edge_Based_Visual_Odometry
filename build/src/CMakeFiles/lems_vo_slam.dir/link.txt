@@ -1,2 +1,0 @@
-/usr/bin/ar qc liblems_vo_slam.a CMakeFiles/lems_vo_slam.dir/Frame.cpp.o CMakeFiles/lems_vo_slam.dir/Dataset.cpp.o CMakeFiles/lems_vo_slam.dir/Pipeline.cpp.o CMakeFiles/lems_vo_slam.dir/utility.cpp.o CMakeFiles/lems_vo_slam.dir/MotionTracker.cpp.o
-/usr/bin/ranlib liblems_vo_slam.a
