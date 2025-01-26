@@ -48,6 +48,7 @@ private:
     std::string Dataset_Path;
     std::string Sequence_Name;
     Eigen::Matrix3d Calib;
+    // Make rotation and translation in eigen format matrix 3d???
     Eigen::Matrix3d Inverse_Calib;
     bool has_Depth;
 

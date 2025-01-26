@@ -94,6 +94,9 @@ int main(int argc, char **argv) {
     CHECK_EQ(dataset_->Init_Fetch_Data(), true);
 	std::cout << "Total Number of Images in the Dataset Sequence: " << dataset_->Total_Num_Of_Imgs << std::endl;
 
+	//INCLUDE EDGE DETECTION AND UNDISTORTION HERE!
+	
+
 	//> Pointers to the classes
 	Frame::Ptr new_frame;
 	Pipeline::Ptr vo_sys = Pipeline::Ptr(new Pipeline);
