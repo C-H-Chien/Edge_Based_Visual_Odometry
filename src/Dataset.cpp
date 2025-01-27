@@ -91,7 +91,7 @@ Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(confi
     }
 }
 void Dataset::PrintDatasetInfo() {
-        // Showing parsed data
+        // Show parsed data
     std::cout << "Cam0 Resolution: " << cam0_resolution[0] << "x" << cam0_resolution[1] << std::endl;
     std::cout << "Cam0 Intrinsics: ";
     for (const auto& value : cam0_intrinsics) std::cout << value << " ";
@@ -114,32 +114,6 @@ void Dataset::PrintDatasetInfo() {
     std::cout << std::endl;
 }
 
-// void Dataset::CheckImageLoading() {
-//     // Build the complete path to first image
-//     std::string cam0_image_path = Dataset_Path + "/" + Sequence_Name + "/mav0/cam0/data/1403715273262142976.png"; 
-//     std::string cam1_image_path = Dataset_Path + "/" + Sequence_Name + "/mav0/cam1/data/1403715273262142976.png";
-
-//     // Load images using OpenCV
-//     cv::Mat cam0_img = cv::imread(cam0_image_path, cv::IMREAD_GRAYSCALE);
-//     cv::Mat cam1_img = cv::imread(cam1_image_path, cv::IMREAD_GRAYSCALE);
-
-//     if (cam0_img.empty()) {
-//         std::cerr << "Error: Failed to load the first image from cam0 at " << cam0_image_path << std::endl;
-//     } else {
-//         std::cout << "Successfully loaded the first image from cam0: " << cam0_image_path << std::endl;
-//         cv::imshow("Cam0 Image", cam0_img);
-//     }
-
-//     if (cam1_img.empty()) {
-//         std::cerr << "Error: Failed to load the first image from cam1 at " << cam1_image_path << std::endl;
-//     } else {
-//         std::cout << "Successfully loaded the first image from cam1: " << cam1_image_path << std::endl;
-//         cv::imshow("Cam1 Image", cam1_img);
-//     }
-
-//     cv::waitKey(0); 
-// }
-
 void Dataset::DetectEdges(int num_images) {
     std::string cam0_path = Dataset_Path + "/" + Sequence_Name + "/mav0/cam0/data/";
     std::string cam1_path = Dataset_Path + "/" + Sequence_Name + "/mav0/cam1/data/";
@@ -153,9 +127,14 @@ void Dataset::DetectEdges(int num_images) {
 
     std::vector<std::string> image_filenames;
     std::string line;
+    bool first_line = true;
 
     // Read the CSV file
     while (std::getline(csv_file, line) && image_filenames.size() < num_images) {
+        if (first_line){
+            first_line = false;
+            continue;
+        }
         std::istringstream line_stream(line);
         std::string timestamp;
         std::getline(line_stream, timestamp, ',');
@@ -183,17 +162,16 @@ void Dataset::DetectEdges(int num_images) {
         cv::Canny(cam1_img, cam1_edges, 50, 150);
 
         // Show edges
-        cv::imshow("Cam0 Edges - " + filename, cam0_edges);
-        cv::imshow("Cam1 Edges - " + filename, cam1_edges);
+        cv::imshow("Left Camera Edges - " + filename, cam0_edges);
+        cv::imshow("Right Camera Edges - " + filename, cam1_edges);
 
         // Save results
-        cv::imwrite("cam0_edges_" + filename, cam0_edges);
-        cv::imwrite("cam1_edges_" + filename, cam1_edges);
+        // cv::imwrite("left_cam_edges_" + filename, cam0_edges);
+        // cv::imwrite("right_cam_edges_" + filename, cam1_edges);
 
         cv::waitKey(0);
     }
 }
-
 
 // bool Dataset::Init_Fetch_Data() {
 

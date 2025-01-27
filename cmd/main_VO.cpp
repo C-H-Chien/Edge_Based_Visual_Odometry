@@ -92,7 +92,6 @@ int main(int argc, char **argv) {
 	Dataset::Ptr dataset_ = Dataset::Ptr(new Dataset(config_map, use_GCC_filter));
 
 	dataset_->PrintDatasetInfo();
-	// dataset_->CheckImageLoading();
 	dataset_->DetectEdges(5);
 
 	//TODO:

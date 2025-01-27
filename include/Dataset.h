@@ -33,8 +33,9 @@ public:
     Dataset(YAML::Node, bool);
 
     void PrintDatasetInfo();
-    // void CheckImageLoading();
     void DetectEdges(int num_images);
+    void UndistortEdgePoints(const cv::Mat& edgeImage, const std::vector<double>& intrinsics, 
+                         const std::vector<double>& distCoeffs, cv::Mat& undistortedPoints);
     // bool Init_Fetch_Data();
     // Frame::Ptr get_Next_Frame();
 
