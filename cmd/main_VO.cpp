@@ -90,16 +90,21 @@ int main(int argc, char **argv) {
 	bool use_GCC_filter = true;
 
 	Dataset::Ptr dataset_ = Dataset::Ptr(new Dataset(config_map, use_GCC_filter));
-	
+
 	dataset_->PrintDatasetInfo();
+	// dataset_->CheckImageLoading();
+	dataset_->DetectEdges();
+
+	//TODO:
+		//1) Make sure you're able to access cam0's images and cam1's images
+		//2) Use OpenCV's canny edge detection for edge detection
+		//3) Undistort edge locations using OpenCV's undistortPoints function
+		//4) Check to make sure this is working properly by displaying images
+
 
     // CHECK_EQ(dataset_->Init_Fetch_Data(), true);
-
 	
 	// std::cout << "Total Number of Images in the Dataset Sequence: " << dataset_->Total_Num_Of_Imgs << std::endl;
-
-	//INCLUDE EDGE DETECTION AND UNDISTORTION HERE!
-
 
 	// //> Pointers to the classes
 	// Frame::Ptr new_frame;
@@ -123,6 +128,5 @@ int main(int argc, char **argv) {
 	// 	}
 	// }
 	
-
 	return 0;
 }

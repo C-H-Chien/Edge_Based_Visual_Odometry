@@ -31,8 +31,10 @@ public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
     typedef std::shared_ptr<Dataset> Ptr;
     Dataset(YAML::Node, bool);
-    
+
     void PrintDatasetInfo();
+    // void CheckImageLoading();
+    void DetectEdges();
     // bool Init_Fetch_Data();
     // Frame::Ptr get_Next_Frame();
 

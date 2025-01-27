@@ -114,6 +114,63 @@ void Dataset::PrintDatasetInfo() {
     std::cout << std::endl;
 }
 
+// void Dataset::CheckImageLoading() {
+//     // Build the complete path to first image
+//     std::string cam0_image_path = Dataset_Path + "/" + Sequence_Name + "/mav0/cam0/data/1403715273262142976.png"; 
+//     std::string cam1_image_path = Dataset_Path + "/" + Sequence_Name + "/mav0/cam1/data/1403715273262142976.png";
+
+//     // Load images using OpenCV
+//     cv::Mat cam0_img = cv::imread(cam0_image_path, cv::IMREAD_GRAYSCALE);
+//     cv::Mat cam1_img = cv::imread(cam1_image_path, cv::IMREAD_GRAYSCALE);
+
+//     if (cam0_img.empty()) {
+//         std::cerr << "Error: Failed to load the first image from cam0 at " << cam0_image_path << std::endl;
+//     } else {
+//         std::cout << "Successfully loaded the first image from cam0: " << cam0_image_path << std::endl;
+//         cv::imshow("Cam0 Image", cam0_img);
+//     }
+
+//     if (cam1_img.empty()) {
+//         std::cerr << "Error: Failed to load the first image from cam1 at " << cam1_image_path << std::endl;
+//     } else {
+//         std::cout << "Successfully loaded the first image from cam1: " << cam1_image_path << std::endl;
+//         cv::imshow("Cam1 Image", cam1_img);
+//     }
+
+//     cv::waitKey(0); 
+// }
+
+void Dataset::DetectEdges() {
+    // Create paths for first image from cam0 and cam1
+    std::string cam0_image_path = Dataset_Path + "/" + Sequence_Name + "/mav0/cam0/data/1403715273262142976.png"; 
+    std::string cam1_image_path = Dataset_Path + "/" + Sequence_Name + "/mav0/cam1/data/1403715273262142976.png";
+
+    // Load images
+    cv::Mat cam0_img = cv::imread(cam0_image_path, cv::IMREAD_GRAYSCALE);
+    cv::Mat cam1_img = cv::imread(cam1_image_path, cv::IMREAD_GRAYSCALE);
+
+    if (cam0_img.empty() || cam1_img.empty()) {
+        std::cerr << "Error: Failed to load images from cam0 or cam1." << std::endl;
+        return;
+    }
+
+    // Use Canny edge detection
+    cv::Mat cam0_edges, cam1_edges;
+    cv::Canny(cam0_img, cam0_edges, 50, 150); 
+    cv::Canny(cam1_img, cam1_edges, 50, 150);
+
+    // Show edges
+    cv::imshow("Cam0 Edges", cam0_edges);
+    cv::imshow("Cam1 Edges", cam1_edges);
+    
+    // Save results
+    cv::imwrite("cam0_edges.png", cam0_edges);
+    cv::imwrite("cam1_edges.png", cam1_edges);
+
+    cv::waitKey(0);
+}
+
+
 // bool Dataset::Init_Fetch_Data() {
 
 //     if (Dataset_Type == "tum") {
