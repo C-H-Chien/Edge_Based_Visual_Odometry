@@ -34,7 +34,7 @@ public:
 
     void PrintDatasetInfo();
     // void CheckImageLoading();
-    void DetectEdges();
+    void DetectEdges(int num_images);
     // bool Init_Fetch_Data();
     // Frame::Ptr get_Next_Frame();
 

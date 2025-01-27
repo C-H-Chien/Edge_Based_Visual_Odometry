@@ -140,34 +140,58 @@ void Dataset::PrintDatasetInfo() {
 //     cv::waitKey(0); 
 // }
 
-void Dataset::DetectEdges() {
-    // Create paths for first image from cam0 and cam1
-    std::string cam0_image_path = Dataset_Path + "/" + Sequence_Name + "/mav0/cam0/data/1403715273262142976.png"; 
-    std::string cam1_image_path = Dataset_Path + "/" + Sequence_Name + "/mav0/cam1/data/1403715273262142976.png";
+void Dataset::DetectEdges(int num_images) {
+    std::string cam0_path = Dataset_Path + "/" + Sequence_Name + "/mav0/cam0/data/";
+    std::string cam1_path = Dataset_Path + "/" + Sequence_Name + "/mav0/cam1/data/";
+    std::string csv_file_path = Dataset_Path + "/" + Sequence_Name + "/mav0/cam0/data.csv";
 
-    // Load images
-    cv::Mat cam0_img = cv::imread(cam0_image_path, cv::IMREAD_GRAYSCALE);
-    cv::Mat cam1_img = cv::imread(cam1_image_path, cv::IMREAD_GRAYSCALE);
-
-    if (cam0_img.empty() || cam1_img.empty()) {
-        std::cerr << "Error: Failed to load images from cam0 or cam1." << std::endl;
+    std::ifstream csv_file(csv_file_path);
+    if (!csv_file.is_open()) {
+        std::cerr << "Error: Unable to open CSV file at the following directory: " << csv_file_path << std::endl;
         return;
     }
 
-    // Use Canny edge detection
-    cv::Mat cam0_edges, cam1_edges;
-    cv::Canny(cam0_img, cam0_edges, 50, 150); 
-    cv::Canny(cam1_img, cam1_edges, 50, 150);
+    std::vector<std::string> image_filenames;
+    std::string line;
 
-    // Show edges
-    cv::imshow("Cam0 Edges", cam0_edges);
-    cv::imshow("Cam1 Edges", cam1_edges);
-    
-    // Save results
-    cv::imwrite("cam0_edges.png", cam0_edges);
-    cv::imwrite("cam1_edges.png", cam1_edges);
+    // Read the CSV file
+    while (std::getline(csv_file, line) && image_filenames.size() < num_images) {
+        std::istringstream line_stream(line);
+        std::string timestamp;
+        std::getline(line_stream, timestamp, ',');
+        image_filenames.push_back(timestamp + ".png");
+    }
+    csv_file.close();
 
-    cv::waitKey(0);
+    // Loop through selected images
+    for (const auto& filename : image_filenames) {
+        std::string cam0_image_path = cam0_path + filename;
+        std::string cam1_image_path = cam1_path + filename;
+
+        // Load images
+        cv::Mat cam0_img = cv::imread(cam0_image_path, cv::IMREAD_GRAYSCALE);
+        cv::Mat cam1_img = cv::imread(cam1_image_path, cv::IMREAD_GRAYSCALE);
+
+        if (cam0_img.empty() || cam1_img.empty()) {
+            std::cerr << "Error: Failed to load image " << filename << " from cam0 or cam1." << std::endl;
+            continue;
+        }
+
+        // Use Canny edge detection
+        cv::Mat cam0_edges, cam1_edges;
+        cv::Canny(cam0_img, cam0_edges, 50, 150);
+        cv::Canny(cam1_img, cam1_edges, 50, 150);
+
+        // Show edges
+        cv::imshow("Cam0 Edges - " + filename, cam0_edges);
+        cv::imshow("Cam1 Edges - " + filename, cam1_edges);
+
+        // Save results
+        cv::imwrite("cam0_edges_" + filename, cam0_edges);
+        cv::imwrite("cam1_edges_" + filename, cam1_edges);
+
+        cv::waitKey(0);
+    }
 }
 
 

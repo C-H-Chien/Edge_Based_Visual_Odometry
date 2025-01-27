@@ -93,7 +93,7 @@ int main(int argc, char **argv) {
 
 	dataset_->PrintDatasetInfo();
 	// dataset_->CheckImageLoading();
-	dataset_->DetectEdges();
+	dataset_->DetectEdges(5);
 
 	//TODO:
 		//1) Make sure you're able to access cam0's images and cam1's images
