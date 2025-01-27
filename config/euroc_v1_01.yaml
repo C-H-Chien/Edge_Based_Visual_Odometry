@@ -1,10 +1,11 @@
 # EuRoC Vicon Room 01 Dataset
 
-# Stereo Image Paths
-image_left_path: "/Users/saulll./Desktop/Edge-Based Visual Odometry/datasets/EuRoC/mav0 3/cam0/data"
-image_right_path: "/Users/saulll./Desktop/Edge-Based Visual Odometry/datasets/EuRoC/mav0 3/cam1/data"
+# Dataset Configuration
+dataset_dir: "/Users/saulll./Desktop/Edge-Based Visual Odometry/datasets"
+sequence_name: "V1_01_easy"
+dataset_type: "EuRoC"
 
-# Stereo Instrinsic Parameters
+# Stereo Intrinsic Parameters
 cam0:
   resolution: [752, 480]
   rate_hz: 20
@@ -30,11 +31,4 @@ stereo:
 
   translation_vector: [-0.110073808127139, 0.000399121547014534, -0.000853702503351098]
 
-# General Dataset Information
-dataset_info:
-  sequence: "V1_01_easy"
-  description: "EuRoC Vicon Room 01 Dataset"
-  sensor_type: "stereo"
-  frame_rate: 20.0
-  imu_topic: "/imu0"
-  camera_topics: ["/cam0", "/cam1"]
+  

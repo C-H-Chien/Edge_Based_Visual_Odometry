@@ -67,6 +67,3 @@ add_subdirectory(src)
 
 add_subdirectory(cmd)
 add_subdirectory(test)
-
-add_executable(euroc_parser euroc_parser.cpp)
-target_link_libraries(euroc_parser ${THIRD_PARTY_LIBS})
