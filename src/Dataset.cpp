@@ -119,6 +119,7 @@ void Dataset::DetectEdges(int num_images) {
     std::string cam1_path = Dataset_Path + "/" + Sequence_Name + "/mav0/cam1/data/";
     std::string csv_file_path = Dataset_Path + "/" + Sequence_Name + "/mav0/cam0/data.csv";
 
+    //Check if able to open CSV file
     std::ifstream csv_file(csv_file_path);
     if (!csv_file.is_open()) {
         std::cerr << "Error: Unable to open CSV file at the following directory: " << csv_file_path << std::endl;
@@ -161,15 +162,62 @@ void Dataset::DetectEdges(int num_images) {
         cv::Canny(cam0_img, cam0_edges, 50, 150);
         cv::Canny(cam1_img, cam1_edges, 50, 150);
 
+        // Undistort edges
+        cv::Mat cam0_undistorted_edges, cam1_undistorted_edges;
+        UndistortEdges(cam0_edges, cam0_undistorted_edges, cam0_intrinsics, cam0_dist_coeffs);
+        UndistortEdges(cam1_edges, cam1_undistorted_edges, cam1_intrinsics, cam1_dist_coeffs);
+
         // Show edges
         cv::imshow("Left Camera Edges - " + filename, cam0_edges);
         cv::imshow("Right Camera Edges - " + filename, cam1_edges);
 
-        // Save results
-        // cv::imwrite("left_cam_edges_" + filename, cam0_edges);
-        // cv::imwrite("right_cam_edges_" + filename, cam1_edges);
+        // Show undistorted edges
+        cv::imshow("Left Undistorted Camera Edges - " + filename, cam0_undistorted_edges);
+        cv::imshow("Right Undistorted Camera Edges - " + filename, cam1_undistorted_edges);
+
+        // Optionally save undistorted edges
+        // cv::imwrite("left_cam_undistorted_edges_" + filename, cam0_undistorted_edges);
+        // cv::imwrite("right_cam_undistorted_edges_" + filename, cam1_undistorted_edges);
 
         cv::waitKey(0);
+    }
+}
+
+void Dataset::UndistortEdges(const cv::Mat& distorted_edges, cv::Mat& undistorted_edges, 
+                             const std::vector<double>& intrinsics, 
+                             const std::vector<double>& distortion_coeffs) {
+
+    cv::Mat calibration_matrix = (cv::Mat_<double>(3, 3) << 
+                                  intrinsics[0], 0, intrinsics[2], 
+                                  0, intrinsics[1], intrinsics[3], 
+                                  0, 0, 1);
+
+    cv::Mat distortion_coeffs_matrix = cv::Mat(distortion_coeffs);
+    std::vector<cv::Point2f> edge_points;
+
+    //Extract edge points
+    for (int y = 0; y < distorted_edges.rows; y++) {
+        for (int x = 0; x < distorted_edges.cols; x++) {
+            if (distorted_edges.at<uchar>(y, x) > 0) {
+                edge_points.emplace_back(x, y);
+            }
+        }
+    }
+
+    // Undistort the edge points
+    std::vector<cv::Point2f> undistorted_edge_points;
+    cv::undistortPoints(edge_points, undistorted_edge_points, calibration_matrix, distortion_coeffs_matrix);
+
+    undistorted_edges = cv::Mat::zeros(distorted_edges.size(), CV_8UC1);
+
+    // Map undistorted points back to the new image
+    for (const auto& point : undistorted_edge_points) {
+        int x = static_cast<int>(point.x * intrinsics[0] + intrinsics[2]); 
+        int y = static_cast<int>(point.y * intrinsics[1] + intrinsics[3]);
+
+        if (x >= 0 && x < undistorted_edges.cols && y >= 0 && y < undistorted_edges.rows) {
+            undistorted_edges.at<uchar>(y, x) = 255;
+        }
     }
 }
 

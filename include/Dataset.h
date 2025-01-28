@@ -34,8 +34,9 @@ public:
 
     void PrintDatasetInfo();
     void DetectEdges(int num_images);
-    void UndistortEdgePoints(const cv::Mat& edgeImage, const std::vector<double>& intrinsics, 
-                         const std::vector<double>& distCoeffs, cv::Mat& undistortedPoints);
+    void UndistortEdges(const cv::Mat& distorted_edges, cv::Mat& undistorted_edges, 
+                             const std::vector<double>& intrinsics, 
+                             const std::vector<double>& distortion_coeffs);
     // bool Init_Fetch_Data();
     // Frame::Ptr get_Next_Frame();
 
