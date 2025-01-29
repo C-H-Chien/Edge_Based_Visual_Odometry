@@ -1,7 +1,6 @@
 //> Macro definitions
 #define USE_GLOGS                       (false)
 
-#define REPO_PATH                       std::string("/Users/saulll./Desktop/Edge-Based Visual Odometry/")
 #define OUTPUT_WRITE_PATH               std::string("Output_Results/")
 #define OUTPUT_DATA_TYPE                std::string("TUM")  //> Either TUM or KITTI
 

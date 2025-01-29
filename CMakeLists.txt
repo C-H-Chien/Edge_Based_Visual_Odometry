@@ -6,7 +6,9 @@ if(NOT CMAKE_CXX_STANDARD_REQUIRED)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
 endif()
 
-PROJECT(LEMS_VO_SLAM)
+PROJECT(EDGE_BASED_VO)
+
+set(SUAL_BUILD 1)
 
 set(CMAKE_CXX_FLAGS_DEBUG "-g -Wall" CACHE STRING "" FORCE)
 
@@ -22,11 +24,9 @@ FIND_PACKAGE(Eigen3 REQUIRED)
 FIND_PACKAGE(OpenCV REQUIRED)
 FIND_PACKAGE(Ceres REQUIRED)
 FIND_PACKAGE(OpenMP REQUIRED)
-FIND_PACKAGE(CSparse REQUIRED)
 
 #> If you have ceres installed, you already have the following dependencies
 FIND_PACKAGE(Glog REQUIRED)
-FIND_PACKAGE(CSparse REQUIRED)
 FIND_PACKAGE(yaml-cpp REQUIRED)
 
 #FIND_PACKAGE(Pangolin REQUIRED)
@@ -43,19 +43,36 @@ message( "========================\n")
 include_directories(/usr/local/include/yaml-cpp)
 include_directories(${EIGEN3_INCLUDE_DIR} ${CSPARSE_INCLUDE_DIR})
 
-set(THIRD_PARTY_LIBS
+
+if(DEFINED SUAL_BUILD)
+    #> for MACOS
+    set(THIRD_PARTY_LIBS
         ${OpenCV_LIBS}
         ${Eigen_LIBS}
         ${Sophus_LIBRARIES}
-        #${Pangolin_LIBRARIES} GL GLU GLEW (FOR LINUX)
+        # ${Pangolin_LIBRARIES}
         ${Pangolin_LIBRARIES} "-framework OpenGL" "-framework GLUT" ${GLEW_LIBRARIES} #(FOR MACOS)
-        #${GTEST_BOTH_LIBRARIES}
         ${GLOG_LIBRARIES}
         ${GFLAGS_LIBRARIES}
         pthread
         ${CSparse_LIBRARY}
         /usr/local/lib/libyaml-cpp.so
-        )
+      )
+else()
+    #> for Ubuntu Linux
+    set(THIRD_PARTY_LIBS
+        ${OpenCV_LIBS}
+        ${Eigen_LIBS}
+        ${Sophus_LIBRARIES}
+        ${GLOG_LIBRARIES}
+        ${GFLAGS_LIBRARIES}
+        pthread
+        ${CSparse_LIBRARY}
+        /usr/local/lib/libyaml-cpp.so
+      )
+endif()
+
+
 
 enable_testing()
 
