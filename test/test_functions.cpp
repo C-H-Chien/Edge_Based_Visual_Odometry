@@ -286,7 +286,7 @@ int main(int argc, char **argv) {
     Gy_2d = cv::Mat::ones(GAUSSIAN_KERNEL_WINDOW_LENGTH, GAUSSIAN_KERNEL_WINDOW_LENGTH, CV_64F);
     utility_tool.get_dG_2D(Gx_2d, Gy_2d, 4*DEPTH_GRAD_GAUSSIAN_SIGMA, DEPTH_GRAD_GAUSSIAN_SIGMA); 
     std::cout << "Size of Gx_2d and Gy_2d: (" << Gx_2d.rows << ", " << Gx_2d.cols << ")" << std::endl;
-    std::string write_Gx_2d_File_Name = REPO_PATH + OUTPUT_WRITE_PATH + std::string("Test_Gx_2d.txt");
+    std::string write_Gx_2d_File_Name = std::string("../") + OUTPUT_WRITE_PATH + std::string("Test_Gx_2d.txt");
     write_cvMat_to_File<double>(write_Gx_2d_File_Name, Gx_2d);
 
     //> [TEST] Depth map
@@ -297,7 +297,7 @@ int main(int argc, char **argv) {
     //> Scale down by the factor of 5000 (according to the TUM-RGBD dataset)
     depth_Map.convertTo(depth_Map, CV_64F);
     depth_Map /= 5000.0;
-    std::string write_Depth_Map_File_Name = REPO_PATH + OUTPUT_WRITE_PATH + std::string("Test_Depth_Map.txt");
+    std::string write_Depth_Map_File_Name = std::string("../") + OUTPUT_WRITE_PATH + std::string("Test_Depth_Map.txt");
     write_cvMat_to_File<double>(write_Depth_Map_File_Name, depth_Map);
 
     //> [TEST] Gradient depths
@@ -307,9 +307,9 @@ int main(int argc, char **argv) {
     cv::filter2D( depth_Map, grad_Depth_eta_, depth_Map.depth(), Gy_2d );
     grad_Depth_xi_  *= (-1);
     grad_Depth_eta_ *= (-1);
-    std::string write_Gradient_Depth_Map_xi_File_Name = REPO_PATH + OUTPUT_WRITE_PATH + std::string("Test_Gradient_Depth_xi.txt");
+    std::string write_Gradient_Depth_Map_xi_File_Name = std::string("../") + OUTPUT_WRITE_PATH + std::string("Test_Gradient_Depth_xi.txt");
     write_cvMat_to_File<double>(write_Gradient_Depth_Map_xi_File_Name, grad_Depth_xi_);
-    std::string write_Gradient_Depth_Map_eta_File_Name = REPO_PATH + OUTPUT_WRITE_PATH + std::string("Test_Gradient_Depth_eta.txt");
+    std::string write_Gradient_Depth_Map_eta_File_Name = std::string("../") + OUTPUT_WRITE_PATH + std::string("Test_Gradient_Depth_eta.txt");
     write_cvMat_to_File<double>(write_Gradient_Depth_Map_eta_File_Name, grad_Depth_eta_);
 
 
