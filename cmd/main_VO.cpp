@@ -91,15 +91,8 @@ int main(int argc, char **argv) {
 
 	Dataset::Ptr dataset_ = Dataset::Ptr(new Dataset(config_map, use_GCC_filter));
 
-	dataset_->PrintDatasetInfo();
-	dataset_->DetectEdges(5);
-
-	//TODO:
-		//1) Make sure you're able to access cam0's images and cam1's images
-		//2) Use OpenCV's canny edge detection for edge detection
-		//3) Undistort edge locations using OpenCV's undistortPoints function
-		//4) Check to make sure this is working properly by displaying images
-
+	// dataset_->PrintDatasetInfo();
+	dataset_->ExtractEdges(5);
 
     // CHECK_EQ(dataset_->Init_Fetch_Data(), true);
 	

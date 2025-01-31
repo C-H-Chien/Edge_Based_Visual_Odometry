@@ -32,11 +32,11 @@ public:
     typedef std::shared_ptr<Dataset> Ptr;
     Dataset(YAML::Node, bool);
 
-    void PrintDatasetInfo();
-    void DetectEdges(int num_images);
-    void UndistortEdges(const cv::Mat& distorted_edges, cv::Mat& undistorted_edges, 
-                             const std::vector<double>& intrinsics, 
-                             const std::vector<double>& distortion_coeffs);
+    // void PrintDatasetInfo();
+    void ExtractEdges(int num_images);
+    void UndistortEdges(const cv::Mat& dist_edges, cv::Mat& undist_edges, 
+                             const std::vector<double>& intr, 
+                             const std::vector<double>& dist_coeffs);
     // bool Init_Fetch_Data();
     // Frame::Ptr get_Next_Frame();
 
@@ -48,23 +48,23 @@ private:
 
     YAML::Node config_file;
 
-    std::string Dataset_Type;
-    std::string Dataset_Path;
-    std::string Sequence_Name;
+    std::string dataset_type;
+    std::string dataset_path;
+    std::string sequence_name;
 
-    std::vector<int> cam0_resolution;
-    int cam0_rate_hz;
-    std::string cam0_model;
-    std::vector<double> cam0_intrinsics;
-    std::string cam0_dist_model;
-    std::vector<double> cam0_dist_coeffs;
+    std::vector<int> left_res;
+    int left_rate;
+    std::string left_model;
+    std::vector<double> left_intr;
+    std::string left_dist_model;
+    std::vector<double> left_dist_coeffs;
 
-    std::vector<int> cam1_resolution;
-    int cam1_rate_hz;
-    std::string cam1_model;
-    std::vector<double> cam1_intrinsics;
-    std::string cam1_dist_model;
-    std::vector<double> cam1_dist_coeffs;
+    std::vector<int> right_res;
+    int right_rate;
+    std::string right_model;
+    std::vector<double> right_intr;
+    std::string right_dist_model;
+    std::vector<double> right_dist_coeffs;
 
     std::vector<std::vector<double>> rotation_matrix;
     std::vector<double> translation_vector;

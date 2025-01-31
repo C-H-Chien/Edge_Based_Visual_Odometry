@@ -1,12 +1,12 @@
 # EuRoC Vicon Room 01 Dataset
 
-# Dataset Configuration
+# Dataset Details
 dataset_dir: "/Users/saulll./Desktop/Edge-Based Visual Odometry/datasets"
 sequence_name: "V1_01_easy"
 dataset_type: "EuRoC"
 
 # Stereo Intrinsic Parameters
-cam0:
+left_camera:
   resolution: [752, 480]
   rate_hz: 20
   camera_model: pinhole
@@ -14,7 +14,7 @@ cam0:
   distortion_model: radial-tangential
   distortion_coefficients: [-0.28340811, 0.07395907, 0.00019359, 1.76187114e-05]
 
-cam1:
+right_camera:
   resolution: [752, 480]
   rate_hz: 20
   camera_model: pinhole

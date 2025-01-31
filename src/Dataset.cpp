@@ -29,31 +29,31 @@
 Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(config_map), compute_grad_depth(use_GCC_filter)
 {
 
-	Dataset_Path = config_file["dataset_dir"].as<std::string>();
-	Sequence_Name = config_file["sequence_name"].as<std::string>();
-    Dataset_Type = config_file["dataset_type"].as<std::string>();
+	dataset_path = config_file["dataset_dir"].as<std::string>();
+	sequence_name = config_file["sequence_name"].as<std::string>();
+    dataset_type = config_file["dataset_type"].as<std::string>();
 
-    if (Dataset_Type == "EuRoC") {
+    if (dataset_type == "EuRoC") {
         try {
-            YAML::Node cam0 = config_file["cam0"];
-            YAML::Node cam1 = config_file["cam1"];
+            YAML::Node left_cam = config_file["left_camera"];
+            YAML::Node right_cam = config_file["right_camera"];
             YAML::Node stereo = config_file["stereo"];
 
-            // Parsing cam0 parameters
-            cam0_resolution = cam0["resolution"].as<std::vector<int>>();
-            cam0_rate_hz = cam0["rate_hz"].as<int>();
-            cam0_model = cam0["camera_model"].as<std::string>();
-            cam0_intrinsics = cam0["intrinsics"].as<std::vector<double>>();
-            cam0_dist_model = cam0["distortion_model"].as<std::string>();
-            cam0_dist_coeffs = cam0["distortion_coefficients"].as<std::vector<double>>();
+            // Parsing left_cam parameters
+            left_res = left_cam["resolution"].as<std::vector<int>>();
+            left_rate = left_cam["rate_hz"].as<int>();
+            left_model = left_cam["camera_model"].as<std::string>();
+            left_intr = left_cam["intrinsics"].as<std::vector<double>>();
+            left_dist_model = left_cam["distortion_model"].as<std::string>();
+            left_dist_coeffs = left_cam["distortion_coefficients"].as<std::vector<double>>();
 
-            // Parsing cam1 parameters
-            cam1_resolution = cam1["resolution"].as<std::vector<int>>();
-            cam1_rate_hz = cam1["rate_hz"].as<int>();
-            cam1_model = cam1["camera_model"].as<std::string>();
-            cam1_intrinsics = cam1["intrinsics"].as<std::vector<double>>();
-            cam1_dist_model = cam1["distortion_model"].as<std::string>();
-            cam1_dist_coeffs = cam1["distortion_coefficients"].as<std::vector<double>>();
+            // Parsing right_cam parameters
+            right_res = right_cam["resolution"].as<std::vector<int>>();
+            right_rate= right_cam["rate_hz"].as<int>();
+            right_model = right_cam["camera_model"].as<std::string>();
+            right_intr = right_cam["intrinsics"].as<std::vector<double>>();
+            right_dist_model = right_cam["distortion_model"].as<std::string>();
+            right_dist_coeffs = right_cam["distortion_coefficients"].as<std::vector<double>>();
 
             // Parsing stereo extrinsic parameters
             for (const auto& row : stereo["rotation_matrix"]) {
@@ -90,39 +90,38 @@ Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(confi
         Small_Patch_Radius_Map = cv::Mat::ones(2*GCC_PATCH_HALF_SIZE+1, 2*GCC_PATCH_HALF_SIZE+1, CV_64F);
     }
 }
-void Dataset::PrintDatasetInfo() {
-        // Show parsed data
-    std::cout << "Cam0 Resolution: " << cam0_resolution[0] << "x" << cam0_resolution[1] << std::endl;
-    std::cout << "Cam0 Intrinsics: ";
-    for (const auto& value : cam0_intrinsics) std::cout << value << " ";
-    std::cout << std::endl;
+// void Dataset::PrintDatasetInfo() {
+//     std::cout << "left_cam Resolution: " << left_cam_resolution[0] << "x" << left_cam_resolution[1] << std::endl;
+//     std::cout << "left_cam Intrinsics: ";
+//     for (const auto& value : left_cam_intrinsics) std::cout << value << " ";
+//     std::cout << std::endl;
 
-    std::cout << "Cam1 Intrinsics: ";
-    for (const auto& value : cam1_intrinsics) std::cout << value << " ";
-    std::cout << std::endl;
+//     std::cout << "right_cam Intrinsics: ";
+//     for (const auto& value : right_cam_intrinsics) std::cout << value << " ";
+//     std::cout << std::endl;
 
-    std::cout << "Stereo Rotation Matrix: " << std::endl;
-    for (const auto& row : rotation_matrix) {
-        for (const auto& value : row) {
-            std::cout << value << " ";
-        }
-        std::cout << std::endl;
-    }
+//     std::cout << "Stereo Rotation Matrix: " << std::endl;
+//     for (const auto& row : rotation_matrix) {
+//         for (const auto& value : row) {
+//             std::cout << value << " ";
+//         }
+//         std::cout << std::endl;
+//     }
 
-    std::cout << "Translation Vector: ";
-    for (const auto& value : translation_vector) std::cout << value << " ";
-    std::cout << std::endl;
-}
+//     std::cout << "Translation Vector: ";
+//     for (const auto& value : translation_vector) std::cout << value << " ";
+//     std::cout << std::endl;
+// }
 
-void Dataset::DetectEdges(int num_images) {
-    std::string cam0_path = Dataset_Path + "/" + Sequence_Name + "/mav0/cam0/data/";
-    std::string cam1_path = Dataset_Path + "/" + Sequence_Name + "/mav0/cam1/data/";
-    std::string csv_file_path = Dataset_Path + "/" + Sequence_Name + "/mav0/cam0/data.csv";
+void Dataset::ExtractEdges(int num_images) {
+    std::string left_path = dataset_path + "/" + sequence_name + "/mav0/cam0/data/";
+    std::string right_path = dataset_path + "/" + sequence_name + "/mav0/cam1/data/";
+    std::string csv_path = dataset_path + "/" + sequence_name + "/mav0/cam0/data.csv";
 
     //Check if able to open CSV file
-    std::ifstream csv_file(csv_file_path);
+    std::ifstream csv_file(csv_path);
     if (!csv_file.is_open()) {
-        std::cerr << "Error: Unable to open CSV file at the following directory: " << csv_file_path << std::endl;
+        std::cerr << "Error opening CSV file at directory: " << csv_path << std::endl;
         return;
     }
 
@@ -145,86 +144,89 @@ void Dataset::DetectEdges(int num_images) {
 
     // Loop through selected images
     for (const auto& filename : image_filenames) {
-        std::string cam0_image_path = cam0_path + filename;
-        std::string cam1_image_path = cam1_path + filename;
+        std::string left_img_path = left_path + filename;
+        std::string right_img_path = right_path + filename;
 
         // Load images
-        cv::Mat cam0_img = cv::imread(cam0_image_path, cv::IMREAD_GRAYSCALE);
-        cv::Mat cam1_img = cv::imread(cam1_image_path, cv::IMREAD_GRAYSCALE);
+        cv::Mat left_img = cv::imread(left_img_path, cv::IMREAD_GRAYSCALE);
+        cv::Mat right_img = cv::imread(right_img_path, cv::IMREAD_GRAYSCALE);
 
-        if (cam0_img.empty() || cam1_img.empty()) {
-            std::cerr << "Error: Failed to load image " << filename << " from cam0 or cam1." << std::endl;
+        if (left_img.empty() || right_img.empty()) {
+            std::cerr << "Error loading image: " << filename << std::endl;
             continue;
         }
 
         // Use Canny edge detection
-        cv::Mat cam0_edges, cam1_edges;
-        cv::Canny(cam0_img, cam0_edges, 50, 150);
-        cv::Canny(cam1_img, cam1_edges, 50, 150);
+        cv::Mat left_edges, right_edges;
+        cv::Canny(left_img, left_edges, 50, 150);
+        cv::Canny(right_img, right_edges, 50, 150);
 
         // Undistort edges
-        cv::Mat cam0_undistorted_edges, cam1_undistorted_edges;
-        UndistortEdges(cam0_edges, cam0_undistorted_edges, cam0_intrinsics, cam0_dist_coeffs);
-        UndistortEdges(cam1_edges, cam1_undistorted_edges, cam1_intrinsics, cam1_dist_coeffs);
+        cv::Mat left_undist_edges, right_undist_edges;
+        UndistortEdges(left_edges, left_undist_edges, left_intr, left_dist_coeffs);
+        UndistortEdges(right_edges, right_undist_edges, right_intr, right_dist_coeffs);
 
         // Show edges
-        cv::imshow("Left Camera Edges - " + filename, cam0_edges);
-        cv::imshow("Right Camera Edges - " + filename, cam1_edges);
+        cv::imshow("Left Camera (DIST) - " + filename, left_edges);
+        cv::imshow("Right Camera (DIST) - " + filename, right_edges);
 
         // Show undistorted edges
-        cv::imshow("Left Undistorted Camera Edges - " + filename, cam0_undistorted_edges);
-        cv::imshow("Right Undistorted Camera Edges - " + filename, cam1_undistorted_edges);
+        cv::imshow("Left Camera (UNDIST) - " + filename, left_undist_edges);
+        cv::imshow("Right Camera (UNDIST) - " + filename, right_undist_edges);
 
-        // Optionally save undistorted edges
-        // cv::imwrite("left_cam_undistorted_edges_" + filename, cam0_undistorted_edges);
-        // cv::imwrite("right_cam_undistorted_edges_" + filename, cam1_undistorted_edges);
+        // Save undistorted edges
+        // cv::imwrite("left_edges_" + filename, left_undist_edges);
+        // cv::imwrite("right_edges_" + filename, right_undist_edges);
 
         cv::waitKey(0);
     }
 }
 
-void Dataset::UndistortEdges(const cv::Mat& distorted_edges, cv::Mat& undistorted_edges, 
-                             const std::vector<double>& intrinsics, 
-                             const std::vector<double>& distortion_coeffs) {
+
+void Dataset::UndistortEdges(const cv::Mat& dist_edges, cv::Mat& undist_edges, 
+                             const std::vector<double>& intr, 
+                             const std::vector<double>& dist_coeffs) {
 
     cv::Mat calibration_matrix = (cv::Mat_<double>(3, 3) << 
-                                  intrinsics[0], 0, intrinsics[2], 
-                                  0, intrinsics[1], intrinsics[3], 
+                                  intr[0], 0, intr[2], 
+                                  0, intr[1], intr[3], 
                                   0, 0, 1);
 
-    cv::Mat distortion_coeffs_matrix = cv::Mat(distortion_coeffs);
+    cv::Mat dist_coeffs_matrix = cv::Mat(dist_coeffs);
     std::vector<cv::Point2f> edge_points;
 
     //Extract edge points
-    for (int y = 0; y < distorted_edges.rows; y++) {
-        for (int x = 0; x < distorted_edges.cols; x++) {
-            if (distorted_edges.at<uchar>(y, x) > 0) {
+    for (int y = 0; y < dist_edges.rows; y++) {
+        for (int x = 0; x < dist_edges.cols; x++) {
+            if (dist_edges.at<uchar>(y, x) > 0) {
                 edge_points.emplace_back(x, y);
             }
         }
     }
 
     // Undistort the edge points
-    std::vector<cv::Point2f> undistorted_edge_points;
-    cv::undistortPoints(edge_points, undistorted_edge_points, calibration_matrix, distortion_coeffs_matrix);
+    std::vector<cv::Point2f> undist_edge_points;
+    cv::undistortPoints(edge_points, undist_edge_points, calibration_matrix, dist_coeffs_matrix);
+    
 
-    undistorted_edges = cv::Mat::zeros(distorted_edges.size(), CV_8UC1);
+    undist_edges = cv::Mat::zeros(dist_edges.size(), CV_8UC1);
 
     // Map undistorted points back to the new image
-    for (const auto& point : undistorted_edge_points) {
-        int x = static_cast<int>(point.x * intrinsics[0] + intrinsics[2]); 
-        int y = static_cast<int>(point.y * intrinsics[1] + intrinsics[3]);
+    for (const auto& point : undist_edge_points) {
+        int x = static_cast<int>(point.x * intr[0] + intr[2]); 
+        int y = static_cast<int>(point.y * intr[1] + intr[3]);
 
-        if (x >= 0 && x < undistorted_edges.cols && y >= 0 && y < undistorted_edges.rows) {
-            undistorted_edges.at<uchar>(y, x) = 255;
+        if (x >= 0 && x < undist_edges.cols && y >= 0 && y < undist_edges.rows) {
+            undist_edges.at<uchar>(y, x) = 255;
         }
     }
 }
 
+
 // bool Dataset::Init_Fetch_Data() {
 
-//     if (Dataset_Type == "tum") {
-//         const std::string Associate_Path = Dataset_Path + Sequence_Name + ASSOCIATION_FILE_NAME;
+//     if (dataset_type == "tum") {
+//         const std::string Associate_Path = dataset_path + sequence_name + ASSOCIATION_FILE_NAME;
 //         stream_Associate_File.open(Associate_Path, std::ios_base::in);
 //         if (!stream_Associate_File) { 
 //             std::cerr << "ERROR: Dataset association file does not exist!" << std::endl; 
@@ -235,8 +237,8 @@ void Dataset::UndistortEdges(const cv::Mat& distorted_edges, cv::Mat& undistorte
 //         std::string image_path, depth_path;
 //         while (stream_Associate_File >> img_time_stamp >> img_file_name >> depth_time_stamp >> depth_file_name) {
             
-//             image_path = Dataset_Path + Sequence_Name + img_file_name;
-//             depth_path = Dataset_Path + Sequence_Name + depth_file_name;
+//             image_path = dataset_path + sequence_name + img_file_name;
+//             depth_path = dataset_path + sequence_name + depth_file_name;
 //             Img_Path_List.push_back(image_path);
 //             Depth_Path_List.push_back(depth_path);
 //             Img_Time_Stamps.push_back(img_time_stamp);
@@ -245,7 +247,7 @@ void Dataset::UndistortEdges(const cv::Mat& distorted_edges, cv::Mat& undistorte
 //         }
 //         has_Depth = true;
 //     }
-//     else if (Dataset_Type == "kitti") {
+//     else if (dataset_type == "kitti") {
 //         //TODO
 //     }
 
