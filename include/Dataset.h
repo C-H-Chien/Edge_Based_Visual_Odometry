@@ -34,13 +34,9 @@ public:
 
     // void PrintDatasetInfo();
     void ExtractEdges(int num_images);
-    void UndistortEdges(const cv::Mat& dist_edges, cv::Mat& undist_edges, std::vector<cv::Point2f>& undist_edge_points,
+    void UndistortEdges(const cv::Mat& dist_edges, cv::Mat& undist_edges,
                              const std::vector<double>& intr, 
                              const std::vector<double>& dist_coeffs);
-    void DrawEpilines(const cv::Mat& left_img, const cv::Mat& right_img, 
-                  const std::vector<cv::Point2f>& left_points, 
-                  const std::vector<cv::Vec3f>& epilines);
-    cv::Mat CalculateEssentialMat(const std::vector<std::vector<double>>& R_21, const std::vector<double>& T_21);
     // bool Init_Fetch_Data();
     // Frame::Ptr get_Next_Frame();
 

@@ -163,82 +163,28 @@ void Dataset::ExtractEdges(int num_images) {
 
         // Undistort edges
         cv::Mat left_undist_edges, right_undist_edges;
-        std::vector<cv::Point2f> left_undist_points, right_undist_points;
 
-        UndistortEdges(left_edges, left_undist_edges, left_undist_points, left_intr, left_dist_coeffs);
-        UndistortEdges(right_edges, right_undist_edges, right_undist_points, right_intr, right_dist_coeffs);
-        // std::cout << "Size: [" << left_undist_mat.rows << " x " << left_undist_mat.cols << "]\n" << std::endl;
+        UndistortEdges(left_edges, left_undist_edges, left_intr, left_dist_coeffs);
+        UndistortEdges(right_edges, right_undist_edges, right_intr, right_dist_coeffs);
 
-        cv::Mat E = CalculateEssentialMat(rotation_matrix, translation_vector);
+        // Concatenate left camera distorted w/ undistorted
+        cv::Mat left_concat;
+        cv::hconcat(left_edges, left_undist_edges, left_concat);
 
-        std::cout << "Essential Matrix E:\n" << E << "\n" << std::endl;
+        // Concatenate right camera distorted w/ undistorted
+        cv::Mat right_concat;
+        cv::hconcat(right_edges, right_undist_edges, right_concat);
 
-        std::vector<cv::Vec3f> epilines;
-        cv::computeCorrespondEpilines(left_undist_points, 1, E, epilines);
-
-        // Visualize epilines
-        DrawEpilines(left_img, right_img, left_undist_points, epilines);
-
-
-        // Show edges
-        cv::imshow("Left Camera (Distorted) - " + filename, left_edges);
-        cv::imshow("Right Camera (Distorted) - " + filename, right_edges);
-
-        // Show undistorted edges
-        cv::imshow("Left Camera (Undistorted) - " + filename, left_undist_edges);
-        cv::imshow("Right Camera (Undistorted) - " + filename, right_undist_edges);
-
-        // Save undistorted edges
-        // cv::imwrite("left_edges_" + filename, left_undist_edges);
-        // cv::imwrite("right_edges_" + filename, right_undist_edges);
+        // Display results
+        cv::imshow("Left Camera (Distorted vs Undistorted)", left_concat);
+        cv::imshow("Right Camera (Distorted vs Undistorted)", right_concat);
 
         cv::waitKey(0);
     }
 }
 
-// Function to draw epipolar lines and show images side by side
-void Dataset::DrawEpilines(const cv::Mat& left_img, const cv::Mat& right_img, 
-                  const std::vector<cv::Point2f>& left_points, 
-                  const std::vector<cv::Vec3f>& epilines) {
-    // Convert images to color for visualization
-    cv::Mat left_img_color, right_img_color;
-    cv::cvtColor(left_img, left_img_color, cv::COLOR_GRAY2BGR);
-    cv::cvtColor(right_img, right_img_color, cv::COLOR_GRAY2BGR);
 
-    // Random number generator for colors
-    cv::RNG rng(12345);
-
-    // Draw epipolar lines on the right image
-    for (size_t i = 0; i < left_points.size(); i++) {
-        // Generate a random color for this line
-        cv::Scalar color(rng.uniform(0, 255), rng.uniform(0, 255), rng.uniform(0, 255));
-
-        // Extract the epipolar line parameters (a, b, c)
-        cv::Vec3f line = epilines[i];
-        float a = line[0], b = line[1], c = line[2];
-
-        // Find two points on the epipolar line: intersection with left and right borders
-        cv::Point pt1(0, -c / b);  // Intersection with left border of right image
-        cv::Point pt2(right_img.cols, -(c + a * right_img.cols) / b); // Intersection with right border
-
-        // Draw the epipolar line on the right image
-        cv::line(right_img_color, pt1, pt2, color, 1, cv::LINE_AA);
-
-        // Draw the corresponding point in the left image
-        cv::circle(left_img_color, left_points[i], 5, color, -1);
-    }
-
-    // Concatenate left and right images horizontally
-    cv::Mat combined;
-    cv::hconcat(left_img_color, right_img_color, combined);
-
-    // Show the result
-    cv::imshow("Epipolar Geometry", combined);
-    cv::waitKey(0);
-}
-
-
-void Dataset::UndistortEdges(const cv::Mat& dist_edges, cv::Mat& undist_edges, std::vector<cv::Point2f>& undist_edge_points,
+void Dataset::UndistortEdges(const cv::Mat& dist_edges, cv::Mat& undist_edges,
                              const std::vector<double>& intr, 
                              const std::vector<double>& dist_coeffs) {
 
@@ -258,16 +204,9 @@ void Dataset::UndistortEdges(const cv::Mat& dist_edges, cv::Mat& undist_edges, s
             }
         }
     }
-
+    std::vector<cv::Point2f> undist_edge_points;
     cv::undistortPoints(edge_points, undist_edge_points, calibration_matrix, dist_coeffs_matrix);
     
-    // //Store edges for later use
-    // undist_mat = cv::Mat(undist_edge_points.size(), 2, CV_32F);
-    // for (size_t i = 0; i < undist_edge_points.size(); i++) {
-    //     undist_mat.at<float>(i, 0) = undist_edge_points[i].x;
-    //     undist_mat.at<float>(i, 1) = undist_edge_points[i].y;
-    // }
-
     undist_edges = cv::Mat::zeros(dist_edges.size(), CV_8UC1);
 
     // Map undistorted points back to the new image
@@ -279,36 +218,6 @@ void Dataset::UndistortEdges(const cv::Mat& dist_edges, cv::Mat& undist_edges, s
             undist_edges.at<uchar>(y, x) = 255;
         }
     }
-}
-
-cv::Mat Dataset::CalculateEssentialMat(const std::vector<std::vector<double>>& R_21, const std::vector<double>& T_21) {
-
-    // Convert std::vector to cv::Mat
-    cv::Mat R21_Mat(3, 3, CV_64F);
-    cv::Mat T21_Mat(3, 1, CV_64F);
-
-    // Populate rotation matrix
-    for (int i = 0; i < 3; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            R21_Mat.at<double>(i, j) = R_21[i][j];
-        }
-    }
-
-    // Populate translation vector
-    for (int i = 0; i < 3; ++i) {
-        T21_Mat.at<double>(i, 0) = T_21[i];
-    }
-
-    // Build skew-symmetric matrix T
-    cv::Mat T_skewed = (cv::Mat_<double>(3, 3) << 
-                          0,           -T21_Mat.at<double>(2, 0),  T21_Mat.at<double>(1, 0),
-                          T21_Mat.at<double>(2, 0),  0,           -T21_Mat.at<double>(0, 0),
-                         -T21_Mat.at<double>(1, 0),  T21_Mat.at<double>(0, 0),  0);
-
-    // Calculate essential matrix
-    cv::Mat E = T_skewed * R21_Mat;
-
-    return E;
 }
 
 
