@@ -203,12 +203,13 @@ void Dataset::DetectEdges(int num_images) {
 
         // VisualizeEdges(left_edges, right_edges, left_edge_coords);
 
-        // cv::imshow("Undistort, then Extract - " + filename, left_edges);
-        // cv::imwrite("Undistort, then Extract - " + filename, left_edges);
+        // cv::imshow("Undistort, then Extract - " + filename, right_edges);
+        // cv::imwrite("Undistort, then Extract  - " + filename, right_edges);
         // cv::waitKey(0);
 
+
         //////////////EXTRACT, THEN DISTORT////////////////////
-        // Use Canny edge detection
+        //Use Canny edge detection
         cv::Mat left_edges, right_edges;
         cv::Canny(left_img, left_edges, 50, 150);
         cv::Canny(right_img, right_edges, 50, 150);
@@ -220,10 +221,11 @@ void Dataset::DetectEdges(int num_images) {
         UndistortEdges(left_edges, left_undist_edges, left_edge_coords, left_intr, left_dist_coeffs);
         UndistortEdges(right_edges, right_undist_edges, right_edge_coords, right_intr, right_dist_coeffs);
 
-        // VisualizeOrder("/Users/saulll./Desktop/Edge-Based Visual Odometry/Edge_Based_Visual_Odometry-main/bin/Extract, then Undistort - 1403715273262142976.png",
-        //  "/Users/saulll./Desktop/Edge-Based Visual Odometry/Edge_Based_Visual_Odometry-main/bin/Undistort, then Extract - 1403715273262142976.png");
 
-        // VisualizeEdges(left_undist_edges, right_undist_edges, left_edge_coords);
+        // VisualizeOrder("/Users/saulll./Desktop/Edge-Based Visual Odometry/Edge_Based_Visual_Odometry-main/bin/Extract, then Undistort - 1403715273262142976.png",
+        //  "/Users/saulll./Desktop/Edge-Based Visual Odometry/Edge_Based_Visual_Odometry-main/bin/Undistort, then Extract  - 1403715273262142976.png");
+
+        VisualizeEdges(left_undist_edges, right_undist_edges, left_edge_coords);
     }
 }
 
@@ -264,7 +266,6 @@ void Dataset::VisualizeOrder(const std::string& extract_undist_path, const std::
 
 
 void Dataset::VisualizeEdges(const cv::Mat& left_edges, const cv::Mat& right_edges, std::vector<cv::Point2f> left_coords){
-    //Visualize random edges
     cv::Mat left_visualization;
     cv::cvtColor(left_edges, left_visualization, cv::COLOR_GRAY2BGR);
 
@@ -273,8 +274,32 @@ void Dataset::VisualizeEdges(const cv::Mat& left_edges, const cv::Mat& right_edg
 
     std::vector<cv::Point2f> random_edges = SelectRandomEdges(left_coords, 5);
 
+    // Patch size
+    int patch_size = 7;
+    int half_patch = patch_size / 2;
+
+    std::vector<cv::Mat> patches;
+
     for (const auto& pt : random_edges) {
-        cv::circle(left_visualization, pt, 5, cv::Scalar(255, 200, 100), cv::FILLED);
+        // Visualize selected edges
+        cv::circle(left_visualization, pt, 3, cv::Scalar(255, 200, 100), cv::FILLED);
+
+        // Extract patch around edge
+        int x = static_cast<int>(pt.x);
+        int y = static_cast<int>(pt.y);
+
+        // Check patch is within bounds
+        if (x - half_patch >= 0 && x + half_patch < left_edges.cols &&
+            y - half_patch >= 0 && y + half_patch < left_edges.rows) {
+            
+            // Extract patch
+            cv::Rect patch_rect(x - half_patch, y - half_patch, patch_size, patch_size);
+            cv::Mat patch = left_edges(patch_rect).clone();
+            patches.push_back(patch);
+
+            // Draw bounding box around patch
+            cv::rectangle(left_visualization, patch_rect, cv::Scalar(0, 0, 255), 1);
+        }
     }
     
     //Calculate epipolar line
