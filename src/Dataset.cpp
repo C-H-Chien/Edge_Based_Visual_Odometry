@@ -174,19 +174,48 @@ void Dataset::DetectEdges(int num_images) {
             continue;
         }
 
-        // Use Canny edge detection
+        //////////////UNDISTORT, THEN EXTRACT///////////////////////
+
+        cv::Mat left_calib = (cv::Mat_<double>(3, 3) << 
+                                  left_intr[0], 0, left_intr[2], 
+                                  0, left_intr[1], left_intr[3], 
+                                  0, 0, 1);
+        cv::Mat right_calib = (cv::Mat_<double>(3,3 )<< 
+                                right_intr[0], 0, right_intr[2],
+                                0, right_intr[1], right_intr[3],
+                                0, 0, 1);
+        cv::Mat left_dist_coeff_mat(left_dist_coeffs);
+        cv::Mat right_dist_coeff_mat(right_dist_coeffs);
+
+        cv::Mat left_undistorted, right_undistorted;
+        cv::undistort(left_img, left_undistorted, left_calib, left_dist_coeff_mat);
+        cv::undistort(right_img, right_undistorted, right_calib, right_dist_coeff_mat);
+
         cv::Mat left_edges, right_edges;
-        cv::Canny(left_img, left_edges, 50, 150);
-        cv::Canny(right_img, right_edges, 50, 150);
 
-        // Undistort edges
-        cv::Mat left_undist_edges, right_undist_edges;
-        std::vector<cv::Point2f> left_edge_coords, right_edge_coords;
+        cv::Canny(left_undistorted, left_edges, 50, 150);
+        cv::Canny(right_undistorted, right_edges, 50, 150);
 
-        UndistortEdges(left_edges, left_undist_edges, left_edge_coords, left_intr, left_dist_coeffs);
-        UndistortEdges(right_edges, right_undist_edges, right_edge_coords, right_intr, right_dist_coeffs);
+        std::vector<cv::Point2f> left_edge_coords;
 
-        VisualizeEdges(left_undist_edges, right_undist_edges, left_edge_coords);
+        cv::findNonZero(left_edges, left_edge_coords);
+
+        VisualizeEdges(left_edges, right_edges, left_edge_coords);
+
+        //////////////EXTRACT, THEN DISTORT////////////////////
+        // // Use Canny edge detection
+        // cv::Mat left_edges, right_edges;
+        // cv::Canny(left_img, left_edges, 50, 150);
+        // cv::Canny(right_img, right_edges, 50, 150);
+
+        // // Undistort edges
+        // cv::Mat left_undist_edges, right_undist_edges;
+        // std::vector<cv::Point2f> left_edge_coords, right_edge_coords;
+
+        // UndistortEdges(left_edges, left_undist_edges, left_edge_coords, left_intr, left_dist_coeffs);
+        // UndistortEdges(right_edges, right_undist_edges, right_edge_coords, right_intr, right_dist_coeffs);
+
+        // VisualizeEdges(left_undist_edges, right_undist_edges, left_edge_coords);
     }
 }
 
