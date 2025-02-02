@@ -11,6 +11,9 @@
 #include <glog/logging.h>
 #include <time.h>
 #include <sys/time.h>
+#include <random>
+#include <unordered_set>
+#include <vector>
 
 #include "Dataset.h"
 #include "definitions.h"
@@ -60,7 +63,11 @@ Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(confi
                 rotation_matrix.push_back(row.as<std::vector<double>>());
             }
 
-            translation_vector = stereo["translation_vector"].as<std::vector<double>>();
+            translation_vector = stereo["translation_vector"].as<std::vector<double>>();\
+
+            for (const auto& row : stereo["fundamental_matrix"]) {
+                fundamental_matrix.push_back(row.as<std::vector<double>>());
+            }
 
         } catch (const YAML::Exception &e) {
             std::cerr << "Error parsing YAML file: " << e.what() << std::endl;
@@ -90,17 +97,19 @@ Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(confi
         Small_Patch_Radius_Map = cv::Mat::ones(2*GCC_PATCH_HALF_SIZE+1, 2*GCC_PATCH_HALF_SIZE+1, CV_64F);
     }
 }
+
+
 // void Dataset::PrintDatasetInfo() {
-//     std::cout << "left_cam Resolution: " << left_cam_resolution[0] << "x" << left_cam_resolution[1] << std::endl;
-//     std::cout << "left_cam Intrinsics: ";
-//     for (const auto& value : left_cam_intrinsics) std::cout << value << " ";
+//     std::cout << "left_cam Resolution: " << left_res[0] << "x" << left_res[1] << std::endl;
+//     std::cout << "\nleft_cam Intrinsics: ";
+//     for (const auto& value : left_intr) std::cout << value << " ";
 //     std::cout << std::endl;
 
 //     std::cout << "right_cam Intrinsics: ";
-//     for (const auto& value : right_cam_intrinsics) std::cout << value << " ";
+//     for (const auto& value : right_intr) std::cout << value << " ";
 //     std::cout << std::endl;
 
-//     std::cout << "Stereo Rotation Matrix: " << std::endl;
+//     std::cout << "\nStereo Rotation Matrix: " << std::endl;
 //     for (const auto& row : rotation_matrix) {
 //         for (const auto& value : row) {
 //             std::cout << value << " ";
@@ -108,10 +117,19 @@ Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(confi
 //         std::cout << std::endl;
 //     }
 
-//     std::cout << "Translation Vector: ";
+//     std::cout << "\nTranslation Vector: ";
 //     for (const auto& value : translation_vector) std::cout << value << " ";
 //     std::cout << std::endl;
+
+//     std::cout << "\nFundamental Matrix: " << std::endl;
+//     for (const auto& row : fundamental_matrix) {
+//         for (const auto& value : row) {
+//             std::cout << value << " ";
+//         }
+//         std::cout << std::endl;
+//     }
 // }
+
 
 void Dataset::ExtractEdges(int num_images) {
     std::string left_path = dataset_path + "/" + sequence_name + "/mav0/cam0/data/";
@@ -163,61 +181,107 @@ void Dataset::ExtractEdges(int num_images) {
 
         // Undistort edges
         cv::Mat left_undist_edges, right_undist_edges;
+        std::vector<cv::Point2f> left_edge_coords, right_edge_coords;
 
-        UndistortEdges(left_edges, left_undist_edges, left_intr, left_dist_coeffs);
-        UndistortEdges(right_edges, right_undist_edges, right_intr, right_dist_coeffs);
+        UndistortEdges(left_edges, left_undist_edges, left_edge_coords, left_intr, left_dist_coeffs);
+        UndistortEdges(right_edges, right_undist_edges, right_edge_coords, right_intr, right_dist_coeffs);
 
-        // Concatenate left camera distorted w/ undistorted
-        cv::Mat left_concat;
-        cv::hconcat(left_edges, left_undist_edges, left_concat);
 
-        // Concatenate right camera distorted w/ undistorted
-        cv::Mat right_concat;
-        cv::hconcat(right_edges, right_undist_edges, right_concat);
+        cv::Mat left_visualization;
+        cv::cvtColor(left_undist_edges, left_visualization, cv::COLOR_GRAY2BGR);
 
-        // Display results
-        cv::imshow("Left Camera (Distorted vs Undistorted)", left_concat);
-        cv::imshow("Right Camera (Distorted vs Undistorted)", right_concat);
+        cv::Mat right_visualization;
+        cv::cvtColor(right_undist_edges, right_visualization, cv::COLOR_GRAY2BGR);
 
+        std::vector<cv::Point2f> random_edges = SelectRandomEdges(left_edge_coords, 10);
+
+        for (const auto& pt : random_edges) {
+            cv::circle(left_visualization, pt, 3, cv::Scalar(255, 200, 100), 1);
+        }
+        
+        //Concatenate left and right camera undistorted
+        cv::Mat both_concat;
+        cv::hconcat(left_visualization, right_visualization, both_concat);
+        cv::imshow("Left Camera Undistorted vs Right Camera Undistorted", both_concat);
         cv::waitKey(0);
+
+
+        // // Concatenate left camera distorted w/ undistorted
+        // cv::Mat left_concat;
+        // cv::hconcat(left_edges, left_undist_edges, left_concat);
+
+        // // Concatenate right camera distorted w/ undistorted
+        // cv::Mat right_concat;
+        // cv::hconcat(right_edges, right_undist_edges, right_concat);
+
+        // // Display results
+        // // cv::imshow("Left Camera (Distorted vs Undistorted)", left_concat);
+        // // cv::imshow("Right Camera (Distorted vs Undistorted)", right_concat);
     }
 }
 
 
-void Dataset::UndistortEdges(const cv::Mat& dist_edges, cv::Mat& undist_edges,
+void Dataset::UndistortEdges(const cv::Mat& dist_edges, cv::Mat& undist_edges, 
+                             std::vector<cv::Point2f>& edge_locations,
                              const std::vector<double>& intr, 
                              const std::vector<double>& dist_coeffs) {
-
+    // Create calibration matrix
     cv::Mat calibration_matrix = (cv::Mat_<double>(3, 3) << 
                                   intr[0], 0, intr[2], 
                                   0, intr[1], intr[3], 
                                   0, 0, 1);
 
-    cv::Mat dist_coeffs_matrix = cv::Mat(dist_coeffs);
-    std::vector<cv::Point2f> edge_points;
+    // Convert distortion coefficients to cv::Mat
+    cv::Mat dist_coeffs_matrix(dist_coeffs);
 
-    //Extract edge points
-    for (int y = 0; y < dist_edges.rows; y++) {
-        for (int x = 0; x < dist_edges.cols; x++) {
-            if (dist_edges.at<uchar>(y, x) > 0) {
-                edge_points.emplace_back(x, y);
-            }
-        }
-    }
+    // Extract edge points
+    std::vector<cv::Point2f> edge_points;
+    cv::findNonZero(dist_edges, edge_points);
+
+    // Undistort edge points
     std::vector<cv::Point2f> undist_edge_points;
     cv::undistortPoints(edge_points, undist_edge_points, calibration_matrix, dist_coeffs_matrix);
-    
+
+    // Create an empty image to store undistorted edges
     undist_edges = cv::Mat::zeros(dist_edges.size(), CV_8UC1);
 
-    // Map undistorted points back to the new image
+    // Map undistorted points back to image
+    edge_locations.clear();
     for (const auto& point : undist_edge_points) {
         int x = static_cast<int>(point.x * intr[0] + intr[2]); 
         int y = static_cast<int>(point.y * intr[1] + intr[3]);
 
         if (x >= 0 && x < undist_edges.cols && y >= 0 && y < undist_edges.rows) {
             undist_edges.at<uchar>(y, x) = 255;
+            edge_locations.emplace_back(x, y);
         }
     }
+}
+
+
+std::vector<cv::Point2f> Dataset::SelectRandomEdges(const std::vector<cv::Point2f>& edge_points, size_t num_points) {
+    std::vector<cv::Point2f> selected_points;
+
+    // Ensure available points are not exceeded
+    if (edge_points.empty()) return selected_points;
+    num_points = std::min(num_points, edge_points.size());
+
+    // Random number generator setup
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<int> dis(0, edge_points.size() - 1);
+
+    std::unordered_set<int> used_indices;
+
+    while (selected_points.size() < num_points) {
+        int idx = dis(gen);
+        if (used_indices.find(idx) == used_indices.end()) {
+            selected_points.push_back(edge_points[idx]);
+            used_indices.insert(idx);
+        }
+    }
+
+    return selected_points;
 }
 
 

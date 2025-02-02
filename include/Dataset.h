@@ -34,9 +34,11 @@ public:
 
     // void PrintDatasetInfo();
     void ExtractEdges(int num_images);
-    void UndistortEdges(const cv::Mat& dist_edges, cv::Mat& undist_edges,
+    void UndistortEdges(const cv::Mat& dist_edges, cv::Mat& undist_edges, 
+                             std::vector<cv::Point2f>& edge_locations,
                              const std::vector<double>& intr, 
                              const std::vector<double>& dist_coeffs);
+    std::vector<cv::Point2f> SelectRandomEdges(const std::vector<cv::Point2f>& edge_points, size_t num_points);
     // bool Init_Fetch_Data();
     // Frame::Ptr get_Next_Frame();
 
@@ -68,6 +70,7 @@ private:
 
     std::vector<std::vector<double>> rotation_matrix;
     std::vector<double> translation_vector;
+    std::vector<std::vector<double>> fundamental_matrix;
 
     // Eigen::Matrix3d Calib;        
     // Eigen::Matrix3d Inverse_Calib; 
