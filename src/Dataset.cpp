@@ -187,6 +187,7 @@ void Dataset::ExtractEdges(int num_images) {
         UndistortEdges(right_edges, right_undist_edges, right_edge_coords, right_intr, right_dist_coeffs);
 
 
+        //Visualize random edges
         cv::Mat left_visualization;
         cv::cvtColor(left_undist_edges, left_visualization, cv::COLOR_GRAY2BGR);
 
@@ -199,6 +200,19 @@ void Dataset::ExtractEdges(int num_images) {
             cv::circle(left_visualization, pt, 3, cv::Scalar(255, 200, 100), 1);
         }
         
+        //Calculate epipolar line
+        Eigen::Matrix3d fund_mat;
+        for (int i = 0; i < 3; i++){
+            for (int j = 0; j < 3; j++){
+                fund_mat(i, j) = fundamental_matrix[i][j];
+            }
+        }
+
+        std::vector<Eigen::Vector3d> computed_lines = computeEpipolarLine(fund_mat, random_edges);
+
+
+
+
         //Concatenate left and right camera undistorted
         cv::Mat both_concat;
         cv::hconcat(left_visualization, right_visualization, both_concat);
@@ -284,6 +298,29 @@ std::vector<cv::Point2f> Dataset::SelectRandomEdges(const std::vector<cv::Point2
     return selected_points;
 }
 
+
+std::vector<Eigen::Vector3d> Dataset::computeEpipolarLine(const Eigen::Matrix3d& fund_mat, const std::vector<cv::Point2f>& edge_points) {
+    std::vector<Eigen::Vector3d> epipolar_lines;
+
+    for (const auto& point : edge_points) {
+        // Convert to homogeneous coordinates
+        Eigen::Vector3d homo_point(point.x, point.y, 1.0);
+
+        // Compute epipolar line
+        Eigen::Vector3d epipolar_line = fund_mat * homo_point;
+
+        // Store line
+        epipolar_lines.push_back(epipolar_line);
+
+        // Print epipolar equation
+        std::cout << "Epipolar Line Equation for Point (" << point.x << ", " << point.y << "): "
+                    << epipolar_line(0) << "x + " 
+                    << epipolar_line(1) << "y + " 
+                    << epipolar_line(2) << " = 0" << std::endl;
+    }
+
+    return epipolar_lines;
+}
 
 // bool Dataset::Init_Fetch_Data() {
 

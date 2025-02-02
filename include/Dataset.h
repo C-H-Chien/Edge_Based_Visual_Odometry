@@ -39,6 +39,7 @@ public:
                              const std::vector<double>& intr, 
                              const std::vector<double>& dist_coeffs);
     std::vector<cv::Point2f> SelectRandomEdges(const std::vector<cv::Point2f>& edge_points, size_t num_points);
+    std::vector<Eigen::Vector3d> computeEpipolarLine(const Eigen::Matrix3d& fund_mat, const std::vector<cv::Point2f>& edge_point);
     // bool Init_Fetch_Data();
     // Frame::Ptr get_Next_Frame();
 
