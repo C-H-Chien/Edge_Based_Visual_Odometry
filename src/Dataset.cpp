@@ -14,6 +14,7 @@
 #include <random>
 #include <unordered_set>
 #include <vector>
+#include <chrono>
 
 #include "Dataset.h"
 #include "definitions.h"
@@ -174,33 +175,43 @@ void Dataset::DetectEdges(int num_images) {
             continue;
         }
 
+        cv::Mat left_calib = (cv::Mat_<double>(3, 3) << 
+                                  left_intr[0], 0, left_intr[2], 
+                                  0, left_intr[1], left_intr[3], 
+                                  0, 0, 1);
+        cv::Mat right_calib = (cv::Mat_<double>(3,3 )<< 
+                                right_intr[0], 0, right_intr[2],
+                                0, right_intr[1], right_intr[3],
+                                0, 0, 1);
+        cv::Mat left_dist_coeff_mat(left_dist_coeffs);
+        cv::Mat right_dist_coeff_mat(right_dist_coeffs);
+
         //////////////UNDISTORT, THEN EXTRACT///////////////////////
 
-        // cv::Mat left_calib = (cv::Mat_<double>(3, 3) << 
-        //                           left_intr[0], 0, left_intr[2], 
-        //                           0, left_intr[1], left_intr[3], 
-        //                           0, 0, 1);
-        // cv::Mat right_calib = (cv::Mat_<double>(3,3 )<< 
-        //                         right_intr[0], 0, right_intr[2],
-        //                         0, right_intr[1], right_intr[3],
-        //                         0, 0, 1);
-        // cv::Mat left_dist_coeff_mat(left_dist_coeffs);
-        // cv::Mat right_dist_coeff_mat(right_dist_coeffs);
+        cv::Mat left_undistorted, right_undistorted;
+        cv::undistort(left_img, left_undistorted, left_calib, left_dist_coeff_mat);
+        cv::undistort(right_img, right_undistorted, right_calib, right_dist_coeff_mat);
 
-        // cv::Mat left_undistorted, right_undistorted;
-        // cv::undistort(left_img, left_undistorted, left_calib, left_dist_coeff_mat);
-        // cv::undistort(right_img, right_undistorted, right_calib, right_dist_coeff_mat);
+        cv::Mat left_edges, right_edges;
 
-        // cv::Mat left_edges, right_edges;
-
-        // cv::Canny(left_undistorted, left_edges, 50, 150);
-        // cv::Canny(right_undistorted, right_edges, 50, 150);
+        cv::Canny(left_undistorted, left_edges, 50, 150);
+        cv::Canny(right_undistorted, right_edges, 50, 150);
 
         // std::vector<cv::Point2f> left_edge_coords;
 
         // cv::findNonZero(left_edges, left_edge_coords);
 
         // VisualizeEdges(left_edges, right_edges, left_edge_coords);
+
+        // cv::imshow("Undistort, then Extract - " + filename, left_edges);
+        // cv::imwrite("Undistort, then Extract - " + filename, left_edges);
+        // cv::waitKey(0);
+        
+        int num_iterations = 1000;
+        double time_elapsed = 0.0;
+
+        for (int i = 0; i < num_iterations; i++){
+        auto start = std::chrono::high_resolution_clock::now();
 
         //////////////EXTRACT, THEN DISTORT////////////////////
         // Use Canny edge detection
@@ -215,14 +226,13 @@ void Dataset::DetectEdges(int num_images) {
         UndistortEdges(left_edges, left_undist_edges, left_edge_coords, left_intr, left_dist_coeffs);
         UndistortEdges(right_edges, right_undist_edges, right_edge_coords, right_intr, right_dist_coeffs);
 
-        VisualizeOrder("/Users/saulll./Desktop/Edge-Based Visual Odometry/Edge_Based_Visual_Odometry-main/bin/Extract, then Undistort - Edge Map (1403715273262142976.png)", 
-        "/Users/saulll./Desktop/Edge-Based Visual Odometry/Edge_Based_Visual_Odometry-main/bin/Undistort, then Extract - Edge Map (1403715273262142976.png)");
-
         // VisualizeEdges(left_undist_edges, right_undist_edges, left_edge_coords);
 
-        // cv::imshow("Extract, then Undistort - Edge Map (" + filename + ")" , left_undist_edges);
-        // cv::imwrite("Extract, then Undistort - Edge Map (" + filename + ")", left_undist_edges);
-        // cv::waitKey(0);
+        auto end = std::chrono::high_resolution_clock::now();
+        time_elapsed += std::chrono::duration<double, std::milli>(end-start).count();
+        }
+
+        std::cout << "Average Run Time: " << time_elapsed / num_iterations << " ms" << std::endl;
     }
 }
 
