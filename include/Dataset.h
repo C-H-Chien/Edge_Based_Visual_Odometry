@@ -33,7 +33,8 @@ public:
     Dataset(YAML::Node, bool);
 
     // void PrintDatasetInfo();
-    void ExtractEdges(int num_images);
+    void DetectEdges(int num_images);
+    void VisualizeEdges(const cv::Mat& left_edges, const cv::Mat& right_edges, std::vector<cv::Point2f> left_coords);
     void UndistortEdges(const cv::Mat& dist_edges, cv::Mat& undist_edges, 
                              std::vector<cv::Point2f>& edge_locations,
                              const std::vector<double>& intr, 

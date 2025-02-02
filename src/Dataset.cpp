@@ -131,7 +131,7 @@ Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(confi
 // }
 
 
-void Dataset::ExtractEdges(int num_images) {
+void Dataset::DetectEdges(int num_images) {
     std::string left_path = dataset_path + "/" + sequence_name + "/mav0/cam0/data/";
     std::string right_path = dataset_path + "/" + sequence_name + "/mav0/cam1/data/";
     std::string csv_path = dataset_path + "/" + sequence_name + "/mav0/cam0/data.csv";
@@ -186,54 +186,57 @@ void Dataset::ExtractEdges(int num_images) {
         UndistortEdges(left_edges, left_undist_edges, left_edge_coords, left_intr, left_dist_coeffs);
         UndistortEdges(right_edges, right_undist_edges, right_edge_coords, right_intr, right_dist_coeffs);
 
-
-        //Visualize random edges
-        cv::Mat left_visualization;
-        cv::cvtColor(left_undist_edges, left_visualization, cv::COLOR_GRAY2BGR);
-
-        cv::Mat right_visualization;
-        cv::cvtColor(right_undist_edges, right_visualization, cv::COLOR_GRAY2BGR);
-
-        std::vector<cv::Point2f> random_edges = SelectRandomEdges(left_edge_coords, 10);
-
-        for (const auto& pt : random_edges) {
-            cv::circle(left_visualization, pt, 3, cv::Scalar(255, 200, 100), 1);
-        }
-        
-        //Calculate epipolar line
-        Eigen::Matrix3d fund_mat;
-        for (int i = 0; i < 3; i++){
-            for (int j = 0; j < 3; j++){
-                fund_mat(i, j) = fundamental_matrix[i][j];
-            }
-        }
-
-        std::vector<Eigen::Vector3d> computed_lines = computeEpipolarLine(fund_mat, random_edges);
-
-
-
-
-        //Concatenate left and right camera undistorted
-        cv::Mat both_concat;
-        cv::hconcat(left_visualization, right_visualization, both_concat);
-        cv::imshow("Left Camera Undistorted vs Right Camera Undistorted", both_concat);
-        cv::waitKey(0);
-
-
-        // // Concatenate left camera distorted w/ undistorted
-        // cv::Mat left_concat;
-        // cv::hconcat(left_edges, left_undist_edges, left_concat);
-
-        // // Concatenate right camera distorted w/ undistorted
-        // cv::Mat right_concat;
-        // cv::hconcat(right_edges, right_undist_edges, right_concat);
-
-        // // Display results
-        // // cv::imshow("Left Camera (Distorted vs Undistorted)", left_concat);
-        // // cv::imshow("Right Camera (Distorted vs Undistorted)", right_concat);
+        VisualizeEdges(left_undist_edges, right_undist_edges, left_edge_coords);
     }
 }
 
+void Dataset::VisualizeEdges(const cv::Mat& left_edges, const cv::Mat& right_edges, std::vector<cv::Point2f> left_coords){
+    //Visualize random edges
+    cv::Mat left_visualization;
+    cv::cvtColor(left_edges, left_visualization, cv::COLOR_GRAY2BGR);
+
+    cv::Mat right_visualization;
+    cv::cvtColor(right_edges, right_visualization, cv::COLOR_GRAY2BGR);
+
+    std::vector<cv::Point2f> random_edges = SelectRandomEdges(left_coords, 5);
+
+    for (const auto& pt : random_edges) {
+        cv::circle(left_visualization, pt, 5, cv::Scalar(255, 200, 100), cv::FILLED);
+    }
+    
+    //Calculate epipolar line
+    Eigen::Matrix3d fund_mat;
+    for (int i = 0; i < 3; i++){
+        for (int j = 0; j < 3; j++){
+            fund_mat(i, j) = fundamental_matrix[i][j];
+        }
+    }
+
+    std::vector<Eigen::Vector3d> computed_lines = computeEpipolarLine(fund_mat, random_edges);
+    
+    // Draw epipolar lines
+    for (size_t i = 0; i < random_edges.size(); i++) {
+        const auto& point = random_edges[i];
+        const auto& line = computed_lines[i];
+
+        // Compute y-values at image borders
+        double x1 = 0;
+        double y1 = (-line(2) - line(0) * x1) / line(1);
+
+        double x2 = right_visualization.cols - 1;
+        double y2 = (-line(2) - line(0) * x2) / line(1);
+
+        // Shift epipolar line to right image
+        cv::line(right_visualization, cv::Point(x1, y1), cv::Point(x2, y2), cv::Scalar(255, 200, 100), 1);
+    }
+
+
+    //Concatenate left and right camera undistorted
+    cv::Mat both_concat;
+    cv::hconcat(left_visualization, right_visualization, both_concat);
+    cv::imshow("Left Camera Undistorted vs Right Camera Undistorted", both_concat);
+    cv::waitKey(0);
+}
 
 void Dataset::UndistortEdges(const cv::Mat& dist_edges, cv::Mat& undist_edges, 
                              std::vector<cv::Point2f>& edge_locations,
