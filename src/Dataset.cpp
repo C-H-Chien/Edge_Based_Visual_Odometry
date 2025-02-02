@@ -176,48 +176,84 @@ void Dataset::DetectEdges(int num_images) {
 
         //////////////UNDISTORT, THEN EXTRACT///////////////////////
 
-        cv::Mat left_calib = (cv::Mat_<double>(3, 3) << 
-                                  left_intr[0], 0, left_intr[2], 
-                                  0, left_intr[1], left_intr[3], 
-                                  0, 0, 1);
-        cv::Mat right_calib = (cv::Mat_<double>(3,3 )<< 
-                                right_intr[0], 0, right_intr[2],
-                                0, right_intr[1], right_intr[3],
-                                0, 0, 1);
-        cv::Mat left_dist_coeff_mat(left_dist_coeffs);
-        cv::Mat right_dist_coeff_mat(right_dist_coeffs);
+        // cv::Mat left_calib = (cv::Mat_<double>(3, 3) << 
+        //                           left_intr[0], 0, left_intr[2], 
+        //                           0, left_intr[1], left_intr[3], 
+        //                           0, 0, 1);
+        // cv::Mat right_calib = (cv::Mat_<double>(3,3 )<< 
+        //                         right_intr[0], 0, right_intr[2],
+        //                         0, right_intr[1], right_intr[3],
+        //                         0, 0, 1);
+        // cv::Mat left_dist_coeff_mat(left_dist_coeffs);
+        // cv::Mat right_dist_coeff_mat(right_dist_coeffs);
 
-        cv::Mat left_undistorted, right_undistorted;
-        cv::undistort(left_img, left_undistorted, left_calib, left_dist_coeff_mat);
-        cv::undistort(right_img, right_undistorted, right_calib, right_dist_coeff_mat);
+        // cv::Mat left_undistorted, right_undistorted;
+        // cv::undistort(left_img, left_undistorted, left_calib, left_dist_coeff_mat);
+        // cv::undistort(right_img, right_undistorted, right_calib, right_dist_coeff_mat);
 
-        cv::Mat left_edges, right_edges;
+        // cv::Mat left_edges, right_edges;
 
-        cv::Canny(left_undistorted, left_edges, 50, 150);
-        cv::Canny(right_undistorted, right_edges, 50, 150);
+        // cv::Canny(left_undistorted, left_edges, 50, 150);
+        // cv::Canny(right_undistorted, right_edges, 50, 150);
 
-        std::vector<cv::Point2f> left_edge_coords;
+        // std::vector<cv::Point2f> left_edge_coords;
 
-        cv::findNonZero(left_edges, left_edge_coords);
+        // cv::findNonZero(left_edges, left_edge_coords);
 
-        VisualizeEdges(left_edges, right_edges, left_edge_coords);
+        // VisualizeEdges(left_edges, right_edges, left_edge_coords);
 
         //////////////EXTRACT, THEN DISTORT////////////////////
-        // // Use Canny edge detection
-        // cv::Mat left_edges, right_edges;
-        // cv::Canny(left_img, left_edges, 50, 150);
-        // cv::Canny(right_img, right_edges, 50, 150);
+        // Use Canny edge detection
+        cv::Mat left_edges, right_edges;
+        cv::Canny(left_img, left_edges, 50, 150);
+        cv::Canny(right_img, right_edges, 50, 150);
 
-        // // Undistort edges
-        // cv::Mat left_undist_edges, right_undist_edges;
-        // std::vector<cv::Point2f> left_edge_coords, right_edge_coords;
+        // Undistort edges
+        cv::Mat left_undist_edges, right_undist_edges;
+        std::vector<cv::Point2f> left_edge_coords, right_edge_coords;
 
-        // UndistortEdges(left_edges, left_undist_edges, left_edge_coords, left_intr, left_dist_coeffs);
-        // UndistortEdges(right_edges, right_undist_edges, right_edge_coords, right_intr, right_dist_coeffs);
+        UndistortEdges(left_edges, left_undist_edges, left_edge_coords, left_intr, left_dist_coeffs);
+        UndistortEdges(right_edges, right_undist_edges, right_edge_coords, right_intr, right_dist_coeffs);
+
+        VisualizeOrder("/Users/saulll./Desktop/Edge-Based Visual Odometry/Edge_Based_Visual_Odometry-main/bin/Extract, then Undistort - Edge Map (1403715273262142976.png)", 
+        "/Users/saulll./Desktop/Edge-Based Visual Odometry/Edge_Based_Visual_Odometry-main/bin/Undistort, then Extract - Edge Map (1403715273262142976.png)");
 
         // VisualizeEdges(left_undist_edges, right_undist_edges, left_edge_coords);
+
+        // cv::imshow("Extract, then Undistort - Edge Map (" + filename + ")" , left_undist_edges);
+        // cv::imwrite("Extract, then Undistort - Edge Map (" + filename + ")", left_undist_edges);
+        // cv::waitKey(0);
     }
 }
+
+
+void Dataset::VisualizeOrder(const std::string& extract_undist_path, const std::string& undistort_extract_path){
+    // Load edge maps
+    cv::Mat extract_undist_img = cv::imread(extract_undist_path, cv::IMREAD_GRAYSCALE);
+    cv::Mat undist_extract_img = cv::imread(undistort_extract_path, cv::IMREAD_GRAYSCALE);
+    
+    cv::Mat overlay;
+    cv::cvtColor(undist_extract_img, overlay, cv::COLOR_GRAY2BGR);
+
+    // Assign colors
+    for (int y = 0; y < overlay.rows; y++) {
+        for (int x = 0; x < overlay.cols; x++) {
+            if (extract_undist_img.at<uchar>(y, x) > 0) {
+                overlay.at<cv::Vec3b>(y, x) = cv::Vec3b(0, 0, 255);  // Red for extract then undistort
+            }
+            if (undist_extract_img.at<uchar>(y, x) > 0) {
+                overlay.at<cv::Vec3b>(y, x) = cv::Vec3b(255, 0, 0);  // Blue for undistort then extract
+                }
+            }
+        }
+
+    // Display
+    cv::imshow("Edge Map Overlay - Red (EU), Blue (UE)", overlay);
+    cv::imwrite("Edge Map Overlay - Red (EU), Blue (UE).png", overlay);
+    cv::waitKey(0);
+
+}
+
 
 void Dataset::VisualizeEdges(const cv::Mat& left_edges, const cv::Mat& right_edges, std::vector<cv::Point2f> left_coords){
     //Visualize random edges
