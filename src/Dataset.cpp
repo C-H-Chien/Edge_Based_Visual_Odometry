@@ -282,7 +282,7 @@ void Dataset::VisualizeEdges(const cv::Mat& left_edges, const cv::Mat& right_edg
 
     for (const auto& pt : random_edges) {
         // Visualize selected edges
-        cv::circle(left_visualization, pt, 3, cv::Scalar(255, 200, 100), cv::FILLED);
+        cv::circle(left_visualization, pt, 3, cv::Scalar(0, 255, 0), cv::FILLED);
 
         // Extract patch around edge
         int x = static_cast<int>(pt.x);
@@ -310,22 +310,25 @@ void Dataset::VisualizeEdges(const cv::Mat& left_edges, const cv::Mat& right_edg
         }
     }
 
-    std::vector<Eigen::Vector3d> computed_lines = computeEpipolarLine(fund_mat, random_edges);
+    std::vector<Eigen::Vector3d> computed_lines = ComputeEpipolarLine(fund_mat, random_edges);
     
-    // Draw epipolar lines
+    // Draw epipolar lines and edge points
     for (size_t i = 0; i < random_edges.size(); i++) {
         const auto& point = random_edges[i];
         const auto& line = computed_lines[i];
 
-        // Compute y-values at image borders
-        double x1 = 0;
-        double y1 = (-line(2) - line(0) * x1) / line(1);
+        // Find edge points along epipolar line
+        std::vector<cv::Point2f> sampled_edges = ExtractEpipolarEdges(line, right_edges);
 
-        double x2 = right_visualization.cols - 1;
-        double y2 = (-line(2) - line(0) * x2) / line(1);
+        // Draw epipolar line
+        if (sampled_edges.size() > 1) {
+            cv::line(right_visualization, sampled_edges.front(), sampled_edges.back(), cv::Scalar(255, 200, 100), 1);
+        }
 
-        // Shift epipolar line to right image
-        cv::line(right_visualization, cv::Point(x1, y1), cv::Point(x2, y2), cv::Scalar(255, 200, 100), 1);
+        // Draw selected edge points
+        for (const auto& sample_point : sampled_edges) {
+            cv::circle(right_visualization, sample_point, 2, cv::Scalar(0, 255, 0), cv::FILLED);
+        }
     }
 
 
@@ -335,6 +338,30 @@ void Dataset::VisualizeEdges(const cv::Mat& left_edges, const cv::Mat& right_edg
     cv::imshow("Left Camera Undistorted vs Right Camera Undistorted", both_concat);
     cv::waitKey(0);
 }
+
+std::vector<cv::Point2f> Dataset::ExtractEpipolarEdges(const Eigen::Vector3d& epipolar_line, const cv::Mat& right_map) {
+    std::vector<cv::Point2f> edge_points;
+
+    int width = right_map.cols;
+    int height = right_map.rows;
+
+    // Loop through x-coords and calculate corresponding y-coords
+    for (int x = 0; x < width; x++) {
+        double y = (-epipolar_line(2) - epipolar_line(0) * x) / epipolar_line(1);
+
+        // Check y-coords is within bounds
+        int y_int = static_cast<int>(std::round(y));
+        if (y_int >= 0 && y_int < height) {
+            // Check if point is an edge
+            if (right_map.at<uchar>(y_int, x) == 255) {
+                edge_points.emplace_back(x, y_int);
+            }
+        }
+    }
+
+    return edge_points;
+}
+
 
 void Dataset::UndistortEdges(const cv::Mat& dist_edges, cv::Mat& undist_edges, 
                              std::vector<cv::Point2f>& edge_locations,
@@ -400,7 +427,7 @@ std::vector<cv::Point2f> Dataset::SelectRandomEdges(const std::vector<cv::Point2
 }
 
 
-std::vector<Eigen::Vector3d> Dataset::computeEpipolarLine(const Eigen::Matrix3d& fund_mat, const std::vector<cv::Point2f>& edge_points) {
+std::vector<Eigen::Vector3d> Dataset::ComputeEpipolarLine(const Eigen::Matrix3d& fund_mat, const std::vector<cv::Point2f>& edge_points) {
     std::vector<Eigen::Vector3d> epipolar_lines;
 
     for (const auto& point : edge_points) {
