@@ -34,16 +34,18 @@ public:
 
     // void PrintDatasetInfo();
     void DetectEdges(int num_images);
-    void VisualizeEdges(const cv::Mat& left_edges, const cv::Mat& right_edges, std::vector<cv::Point2f> left_coords);
+    void VisualizeMatches(const cv::Mat& left_map, const cv::Mat& right_map, std::vector<cv::Point2f> left_edge_coords);
+    int FindBestMatchSSD(const cv::Mat& left_patch, const std::vector<cv::Mat>& right_patches);
+    void ExtractPatches(int patch_size, const cv::Mat& binary_map, const std::vector<cv::Point2f>& selected_edges, 
+                             cv::Mat& visualization, std::vector<cv::Mat>& patches);
     void UndistortEdges(const cv::Mat& dist_edges, cv::Mat& undist_edges, 
                              std::vector<cv::Point2f>& edge_locations,
                              const std::vector<double>& intr, 
                              const std::vector<double>& dist_coeffs);
-    void VisualizeOrder(const std::string& extract_undist_path, const std::string& undistort_extract_path);
-    std::vector<cv::Point2f> SelectRandomEdges(const std::vector<cv::Point2f>& edge_points, size_t num_points);
-    std::vector<Eigen::Vector3d> ComputeEpipolarLine(const Eigen::Matrix3d& fund_mat, const std::vector<cv::Point2f>& edge_point);
-    std::vector<cv::Point2f> ExtractEpipolarEdges(const Eigen::Vector3d& epipolar_line, const cv::Mat& right_map);
-    void ExtractPatches(int patch_size, const cv::Mat& left_edges, std::vector<cv::Point2f> edges, const cv::Mat& visualization);
+    std::vector<cv::Point2f> ExtractEpipolarEdges(const Eigen::Vector3d& epipolar_line, const cv::Mat& binary_map);
+    std::vector<cv::Point2f> SelectRandomEdges(const std::vector<cv::Point2f>& edges, size_t num_points);
+    std::vector<Eigen::Vector3d> ComputeEpipolarLine(const Eigen::Matrix3d& fund_mat, const std::vector<cv::Point2f>& edges);
+    void VisualizeOverlay(const std::string& extract_undist_path, const std::string& undistort_extract_path);
     // bool Init_Fetch_Data();
     // Frame::Ptr get_Next_Frame();
 
