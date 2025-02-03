@@ -43,6 +43,7 @@ public:
     std::vector<cv::Point2f> SelectRandomEdges(const std::vector<cv::Point2f>& edge_points, size_t num_points);
     std::vector<Eigen::Vector3d> ComputeEpipolarLine(const Eigen::Matrix3d& fund_mat, const std::vector<cv::Point2f>& edge_point);
     std::vector<cv::Point2f> ExtractEpipolarEdges(const Eigen::Vector3d& epipolar_line, const cv::Mat& right_map);
+    void ExtractPatches(int patch_size, const cv::Mat& left_edges, std::vector<cv::Point2f> edges, const cv::Mat& visualization);
     // bool Init_Fetch_Data();
     // Frame::Ptr get_Next_Frame();
 

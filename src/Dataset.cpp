@@ -264,7 +264,6 @@ void Dataset::VisualizeOrder(const std::string& extract_undist_path, const std::
     cv::waitKey(0);
 }
 
-
 void Dataset::VisualizeEdges(const cv::Mat& left_edges, const cv::Mat& right_edges, std::vector<cv::Point2f> left_coords){
     cv::Mat left_visualization;
     cv::cvtColor(left_edges, left_visualization, cv::COLOR_GRAY2BGR);
@@ -274,34 +273,8 @@ void Dataset::VisualizeEdges(const cv::Mat& left_edges, const cv::Mat& right_edg
 
     std::vector<cv::Point2f> random_edges = SelectRandomEdges(left_coords, 5);
 
-    // Patch size
-    int patch_size = 7;
-    int half_patch = patch_size / 2;
+    ExtractPatches(7, left_edges, random_edges, left_visualization);
 
-    std::vector<cv::Mat> patches;
-
-    for (const auto& pt : random_edges) {
-        // Visualize selected edges
-        cv::circle(left_visualization, pt, 3, cv::Scalar(0, 255, 0), cv::FILLED);
-
-        // Extract patch around edge
-        int x = static_cast<int>(pt.x);
-        int y = static_cast<int>(pt.y);
-
-        // Check patch is within bounds
-        if (x - half_patch >= 0 && x + half_patch < left_edges.cols &&
-            y - half_patch >= 0 && y + half_patch < left_edges.rows) {
-            
-            // Extract patch
-            cv::Rect patch_rect(x - half_patch, y - half_patch, patch_size, patch_size);
-            cv::Mat patch = left_edges(patch_rect).clone();
-            patches.push_back(patch);
-
-            // Draw bounding box around patch
-            cv::rectangle(left_visualization, patch_rect, cv::Scalar(0, 0, 255), 1);
-        }
-    }
-    
     //Calculate epipolar line
     Eigen::Matrix3d fund_mat;
     for (int i = 0; i < 3; i++){
@@ -325,10 +298,7 @@ void Dataset::VisualizeEdges(const cv::Mat& left_edges, const cv::Mat& right_edg
             cv::line(right_visualization, sampled_edges.front(), sampled_edges.back(), cv::Scalar(255, 200, 100), 1);
         }
 
-        // Draw selected edge points
-        for (const auto& sample_point : sampled_edges) {
-            cv::circle(right_visualization, sample_point, 2, cv::Scalar(0, 255, 0), cv::FILLED);
-        }
+        ExtractPatches(7, right_edges, sampled_edges, right_visualization);
     }
 
 
@@ -338,6 +308,37 @@ void Dataset::VisualizeEdges(const cv::Mat& left_edges, const cv::Mat& right_edg
     cv::imshow("Left Camera Undistorted vs Right Camera Undistorted", both_concat);
     cv::waitKey(0);
 }
+
+
+void Dataset::ExtractPatches(int patch_size, const cv::Mat& binary_map, std::vector<cv::Point2f> selected_edges, const cv::Mat& visualization){
+    int half_patch = patch_size / 2;
+
+    std::vector<cv::Mat> patches;
+
+    for (const auto& pt : selected_edges) {
+        // Visualize selected edges
+        cv::circle(visualization, pt, 3, cv::Scalar(0, 255, 0), cv::FILLED);
+
+        // Extract patch around edge
+        int x = static_cast<int>(pt.x);
+        int y = static_cast<int>(pt.y);
+
+        // Check patch is within bounds
+        if (x - half_patch >= 0 && x + half_patch < binary_map.cols &&
+            y - half_patch >= 0 && y + half_patch < binary_map.rows) {
+            
+            // Extract patch
+            cv::Rect patch_rect(x - half_patch, y - half_patch, patch_size, patch_size);
+            cv::Mat patch = binary_map(patch_rect).clone();
+            patches.push_back(patch);
+
+            // Draw bounding box around patch
+            cv::rectangle(visualization, patch_rect, cv::Scalar(0, 0, 255), 1);
+        }
+    }
+
+}
+
 
 std::vector<cv::Point2f> Dataset::ExtractEpipolarEdges(const Eigen::Vector3d& epipolar_line, const cv::Mat& right_map) {
     std::vector<cv::Point2f> edge_points;
