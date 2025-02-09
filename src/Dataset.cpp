@@ -30,11 +30,9 @@
 //> Chiang-Heng Chien (chiang-heng_chien@brown.edu)
 // =======================================================================================================
 
-Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(config_map), compute_grad_depth(use_GCC_filter)
-{
-
-	dataset_path = config_file["dataset_dir"].as<std::string>();
-	sequence_name = config_file["sequence_name"].as<std::string>();
+Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(config_map), compute_grad_depth(use_GCC_filter){
+    dataset_path = config_file["dataset_dir"].as<std::string>();
+    sequence_name = config_file["sequence_name"].as<std::string>();
     dataset_type = config_file["dataset_type"].as<std::string>();
 
     if (dataset_type == "EuRoC") {
@@ -43,7 +41,7 @@ Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(confi
             YAML::Node right_cam = config_file["right_camera"];
             YAML::Node stereo = config_file["stereo"];
 
-            // Parsing left_cam parameters
+            // Parsing left camera parameters
             left_res = left_cam["resolution"].as<std::vector<int>>();
             left_rate = left_cam["rate_hz"].as<int>();
             left_model = left_cam["camera_model"].as<std::string>();
@@ -51,29 +49,47 @@ Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(confi
             left_dist_model = left_cam["distortion_model"].as<std::string>();
             left_dist_coeffs = left_cam["distortion_coefficients"].as<std::vector<double>>();
 
-            // Parsing right_cam parameters
+            // Parsing right camera parameters
             right_res = right_cam["resolution"].as<std::vector<int>>();
-            right_rate= right_cam["rate_hz"].as<int>();
+            right_rate = right_cam["rate_hz"].as<int>();
             right_model = right_cam["camera_model"].as<std::string>();
             right_intr = right_cam["intrinsics"].as<std::vector<double>>();
             right_dist_model = right_cam["distortion_model"].as<std::string>();
             right_dist_coeffs = right_cam["distortion_coefficients"].as<std::vector<double>>();
 
             // Parsing stereo extrinsic parameters
-            for (const auto& row : stereo["rotation_matrix"]) {
-                rotation_matrix.push_back(row.as<std::vector<double>>());
+            if (stereo["R21"] && stereo["T21"] && stereo["F21"]) {
+                for (const auto& row : stereo["R21"]) {
+                    R21.push_back(row.as<std::vector<double>>());
+                }
+                T21 = stereo["T21"].as<std::vector<double>>();
+                for (const auto& row : stereo["F21"]) {
+                    F21.push_back(row.as<std::vector<double>>());
+                }
+            } else {
+                std::cerr << "ERROR: Missing Left-to-Right stereo parameters (R21, T21, F21) in YAML file!" << std::endl;
             }
 
-            translation_vector = stereo["translation_vector"].as<std::vector<double>>();\
+            if (stereo["R12"] && stereo["T12"] && stereo["F12"]) {
 
-            for (const auto& row : stereo["fundamental_matrix"]) {
-                fundamental_matrix.push_back(row.as<std::vector<double>>());
+                for (const auto& row : stereo["R12"]) {
+                    R12.push_back(row.as<std::vector<double>>());
+                }
+ 
+                T12 = stereo["T12"].as<std::vector<double>>();
+
+                for (const auto& row : stereo["F12"]) {
+                    F12.push_back(row.as<std::vector<double>>());
+                }
+            } else {
+                std::cerr << "ERROR: Missing Right-to-Left stereo parameters (R12, T12, F12) in YAML file!" << std::endl;
             }
 
         } catch (const YAML::Exception &e) {
-            std::cerr << "ERROR: Could not parse YAML file!" << e.what() << std::endl;
+            std::cerr << "ERROR: Could not parse YAML file! " << e.what() << std::endl;
         }
     }
+
     // Calib = Eigen::Matrix3d::Identity();
     // Inverse_Calib = Eigen::Matrix3d::Identity();
 
@@ -101,33 +117,61 @@ Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(confi
 
 
 // void Dataset::PrintDatasetInfo() {
-//     std::cout << "left_cam Resolution: " << left_res[0] << "x" << left_res[1] << std::endl;
-//     std::cout << "\nleft_cam Intrinsics: ";
+//     //Stereo Intrinsic Parameters
+//     std::cout << "Left Camera Resolution: " << left_res[0] << "x" << left_res[1] << std::endl;
+
+//     std::cout << "\nLeft Camera Intrinsics: ";
 //     for (const auto& value : left_intr) std::cout << value << " ";
 //     std::cout << std::endl;
 
-//     std::cout << "right_cam Intrinsics: ";
+//     std::cout << "Right Camera Intrinsics: ";
 //     for (const auto& value : right_intr) std::cout << value << " ";
 //     std::cout << std::endl;
 
-//     std::cout << "\nStereo Rotation Matrix: " << std::endl;
-//     for (const auto& row : rotation_matrix) {
+//     // Stereo Extrinsic Parameters (Left to Right)
+//     std::cout << "\nStereo Extrinsic Parameters (Left to Right - R21, T21, F21):\n";
+
+//     std::cout << "\nRotation Matrix R21: \n";
+//     for (const auto& row : R21) {
 //         for (const auto& value : row) {
 //             std::cout << value << " ";
 //         }
 //         std::cout << std::endl;
 //     }
 
-//     std::cout << "\nTranslation Vector: ";
-//     for (const auto& value : translation_vector) std::cout << value << " ";
+//     std::cout << "\nTranslation Vector T21: ";
+//     for (const auto& value : T21) std::cout << value << " ";
 //     std::cout << std::endl;
 
-//     std::cout << "\nFundamental Matrix: " << std::endl;
-//     for (const auto& row : fundamental_matrix) {
+//     std::cout << "\nFundamental Matrix F21: \n";
+//     for (const auto& row : F21) {
 //         for (const auto& value : row) {
 //             std::cout << value << " ";
 //         }
 //         std::cout << std::endl;
+//     }
+
+//     // Stereo Extrinsic Parameters (Right to Left)
+//     std::cout << "\nStereo Extrinsic Parameters (Right to Left - R12, T12, F12):\n";
+
+//     std::cout << "\nRotation Matrix R12: \n";
+//     for (const auto& row : R12) {
+//         for (const auto& value : row) {
+//             std::cout << value << " ";
+//         }
+//         std::cout << std::endl;
+//     }
+
+//     std::cout << "\nTranslation Vector T12: ";
+//     for (const auto& value : T12) std::cout << value << " ";
+//     std::cout << std::endl;
+
+//     std::cout << "\nFundamental Matrix F12: \n";
+//     for (const auto& row : F12) {
+//         for (const auto& value : row) {
+//             std::cout << value << " ";
+//         }
+//         std::cout << "\n" << std::endl;
 //     }
 // }
 
@@ -258,7 +302,7 @@ void Dataset::VisualizeMatches(const cv::Mat& left_map, const cv::Mat& right_map
     Eigen::Matrix3d fund_mat;
     for (int i = 0; i < 3; i++) {
         for (int j = 0; j < 3; j++) {
-            fund_mat(i, j) = fundamental_matrix[i][j];
+            fund_mat(i, j) = F21[i][j];
         }
     }
     

@@ -32,7 +32,7 @@ public:
     typedef std::shared_ptr<Dataset> Ptr;
     Dataset(YAML::Node, bool);
 
-    // void PrintDatasetInfo();
+    void PrintDatasetInfo();
     void DetectEdges(int num_images);
     void VisualizeMatches(const cv::Mat& left_map, const cv::Mat& right_map, std::vector<cv::Point2f> left_edge_coords);
     int FindBestMatchSSD(const cv::Mat& left_patch, const std::vector<cv::Mat>& right_patches);
@@ -75,10 +75,13 @@ private:
     std::string right_dist_model;
     std::vector<double> right_dist_coeffs;
 
-    std::vector<std::vector<double>> rotation_matrix;
-    std::vector<double> translation_vector;
-    std::vector<std::vector<double>> fundamental_matrix;
+    std::vector<std::vector<double>> R21;
+    std::vector<double> T21;
+    std::vector<std::vector<double>> F21;
 
+    std::vector<std::vector<double>> R12;
+    std::vector<double> T12;
+    std::vector<std::vector<double>> F12;
     // Eigen::Matrix3d Calib;        
     // Eigen::Matrix3d Inverse_Calib; 
 
