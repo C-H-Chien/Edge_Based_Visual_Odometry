@@ -1,6 +1,10 @@
 //> Macro definitions
 #define USE_GLOGS                       (false)
 
+//> Number of CPU cores to process
+#define NUM_OF_CPU_CORES                (4)
+
+//> Define output file folder
 #define OUTPUT_WRITE_PATH               std::string("Output_Results/")
 #define OUTPUT_DATA_TYPE                std::string("TUM")  //> Either TUM or KITTI
 
@@ -24,6 +28,10 @@
 
 #define ACTIVATE_GCC (true)
 #define GCC_PATCH_HALF_SIZE (3)
+
+//> Third-Order Edge Detection Parameters
+#define TOED_KERNEL_SIZE                (17)
+#define TOED_SIGMA                      (2)
 
 //> SIFT parameters
 #define SIFT_NFEATURES                  (0)
