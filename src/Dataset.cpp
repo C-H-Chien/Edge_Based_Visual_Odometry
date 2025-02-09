@@ -74,6 +74,8 @@ Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(confi
             std::cerr << "ERROR: Could not parse YAML file!" << e.what() << std::endl;
         }
     }
+
+
     // Calib = Eigen::Matrix3d::Identity();
     // Inverse_Calib = Eigen::Matrix3d::Identity();
 
@@ -91,6 +93,7 @@ Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(confi
     // Current_Frame_Index = 0;
     // has_Depth = false;
 
+    
     if (compute_grad_depth) {
         Gx_2d = cv::Mat::ones(GAUSSIAN_KERNEL_WINDOW_LENGTH, GAUSSIAN_KERNEL_WINDOW_LENGTH, CV_64F);
         Gy_2d = cv::Mat::ones(GAUSSIAN_KERNEL_WINDOW_LENGTH, GAUSSIAN_KERNEL_WINDOW_LENGTH, CV_64F);
@@ -100,13 +103,13 @@ Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(confi
 }
 
 
-// void Dataset::PrintDatasetInfo() {
-//     std::cout << "left_cam Resolution: " << left_res[0] << "x" << left_res[1] << std::endl;
-//     std::cout << "\nleft_cam Intrinsics: ";
+// void Dataset::DisplayDatasetInfo() {
+//     std::cout << "Left Camera Resolution: " << left_res[0] << "x" << left_res[1] << std::endl;
+//     std::cout << "\nLeft Camera Intrinsics: ";
 //     for (const auto& value : left_intr) std::cout << value << " ";
 //     std::cout << std::endl;
 
-//     std::cout << "right_cam Intrinsics: ";
+//     std::cout << "Right Camera Intrinsics: ";
 //     for (const auto& value : right_intr) std::cout << value << " ";
 //     std::cout << std::endl;
 
@@ -132,177 +135,125 @@ Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(confi
 // }
 
 
-void Dataset::DetectEdges(int num_images) {
+void Dataset::PerformEdgeBasedVO() {
     std::string left_path = dataset_path + "/" + sequence_name + "/mav0/cam0/data/";
     std::string right_path = dataset_path + "/" + sequence_name + "/mav0/cam1/data/";
     std::string csv_path = dataset_path + "/" + sequence_name + "/mav0/cam0/data.csv";
+    
+    std::vector<std::pair<cv::Mat, cv::Mat>> image_pairs = LoadImagesFromCSV(csv_path, left_path, right_path, 5);
 
-    //Check if able to open CSV file
-    std::ifstream csv_file(csv_path);
-    if (!csv_file.is_open()) {
-        std::cerr << "ERROR: Could not open the CSV file located at " << csv_path << "!" << std::endl;
-        return;
-    }
-
-    std::vector<std::string> image_filenames;
-    std::string line;
-    bool first_line = true;
-
-    // Read the CSV file
-    while (std::getline(csv_file, line) && image_filenames.size() < num_images) {
-        if (first_line){
-            first_line = false;
-            continue;
-        }
-        std::istringstream line_stream(line);
-        std::string timestamp;
-        std::getline(line_stream, timestamp, ',');
-        image_filenames.push_back(timestamp + ".png");
-    }
-    csv_file.close();
-
-    // Loop through selected images
-    for (const auto& filename : image_filenames) {
-        std::string left_img_path = left_path + filename;
-        std::string right_img_path = right_path + filename;
-
-        // Load images
-        cv::Mat left_img = cv::imread(left_img_path, cv::IMREAD_GRAYSCALE);
-        cv::Mat right_img = cv::imread(right_img_path, cv::IMREAD_GRAYSCALE);
-
-        if (left_img.empty() || right_img.empty()) {
-            std::cerr << "ERROR: Could not load the image " << filename << "!" << std::endl;
-            continue;
-        }
-
-        cv::Mat left_calib = (cv::Mat_<double>(3, 3) << 
-                                  left_intr[0], 0, left_intr[2], 
-                                  0, left_intr[1], left_intr[3], 
-                                  0, 0, 1);
-        cv::Mat right_calib = (cv::Mat_<double>(3,3 )<< 
-                                right_intr[0], 0, right_intr[2],
-                                0, right_intr[1], right_intr[3],
-                                0, 0, 1);
+    for (const auto& pair : image_pairs) {
+        const cv::Mat& left_img = pair.first;
+        const cv::Mat& right_img = pair.second; {
+        cv::Mat left_calib = (cv::Mat_<double>(3, 3) << left_intr[0], 0, left_intr[2], 0, left_intr[1], left_intr[3], 0, 0, 1);
+        cv::Mat right_calib = (cv::Mat_<double>(3, 3) << right_intr[0], 0, right_intr[2], 0, right_intr[1], right_intr[3], 0, 0, 1);
         cv::Mat left_dist_coeff_mat(left_dist_coeffs);
         cv::Mat right_dist_coeff_mat(right_dist_coeffs);
-
-        //////////////UNDISTORT, THEN EXTRACT///////////////////////
+        
+        //////////////UNDISTORT, THEN EXTRACT////////////////////
 
         cv::Mat left_undistorted, right_undistorted;
         cv::undistort(left_img, left_undistorted, left_calib, left_dist_coeff_mat);
         cv::undistort(right_img, right_undistorted, right_calib, right_dist_coeff_mat);
-
+        
         cv::Mat left_map, right_map;
-
         cv::Canny(left_undistorted, left_map, 50, 150);
         cv::Canny(right_undistorted, right_map, 50, 150);
-
+        
         std::vector<cv::Point2f> left_edge_coords;
-
         cv::findNonZero(left_map, left_edge_coords);
+        
+        if (!left_edge_coords.empty()) {
+            // Select random edges
+            std::vector<cv::Point2f> random_edges = SelectRandomEdges(left_edge_coords, 5);
+            
+            // Extract left patches
+            std::vector<cv::Mat> left_patches;
+            ExtractPatches(7, left_map, random_edges, left_patches);
 
-        VisualizeMatches(left_map, right_map, left_edge_coords);
+            // Convert Fundamental Matrix to Eigen DS
+            Eigen::Matrix3d fund_mat;
+            for (int i = 0; i < 3; i++) {
+                for (int j = 0; j < 3; j++) {
+                    fund_mat(i, j) = fundamental_matrix[i][j];
+                }
+            }
 
-        // cv::imshow("Undistort, then Extract - " + filename, right_map);
-        // cv::imwrite("Undistort, then Extract  - " + filename, right_map);
-        // cv::waitKey(0);
+            // Compute epipolar lines
+            std::vector<Eigen::Vector3d> computed_lines = ComputeEpipolarLine(fund_mat, random_edges);
 
+            // Compute edge correspondences and epipolar line endpoints
+            std::vector<std::pair<cv::Point2f, cv::Point2f>> epipolar_lines;
+            std::vector<std::pair<cv::Point2f, cv::Point2f>> matched_edges = 
+                FindEdgeCorrespondences(random_edges, left_patches, computed_lines, right_map, epipolar_lines);
 
-        //////////////EXTRACT, THEN DISTORT////////////////////
-        // //Use Canny edge detection
-        // cv::Mat left_map, right_map;
-        // cv::Canny(left_img, left_map, 50, 150);
-        // cv::Canny(right_img, right_map, 50, 150);
-
-        // // Undistort edges
-        // cv::Mat left_undist_edges, right_undist_edges;
-        // std::vector<cv::Point2f> left_edge_coords, right_edge_coords;
-
-        // UndistortEdges(left_map, left_undist_edges, left_edge_coords, left_intr, left_dist_coeffs);
-        // UndistortEdges(right_map, right_undist_edges, right_edge_coords, right_intr, right_dist_coeffs);
-
-
-        //// VisualizeOverlay("/Users/saulll./Desktop/Edge-Based Visual Odometry/Edge_Based_Visual_Odometry-main/bin/Extract, then Undistort - 1403715273262142976.png",
-        ////  "/Users/saulll./Desktop/Edge-Based Visual Odometry/Edge_Based_Visual_Odometry-main/bin/Undistort, then Extract  - 1403715273262142976.png");
-
-        // VisualizeMatches(left_undist_edges, right_undist_edges, left_edge_coords);
+            // Visualize results
+            VisualizeEdgeCorrespondences(left_map, right_map, matched_edges, epipolar_lines);
+            }
+        }
     }
 }
 
 
-void Dataset::VisualizeMatches(const cv::Mat& left_map, const cv::Mat& right_map, std::vector<cv::Point2f> left_edge_coords){
-    cv::Mat left_visualization;
+void Dataset::VisualizeEdgeCorrespondences(const cv::Mat& left_map, const cv::Mat& right_map,
+    const std::vector<std::pair<cv::Point2f, cv::Point2f>>& matched_edges, const std::vector<std::pair<cv::Point2f, cv::Point2f>>& epipolar_line_endpoints) {
+    cv::Mat left_visualization, right_visualization;
     cv::cvtColor(left_map, left_visualization, cv::COLOR_GRAY2BGR);
-
-    cv::Mat right_visualization;
     cv::cvtColor(right_map, right_visualization, cv::COLOR_GRAY2BGR);
 
-    // Select random edges from left image
-    std::vector<cv::Point2f> random_edges = SelectRandomEdges(left_edge_coords, 5);
-
-    for (const auto& point : random_edges) {
-        cv::circle(left_visualization, point, 5, cv::Scalar(0, 0, 255), cv::FILLED);
+    // Draw epipolar lines on the right image
+    for (const auto& line : epipolar_line_endpoints) {
+        cv::line(right_visualization, line.first, line.second, cv::Scalar(255, 200, 100), 1);
     }
 
-    // Extract left patches
-    std::vector<cv::Mat> left_patches;
-    ExtractPatches(7, left_map, random_edges, left_visualization, left_patches);
-
-    // Confirm left patches are valid
-    if (random_edges.size() != left_patches.size()) {
-        std::cerr << "ERROR: Mismatch between random edges and extracted left patches!" << std::endl;
-        return;
+    // Draw edge correspondences
+    for (const auto& match : matched_edges) {
+        cv::circle(left_visualization, match.first, 5, cv::Scalar(0, 0, 255), cv::FILLED);
+        cv::circle(right_visualization, match.second, 5, cv::Scalar(0, 0, 255), cv::FILLED);
     }
 
-    // Compute epipolar lines
-    Eigen::Matrix3d fund_mat;
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-            fund_mat(i, j) = fundamental_matrix[i][j];
-        }
-    }
-    
-    std::vector<Eigen::Vector3d> computed_lines = ComputeEpipolarLine(fund_mat, random_edges);
-
-    // Process each left patch and find best match in right image
-    for (size_t i = 0; i < random_edges.size(); i++) {
-        const auto& left_point = random_edges[i];
-        const auto& left_patch = left_patches[i];
-        const auto& epipolar_line = computed_lines[i];
-
-        // Extract edges along the epipolar line
-        std::vector<cv::Point2f> sampled_edges = ExtractEpipolarEdges(epipolar_line, right_map);
-
-        // Draw epipolar line
-        if (sampled_edges.size() > 1) {
-            cv::line(right_visualization, sampled_edges.front(), sampled_edges.back(), cv::Scalar(255, 200, 100), 1);
-        }
-
-        // Extract right patches at edges
-        std::vector<cv::Mat> right_patches;
-        ExtractPatches(7, right_map, sampled_edges, right_visualization, right_patches);
-
-        // Check there are valid right patches to compare to
-        if (!left_patch.empty() && !right_patches.empty()) {
-            // Find best match using SSD
-            int best_match_idx = FindBestMatchSSD(left_patch, right_patches);
-            
-            if (best_match_idx != -1) {
-                // Draw edge correspondences
-                cv::circle(right_visualization, sampled_edges[best_match_idx], 5, cv::Scalar(0, 0, 255), cv::FILLED);
-            }
-        }
-    }
-
-    // Display results
     cv::Mat both_concat;
     cv::hconcat(left_visualization, right_visualization, both_concat);
-    cv::imshow("Edge Matching Using SSD", both_concat);
+    cv::imshow("Edge Correspondences with Epipolar Lines", both_concat);
     cv::waitKey(0);
 }
 
 
-int Dataset::FindBestMatchSSD(const cv::Mat& left_patch, const std::vector<cv::Mat>& right_patches) {
+std::vector<std::pair<cv::Point2f, cv::Point2f>> Dataset::FindEdgeCorrespondences(const std::vector<cv::Point2f>& left_edges, const std::vector<cv::Mat>& left_patches,
+    const std::vector<Eigen::Vector3d>& epipolar_lines, const cv::Mat& right_map, std::vector<std::pair<cv::Point2f, cv::Point2f>>& epipolar_line_endpoints) {
+    std::vector<std::pair<cv::Point2f, cv::Point2f>> matched_edges;
+
+    for (size_t i = 0; i < left_edges.size(); i++) {
+        const auto& left_patch = left_patches[i];
+        const auto& epipolar_line = epipolar_lines[i];
+
+        // Extract edges along the epipolar line
+        std::vector<cv::Point2f> sampled_edges = ExtractEpipolarEdges(epipolar_line, right_map);
+
+        // Store epipolar line endpoints for visualization
+        if (sampled_edges.size() > 1) {
+            epipolar_line_endpoints.emplace_back(sampled_edges.front(), sampled_edges.back());
+        }
+
+        // Extract right patches at edges
+        std::vector<cv::Mat> right_patches;
+        ExtractPatches(7, right_map, sampled_edges, right_patches);
+
+        // Find best match using SSD
+        if (!left_patch.empty() && !right_patches.empty()) {
+            int best_match_idx = MatchPatchSSD(left_patch, right_patches);
+            
+            if (best_match_idx != -1) {
+                matched_edges.emplace_back(left_edges[i], sampled_edges[best_match_idx]);
+            }
+        }
+    }
+
+    return matched_edges;
+}
+
+
+int Dataset::MatchPatchSSD(const cv::Mat& left_patch, const std::vector<cv::Mat>& right_patches) {
     if (right_patches.empty()) return -1;
 
     int best_match_idx = -1;
@@ -333,15 +284,11 @@ int Dataset::FindBestMatchSSD(const cv::Mat& left_patch, const std::vector<cv::M
     return best_match_idx;
 }
 
-void Dataset::ExtractPatches(int patch_size, const cv::Mat& binary_map, const std::vector<cv::Point2f>& selected_edges, 
-                             cv::Mat& visualization, std::vector<cv::Mat>& patches) {
+void Dataset::ExtractPatches(int patch_size, const cv::Mat& binary_map, const std::vector<cv::Point2f>& selected_edges, std::vector<cv::Mat>& patches) {
     int half_patch = patch_size / 2;
     patches.clear();
 
     for (const auto& edge : selected_edges) {
-        // // Visualize selected edges
-        // cv::circle(visualization, edge, 3, cv::Scalar(0, 255, 0), cv::FILLED);
-
         // Extract patch around edge
         int x = static_cast<int>(edge.x);
         int y = static_cast<int>(edge.y);
@@ -354,48 +301,10 @@ void Dataset::ExtractPatches(int patch_size, const cv::Mat& binary_map, const st
             cv::Rect patch_rect(x - half_patch, y - half_patch, patch_size, patch_size);
             cv::Mat patch = binary_map(patch_rect).clone();
             patches.push_back(patch);
-
-            // // Draw bounding box around patch
-            // cv::rectangle(visualization, patch_rect, cv::Scalar(0, 0, 255), 1);
         }
     }
-}
-
-
-void Dataset::UndistortEdges(const cv::Mat& dist_edges, cv::Mat& undist_edges, 
-                             std::vector<cv::Point2f>& edge_locations,
-                             const std::vector<double>& intr, 
-                             const std::vector<double>& dist_coeffs) {
-    // Create calibration matrix
-    cv::Mat calibration_matrix = (cv::Mat_<double>(3, 3) << 
-                                  intr[0], 0, intr[2], 
-                                  0, intr[1], intr[3], 
-                                  0, 0, 1);
-
-    // Convert distortion coefficients to cv::Mat
-    cv::Mat dist_coeffs_matrix(dist_coeffs);
-
-    // Extract edge points
-    std::vector<cv::Point2f> edge_points;
-    cv::findNonZero(dist_edges, edge_points);
-
-    // Undistort edge points
-    std::vector<cv::Point2f> undist_edge_points;
-    cv::undistortPoints(edge_points, undist_edge_points, calibration_matrix, dist_coeffs_matrix);
-
-    // Create an empty image to store undistorted edges
-    undist_edges = cv::Mat::zeros(dist_edges.size(), CV_8UC1);
-
-    // Map undistorted points back to image
-    edge_locations.clear();
-    for (const auto& point : undist_edge_points) {
-        int x = static_cast<int>(point.x * intr[0] + intr[2]); 
-        int y = static_cast<int>(point.y * intr[1] + intr[3]);
-
-        if (x >= 0 && x < undist_edges.cols && y >= 0 && y < undist_edges.rows) {
-            undist_edges.at<uchar>(y, x) = 255;
-            edge_locations.emplace_back(x, y);
-        }
+    if (selected_edges.size() != patches.size()) {
+    std::cerr << "ERROR: Mismatch between selected edges and extracted patches!" << std::endl;
     }
 }
 
@@ -506,6 +415,78 @@ void Dataset::VisualizeOverlay(const std::string& extract_undist_path, const std
     cv::imshow("Edge Map Overlay - Blue (EU), Red (UE), Pink (Both)", overlay);
     cv::imwrite("Edge Map Overlay - Blue (EU), Red (UE), Pink (Both).png", overlay);
     cv::waitKey(0);
+}
+
+
+void Dataset::UndistortEdges(const cv::Mat& dist_edges, cv::Mat& undist_edges, std::vector<cv::Point2f>& edge_locations, const std::vector<double>& intr, const std::vector<double>& dist_coeffs) {
+    // Create calibration matrix
+    cv::Mat calibration_matrix = (cv::Mat_<double>(3, 3) << 
+                                  intr[0], 0, intr[2], 
+                                  0, intr[1], intr[3], 
+                                  0, 0, 1);
+
+    // Convert distortion coefficients to cv::Mat
+    cv::Mat dist_coeffs_matrix(dist_coeffs);
+
+    // Extract edge points
+    std::vector<cv::Point2f> edge_points;
+    cv::findNonZero(dist_edges, edge_points);
+
+    // Undistort edge points
+    std::vector<cv::Point2f> undist_edge_points;
+    cv::undistortPoints(edge_points, undist_edge_points, calibration_matrix, dist_coeffs_matrix);
+
+    // Create an empty image to store undistorted edges
+    undist_edges = cv::Mat::zeros(dist_edges.size(), CV_8UC1);
+
+    // Map undistorted points back to image
+    edge_locations.clear();
+    for (const auto& point : undist_edge_points) {
+        int x = static_cast<int>(point.x * intr[0] + intr[2]); 
+        int y = static_cast<int>(point.y * intr[1] + intr[3]);
+
+        if (x >= 0 && x < undist_edges.cols && y >= 0 && y < undist_edges.rows) {
+            undist_edges.at<uchar>(y, x) = 255;
+            edge_locations.emplace_back(x, y);
+        }
+    }
+}
+
+
+std::vector<std::pair<cv::Mat, cv::Mat>> Dataset::LoadImagesFromCSV(const std::string& csv_path, const std::string& left_path, const std::string& right_path, int num_images) {
+    std::ifstream csv_file(csv_path);
+    if (!csv_file.is_open()) {
+        std::cerr << "ERROR: Could not open the CSV file located at " << csv_path << "!" << std::endl;
+        return {};
+    }
+    
+    std::vector<std::pair<cv::Mat, cv::Mat>> image_pairs;
+    std::string line;
+    bool first_line = true;
+    while (std::getline(csv_file, line) && image_pairs.size() < num_images) {
+        if (first_line) {
+            first_line = false;
+            continue;
+        }
+        std::istringstream line_stream(line);
+        std::string timestamp;
+        std::getline(line_stream, timestamp, ',');
+        
+        std::string left_img_path = left_path + timestamp + ".png";
+        std::string right_img_path = right_path + timestamp + ".png";
+        
+        cv::Mat left_img = cv::imread(left_img_path, cv::IMREAD_GRAYSCALE);
+        cv::Mat right_img = cv::imread(right_img_path, cv::IMREAD_GRAYSCALE);
+        
+        if (left_img.empty() || right_img.empty()) {
+            std::cerr << "ERROR: Could not load the images: " << left_img_path << " or " << right_img_path << "!" << std::endl;
+            continue;
+        }
+        
+        image_pairs.emplace_back(left_img, right_img);
+    }
+    csv_file.close();
+    return image_pairs;
 }
 
 

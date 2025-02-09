@@ -32,20 +32,9 @@ public:
     typedef std::shared_ptr<Dataset> Ptr;
     Dataset(YAML::Node, bool);
 
-    // void PrintDatasetInfo();
-    void DetectEdges(int num_images);
-    void VisualizeMatches(const cv::Mat& left_map, const cv::Mat& right_map, std::vector<cv::Point2f> left_edge_coords);
-    int FindBestMatchSSD(const cv::Mat& left_patch, const std::vector<cv::Mat>& right_patches);
-    void ExtractPatches(int patch_size, const cv::Mat& binary_map, const std::vector<cv::Point2f>& selected_edges, 
-                             cv::Mat& visualization, std::vector<cv::Mat>& patches);
-    void UndistortEdges(const cv::Mat& dist_edges, cv::Mat& undist_edges, 
-                             std::vector<cv::Point2f>& edge_locations,
-                             const std::vector<double>& intr, 
-                             const std::vector<double>& dist_coeffs);
-    std::vector<cv::Point2f> ExtractEpipolarEdges(const Eigen::Vector3d& epipolar_line, const cv::Mat& binary_map);
-    std::vector<cv::Point2f> SelectRandomEdges(const std::vector<cv::Point2f>& edges, size_t num_points);
-    std::vector<Eigen::Vector3d> ComputeEpipolarLine(const Eigen::Matrix3d& fund_mat, const std::vector<cv::Point2f>& edges);
-    void VisualizeOverlay(const std::string& extract_undist_path, const std::string& undistort_extract_path);
+    // void DisplayDatasetInfo();
+    void PerformEdgeBasedVO();
+
     // bool Init_Fetch_Data();
     // Frame::Ptr get_Next_Frame();
 
@@ -78,6 +67,20 @@ private:
     std::vector<std::vector<double>> rotation_matrix;
     std::vector<double> translation_vector;
     std::vector<std::vector<double>> fundamental_matrix;
+
+    void VisualizeEdgeCorrespondences(const cv::Mat& left_map, const cv::Mat& right_map,
+    const std::vector<std::pair<cv::Point2f, cv::Point2f>>& matched_edges, const std::vector<std::pair<cv::Point2f, cv::Point2f>>& epipolar_line_endpoints);
+    std::vector<std::pair<cv::Point2f, cv::Point2f>> FindEdgeCorrespondences(const std::vector<cv::Point2f>& left_edges, const std::vector<cv::Mat>& left_patches,
+    const std::vector<Eigen::Vector3d>& epipolar_lines, const cv::Mat& right_map, std::vector<std::pair<cv::Point2f, cv::Point2f>>& epipolar_line_endpoints);
+    int MatchPatchSSD(const cv::Mat& left_patch, const std::vector<cv::Mat>& right_patches);
+    void ExtractPatches(int patch_size, const cv::Mat& binary_map, const std::vector<cv::Point2f>& selected_edges, std::vector<cv::Mat>& patches);
+    std::vector<cv::Point2f> ExtractEpipolarEdges(const Eigen::Vector3d& epipolar_line, const cv::Mat& binary_map);
+    std::vector<cv::Point2f> SelectRandomEdges(const std::vector<cv::Point2f>& edges, size_t num_points);
+    std::vector<Eigen::Vector3d> ComputeEpipolarLine(const Eigen::Matrix3d& fund_mat, const std::vector<cv::Point2f>& edges);
+    void VisualizeOverlay(const std::string& extract_undist_path, const std::string& undistort_extract_path);
+    void UndistortEdges(const cv::Mat& dist_edges, cv::Mat& undist_edges, std::vector<cv::Point2f>& edge_locations, const std::vector<double>& intr, 
+        const std::vector<double>& dist_coeffs);
+    std::vector<std::pair<cv::Mat, cv::Mat>> LoadImagesFromCSV(const std::string& csv_path, const std::string& left_path, const std::string& right_path, int num_images);
 
     // Eigen::Matrix3d Calib;        
     // Eigen::Matrix3d Inverse_Calib; 
