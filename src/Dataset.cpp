@@ -103,16 +103,15 @@ Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(confi
     // Inverse_Calib(0,2) = -Calib(0,2) / Calib(0,0);
     // Inverse_Calib(1,2) = -Calib(1,2) / Calib(1,1);
 
-    // Total_Num_Of_Imgs = 0;
     // Current_Frame_Index = 0;
     // has_Depth = false;
 
-    if (compute_grad_depth) {
-        Gx_2d = cv::Mat::ones(GAUSSIAN_KERNEL_WINDOW_LENGTH, GAUSSIAN_KERNEL_WINDOW_LENGTH, CV_64F);
-        Gy_2d = cv::Mat::ones(GAUSSIAN_KERNEL_WINDOW_LENGTH, GAUSSIAN_KERNEL_WINDOW_LENGTH, CV_64F);
-        utility_tool->get_dG_2D(Gx_2d, Gy_2d, 4*DEPTH_GRAD_GAUSSIAN_SIGMA, DEPTH_GRAD_GAUSSIAN_SIGMA); 
-        Small_Patch_Radius_Map = cv::Mat::ones(2*GCC_PATCH_HALF_SIZE+1, 2*GCC_PATCH_HALF_SIZE+1, CV_64F);
-    }
+    // if (compute_grad_depth) {
+    //     Gx_2d = cv::Mat::ones(GAUSSIAN_KERNEL_WINDOW_LENGTH, GAUSSIAN_KERNEL_WINDOW_LENGTH, CV_64F);
+    //     Gy_2d = cv::Mat::ones(GAUSSIAN_KERNEL_WINDOW_LENGTH, GAUSSIAN_KERNEL_WINDOW_LENGTH, CV_64F);
+    //     utility_tool->get_dG_2D(Gx_2d, Gy_2d, 4*DEPTH_GRAD_GAUSSIAN_SIGMA, DEPTH_GRAD_GAUSSIAN_SIGMA); 
+    //     Small_Patch_Radius_Map = cv::Mat::ones(2*GCC_PATCH_HALF_SIZE+1, 2*GCC_PATCH_HALF_SIZE+1, CV_64F);
+    // }
 }
 
 
@@ -235,6 +234,33 @@ void Dataset::DetectEdges(int num_images) {
         cv::Mat left_undistorted, right_undistorted;
         cv::undistort(left_img, left_undistorted, left_calib, left_dist_coeff_mat);
         cv::undistort(right_img, right_undistorted, right_calib, right_dist_coeff_mat);
+
+        //> CH: stack all the undistorted images
+        undistorted_left_img.push_back(left_undistorted);
+        undistorted_right_img.push_back(right_undistorted);
+        if (Total_Num_Of_Imgs == 0) {
+            img_height = left_undistorted.rows;
+            img_width  = left_undistorted.cols;
+            //> CH: initiate a TOED constructor
+            TOED = std::shared_ptr<ThirdOrderEdgeDetectionCPU>(new ThirdOrderEdgeDetectionCPU( img_height, img_width ));
+        }
+
+        //> CH: get third-order edges
+        //> (i) left undistorted image
+        std::cout << "Processing third-order edges on the left image... " << std::endl;
+        TOED->get_Third_Order_Edges( left_undistorted );
+        left_third_order_edges_locations = TOED->toed_locations;
+        left_third_order_edges_orientation = TOED->toed_orientations;
+        std::cout << "Number of third-order edges on the left image: " << TOED->Total_Num_Of_TOED << std::endl;
+
+        //> (ii) right undistorted image
+        std::cout << "Processing third-order edges on the right image... " << std::endl;
+        TOED->get_Third_Order_Edges( right_undistorted );
+        right_third_order_edges_locations = TOED->toed_locations;
+        right_third_order_edges_orientation = TOED->toed_orientations;
+        std::cout << "Number of third-order edges on the right image: " << TOED->Total_Num_Of_TOED << std::endl;
+
+        Total_Num_Of_Imgs++;
 
         cv::Mat left_map, right_map;
 
@@ -552,7 +578,6 @@ std::vector<Eigen::Vector3d> Dataset::ComputeEpipolarLine(const Eigen::Matrix3d&
     return epipolar_lines;
 }
 
-
 void Dataset::VisualizeOverlay(const std::string& extract_undist_path, const std::string& undistort_extract_path) {
     // Load edge maps
     cv::Mat extract_undist_img = cv::imread(extract_undist_path, cv::IMREAD_GRAYSCALE);
@@ -587,7 +612,6 @@ void Dataset::VisualizeOverlay(const std::string& extract_undist_path, const std
     cv::waitKey(0);
 }
 
-
 // bool Dataset::Init_Fetch_Data() {
 
 //     if (dataset_type == "tum") {
@@ -619,6 +643,7 @@ void Dataset::VisualizeOverlay(const std::string& extract_undist_path, const std
 //     return true;
 // }
 
+//> This is the olde get_Next_Frame function
 // Frame::Ptr Dataset::get_Next_Frame() {
     
 //     std::string Current_Image_Path = Img_Path_List[Current_Frame_Index];

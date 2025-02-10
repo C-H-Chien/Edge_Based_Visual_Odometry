@@ -96,7 +96,7 @@ int main(int argc, char **argv) {
 
     // CHECK_EQ(dataset_->Init_Fetch_Data(), true);
 	
-	// std::cout << "Total Number of Images in the Dataset Sequence: " << dataset_->Total_Num_Of_Imgs << std::endl;
+	std::cout << "Total Number of Images in the Dataset Sequence: " << dataset_->Total_Num_Of_Imgs << std::endl;
 
 	// //> Pointers to the classes
 	// Frame::Ptr new_frame;

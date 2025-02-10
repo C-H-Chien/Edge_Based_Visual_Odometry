@@ -13,6 +13,7 @@
 #include "definitions.h"
 #include "Frame.h"
 #include "utility.h"
+#include "./toed/cpu_toed.hpp"
 
 // =======================================================================================================
 // class Dataset: Fetch data from dataset specified in the configuration file
@@ -46,12 +47,22 @@ public:
     std::vector<cv::Point2f> SelectRandomEdges(const std::vector<cv::Point2f>& edges, size_t num_points);
     std::vector<Eigen::Vector3d> ComputeEpipolarLine(const Eigen::Matrix3d& fund_mat, const std::vector<cv::Point2f>& edges);
     void VisualizeOverlay(const std::string& extract_undist_path, const std::string& undistort_extract_path);
+
     // bool Init_Fetch_Data();
     // Frame::Ptr get_Next_Frame();
 
-    // unsigned Total_Num_Of_Imgs;
+    unsigned Total_Num_Of_Imgs;
     // int Current_Frame_Index;
     // double fx, fy, cx, cy;
+
+    std::vector<cv::Mat> undistorted_left_img;
+    std::vector<cv::Mat> undistorted_right_img;
+    int img_height, img_width;
+
+    std::vector<cv::Point2d> left_third_order_edges_locations;
+    std::vector<double> left_third_order_edges_orientation;
+    std::vector<cv::Point2d> right_third_order_edges_locations;
+    std::vector<double> right_third_order_edges_orientation;
 
 private:
 
@@ -97,6 +108,9 @@ private:
     cv::Mat Small_Patch_Radius_Map;
 
     Utility::Ptr utility_tool = nullptr;
+
+    //> CH: shared pointer to the class of third-order edge detector
+    std::shared_ptr< ThirdOrderEdgeDetectionCPU > TOED = nullptr;
 };
 
 #endif 

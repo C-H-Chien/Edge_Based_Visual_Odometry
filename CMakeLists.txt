@@ -48,10 +48,7 @@ if(DEFINED SUAL_BUILD)
     #> for MACOS
     set(THIRD_PARTY_LIBS
         ${OpenCV_LIBS}
-        ${Eigen_LIBS}
-        ${Sophus_LIBRARIES}
-        # ${Pangolin_LIBRARIES}
-        ${Pangolin_LIBRARIES} "-framework OpenGL" "-framework GLUT" ${GLEW_LIBRARIES} #(FOR MACOS)
+        ${Eigen_LIBS}        
         ${GLOG_LIBRARIES}
         ${GFLAGS_LIBRARIES}
         pthread
@@ -63,7 +60,6 @@ else()
     set(THIRD_PARTY_LIBS
         ${OpenCV_LIBS}
         ${Eigen_LIBS}
-        ${Sophus_LIBRARIES}
         ${GLOG_LIBRARIES}
         ${GFLAGS_LIBRARIES}
         pthread
