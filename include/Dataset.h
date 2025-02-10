@@ -34,7 +34,7 @@ public:
 
     void PrintDatasetInfo();
     void DetectEdges(int num_images);
-    void VisualizeMatches(const cv::Mat& left_map, const cv::Mat& right_map, std::vector<cv::Point2f> left_edge_coords);
+    void PerformEdgeBasedVO(const cv::Mat& left_map, const cv::Mat& right_map, std::vector<cv::Point2f> left_edge_coords);
     int FindBestMatchSSD(const cv::Mat& left_patch, const std::vector<cv::Mat>& right_patches);
     void ExtractPatches(int patch_size, const cv::Mat& binary_map, const std::vector<cv::Point2f>& selected_edges, 
                              cv::Mat& visualization, std::vector<cv::Mat>& patches);

@@ -242,10 +242,9 @@ void Dataset::DetectEdges(int num_images) {
         cv::Canny(right_undistorted, right_map, 50, 150);
 
         std::vector<cv::Point2f> left_edge_coords;
-
         cv::findNonZero(left_map, left_edge_coords);
 
-        VisualizeMatches(left_map, right_map, left_edge_coords);
+        PerformEdgeBasedVO(left_map, right_map, left_edge_coords);
 
         // cv::imshow("Undistort, then Extract - " + filename, right_map);
         // cv::imwrite("Undistort, then Extract  - " + filename, right_map);
@@ -274,76 +273,95 @@ void Dataset::DetectEdges(int num_images) {
 }
 
 
-void Dataset::VisualizeMatches(const cv::Mat& left_map, const cv::Mat& right_map, std::vector<cv::Point2f> left_edge_coords){
+void Dataset::PerformEdgeBasedVO(const cv::Mat& left_map, const cv::Mat& right_map, std::vector<cv::Point2f> left_edge_coords){
+    // Convert grayscale images to BGR
     cv::Mat left_visualization;
     cv::cvtColor(left_map, left_visualization, cv::COLOR_GRAY2BGR);
-
+    
     cv::Mat right_visualization;
     cv::cvtColor(right_map, right_visualization, cv::COLOR_GRAY2BGR);
-
-    // Select random edges from left image
-    std::vector<cv::Point2f> random_edges = SelectRandomEdges(left_edge_coords, 5);
-
-    for (const auto& point : random_edges) {
+    
+    // Select 5 random edges from left image
+    std::vector<cv::Point2f> selected_left_edges = SelectRandomEdges(left_edge_coords, 5);
+    
+    // Visualize selected edges
+    for (const auto& point : selected_left_edges) {
         cv::circle(left_visualization, point, 5, cv::Scalar(0, 0, 255), cv::FILLED);
     }
-
-    // Extract left patches
+    
+    // Extract patches around selected left edges
     std::vector<cv::Mat> left_patches;
-    ExtractPatches(7, left_map, random_edges, left_visualization, left_patches);
-
-    // Confirm left patches are valid
-    if (random_edges.size() != left_patches.size()) {
-        std::cerr << "ERROR: Mismatch between random edges and extracted left patches!" << std::endl;
-        return;
-    }
-
-    // Compute epipolar lines
-    Eigen::Matrix3d fund_mat;
+    ExtractPatches(7, left_map, selected_left_edges, left_visualization, left_patches);
+    
+    // Build fundamental matrices for epipolar geometry
+    Eigen::Matrix3d fundamental_matrix_21, fundamental_matrix_12;
     for (int i = 0; i < 3; i++) {
         for (int j = 0; j < 3; j++) {
-            fund_mat(i, j) = F21[i][j];
+            fundamental_matrix_21(i, j) = F21[i][j];
+            fundamental_matrix_12(i, j) = F12[i][j];
         }
     }
     
-    std::vector<Eigen::Vector3d> computed_lines = ComputeEpipolarLine(fund_mat, random_edges);
-
-    // Process each left patch and find best match in right image
-    for (size_t i = 0; i < random_edges.size(); i++) {
-        const auto& left_point = random_edges[i];
+    // Compute epipolar lines for selected left edges
+    std::vector<Eigen::Vector3d> epipolar_lines_right = ComputeEpipolarLine(fundamental_matrix_21, selected_left_edges);
+    
+    for (size_t i = 0; i < selected_left_edges.size(); i++) {
+        const auto& left_edge = selected_left_edges[i];
         const auto& left_patch = left_patches[i];
-        const auto& epipolar_line = computed_lines[i];
-
-        // Extract edges along the epipolar line
-        std::vector<cv::Point2f> sampled_edges = ExtractEpipolarEdges(epipolar_line, right_map);
-
-        // Draw epipolar line
-        if (sampled_edges.size() > 1) {
-            cv::line(right_visualization, sampled_edges.front(), sampled_edges.back(), cv::Scalar(255, 200, 100), 1);
+        const auto& epipolar_line = epipolar_lines_right[i];
+        
+        // Extract edges near epipolar line in right image
+        std::vector<cv::Point2f> right_candidate_edges = ExtractEpipolarEdges(epipolar_line, right_map);
+        
+        // Visualize epipolar line on right image
+        if (right_candidate_edges.size() > 1) {
+            cv::line(right_visualization, right_candidate_edges.front(), right_candidate_edges.back(), cv::Scalar(255, 200, 100), 1);
         }
-
-        // Extract right patches at edges
+        
+        // Extract patches from right image edges
         std::vector<cv::Mat> right_patches;
-        ExtractPatches(7, right_map, sampled_edges, right_visualization, right_patches);
-
-        // Check there are valid right patches to compare to
+        ExtractPatches(7, right_map, right_candidate_edges, right_visualization, right_patches);
+        
         if (!left_patch.empty() && !right_patches.empty()) {
-            // Find best match using SSD
-            int best_match_idx = FindBestMatchSSD(left_patch, right_patches);
+            // Find best matching right edge
+            int best_right_match_idx = FindBestMatchSSD(left_patch, right_patches);
             
-            if (best_match_idx != -1) {
-                // Draw edge correspondences
-                cv::circle(right_visualization, sampled_edges[best_match_idx], 5, cv::Scalar(0, 0, 255), cv::FILLED);
+            if (best_right_match_idx != -1) {
+                cv::Point2f best_right_match = right_candidate_edges[best_right_match_idx];
+                
+                // Compute epipolar line for best right match in left image
+                std::vector<Eigen::Vector3d> right_to_left_epipolar = ComputeEpipolarLine(fundamental_matrix_12, {best_right_match});
+                Eigen::Vector3d epipolar_line_left = right_to_left_epipolar[0];
+                
+                // Extract edges near epipolar line in left image
+                std::vector<cv::Point2f> left_candidate_edges = ExtractEpipolarEdges(epipolar_line_left, left_map);
+                std::vector<cv::Mat> left_candidate_patches;
+                ExtractPatches(7, left_map, left_candidate_edges, left_visualization, left_candidate_patches);
+                
+                if (!left_candidate_patches.empty()) {
+                    // Find best matching left edge for bidirectional test
+                    int best_left_match_idx = FindBestMatchSSD(right_patches[best_right_match_idx], left_candidate_patches);
+                    
+                    if (best_left_match_idx != -1) {
+                        cv::Point2f best_left_match = left_candidate_edges[best_left_match_idx];
+                        
+                        // Check bidirectional consistency
+                        if (best_left_match == left_edge) {
+                            cv::circle(right_visualization, best_right_match, 5, cv::Scalar(0, 0, 255), cv::FILLED);
+                        }
+                    }
+                }
             }
         }
     }
-
-    // Display results
-    cv::Mat both_concat;
-    cv::hconcat(left_visualization, right_visualization, both_concat);
-    cv::imshow("Edge Matching Using SSD", both_concat);
+    
+    // Display final visualization
+    cv::Mat merged_visualization;
+    cv::hconcat(left_visualization, right_visualization, merged_visualization);
+    cv::imshow("Edge Matching Using SSD, Lowe's Ratio Test, & Bidirectional Consistency", merged_visualization);
     cv::waitKey(0);
 }
+
 
 
 int Dataset::FindBestMatchSSD(const cv::Mat& left_patch, const std::vector<cv::Mat>& right_patches) {
