@@ -137,15 +137,15 @@ void Dataset::PerformEdgeBasedVO() {
         cv::undistort(left_img, left_undistorted, left_calib, left_dist_coeff_mat);
         cv::undistort(right_img, right_undistorted, right_calib, right_dist_coeff_mat);
         
-        cv::Mat left_map, right_map;
+        // cv::Mat left_map, right_map;
 
-        cv::Canny(left_undistorted, left_map, 50, 150);
-        cv::Canny(right_undistorted, right_map, 50, 150);
+        // cv::Canny(left_undistorted, left_map, 50, 150);
+        // cv::Canny(right_undistorted, right_map, 50, 150);
         
-        std::vector<cv::Point2f> left_edge_coords;
-        cv::findNonZero(left_map, left_edge_coords);
+        // std::vector<cv::Point2f> left_edge_coords;
+        // cv::findNonZero(left_map, left_edge_coords);
 
-        DisplayMatches(left_map, right_map, left_edge_coords);
+        // DisplayMatches(left_map, right_map, left_edge_coords);
 
         //////////////EXTRACT, THEN UNDISTORT////////////////////
 
@@ -162,52 +162,53 @@ void Dataset::PerformEdgeBasedVO() {
 
         //////////////THIRD ORDER DETECTION////////////////////
 
-        // //> CH: stack all the undistorted images
-        // undistorted_left_img.push_back(left_undistorted);
-        // undistorted_right_img.push_back(right_undistorted);
-        // if (Total_Num_Of_Imgs == 0) {
-        //     img_height = left_undistorted.rows;
-        //     img_width  = left_undistorted.cols;
-        //     //> CH: initiate a TOED constructor
-        //     TOED = std::shared_ptr<ThirdOrderEdgeDetectionCPU>(new ThirdOrderEdgeDetectionCPU( img_height, img_width ));
-        // }
+        //> CH: stack all the undistorted images
+        undistorted_left_img.push_back(left_undistorted);
+        undistorted_right_img.push_back(right_undistorted);
+        if (Total_Num_Of_Imgs == 0) {
+            img_height = left_undistorted.rows;
+            img_width  = left_undistorted.cols;
+            //> CH: initiate a TOED constructor
+            TOED = std::shared_ptr<ThirdOrderEdgeDetectionCPU>(new ThirdOrderEdgeDetectionCPU( img_height, img_width ));
+        }
 
-        // //> CH: get third-order edges
-        // //> (i) left undistorted image
-        // std::cout << "Processing third-order edges on the left image... " << std::endl;
-        // TOED->get_Third_Order_Edges( left_undistorted );
-        // left_third_order_edges_locations = TOED->toed_locations;
-        // left_third_order_edges_orientation = TOED->toed_orientations;
-        // std::cout << "Number of third-order edges on the left image: " << TOED->Total_Num_Of_TOED << std::endl;
+        //> CH: get third-order edges
+        //> (i) left undistorted image
+        std::cout << "Processing third-order edges on the left image... " << std::endl;
+        TOED->get_Third_Order_Edges( left_undistorted );
+        left_third_order_edges_locations = TOED->toed_locations;
+        left_third_order_edges_orientation = TOED->toed_orientations;
+        std::cout << "Number of third-order edges on the left image: " << TOED->Total_Num_Of_TOED << std::endl;
 
-        // //> (ii) right undistorted image
-        // std::cout << "Processing third-order edges on the right image... " << std::endl;
-        // TOED->get_Third_Order_Edges( right_undistorted );
-        // right_third_order_edges_locations = TOED->toed_locations;
-        // right_third_order_edges_orientation = TOED->toed_orientations;
-        // std::cout << "Number of third-order edges on the right image: " << TOED->Total_Num_Of_TOED << std::endl;
+        //> (ii) right undistorted image
+        std::cout << "Processing third-order edges on the right image... " << std::endl;
+        TOED->get_Third_Order_Edges( right_undistorted );
+        right_third_order_edges_locations = TOED->toed_locations;
+        right_third_order_edges_orientation = TOED->toed_orientations;
+        std::cout << "Number of third-order edges on the right image: " << TOED->Total_Num_Of_TOED << std::endl;
 
-        // Total_Num_Of_Imgs++;
+        Total_Num_Of_Imgs++;
 
-        // // Initialize empty binary maps for edges
-        // cv::Mat left_edge_map = cv::Mat::zeros(left_undistorted.size(), CV_8UC1);
-        // cv::Mat right_edge_map = cv::Mat::zeros(right_undistorted.size(), CV_8UC1);
+        // Initialize empty binary maps for edges
+        cv::Mat left_edge_map = cv::Mat::zeros(left_undistorted.size(), CV_8UC1);
+        cv::Mat right_edge_map = cv::Mat::zeros(right_undistorted.size(), CV_8UC1);
 
-        // // Convert edge locations to binary maps
-        // for (const auto& edge : left_third_order_edges_locations) {
-        //     if (edge.x >= 0 && edge.x < left_edge_map.cols && edge.y >= 0 && edge.y < left_edge_map.rows) {
-        //         left_edge_map.at<uchar>(cv::Point(edge.x, edge.y)) = 255;
-        //     }
-        // }
+        // Convert edge locations to binary maps
+        for (const auto& edge : left_third_order_edges_locations) {
+            if (edge.x >= 0 && edge.x < left_edge_map.cols && edge.y >= 0 && edge.y < left_edge_map.rows) {
+                left_edge_map.at<uchar>(cv::Point(edge.x, edge.y)) = 255;
+            }
+        }
 
-        // for (const auto& edge : right_third_order_edges_locations) {
-        //     if (edge.x >= 0 && edge.x < right_edge_map.cols && edge.y >= 0 && edge.y < right_edge_map.rows) {
-        //         right_edge_map.at<uchar>(cv::Point(edge.x, edge.y)) = 255;
-        //     }
-        // }
+        for (const auto& edge : right_third_order_edges_locations) {
+            if (edge.x >= 0 && edge.x < right_edge_map.cols && edge.y >= 0 && edge.y < right_edge_map.rows) {
+                right_edge_map.at<uchar>(cv::Point(edge.x, edge.y)) = 255;
+            }
+        }
 
-        // std::vector<cv::Point2f> left_edge_coords;
-        // cv::findNonZero(left_edge_map, left_edge_coords);
+        std::vector<cv::Point2f> left_edge_coords;
+        cv::findNonZero(left_edge_map, left_edge_coords);
+        DisplayMatches(left_edge_map, right_edge_map, left_edge_coords);
 
         }
     }
