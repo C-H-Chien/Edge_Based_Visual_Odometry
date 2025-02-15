@@ -2,7 +2,7 @@
 #define USE_GLOGS                       (false)
 
 //> Number of CPU cores to process
-#define NUM_OF_CPU_CORES                (4)
+#define NUM_OF_CPU_CORES                (6)
 
 //> Define output file folder
 #define OUTPUT_WRITE_PATH               std::string("Output_Results/")

@@ -4,9 +4,7 @@
 #include <iostream>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
-
 #include <yaml-cpp/yaml.h>
-
 #include "../include/definitions.h"
 #include "../include/Dataset.h"
 #include "../include/Pipeline.h"
@@ -15,10 +13,11 @@
 // main_VO: main function for LEMS VO pipeline
 //
 // ChangeLogs
+//    Lopez  25-01-26    Modified to perform Edge-Based Visual Odometry. 
 //    Chien  24-01-16    Initially built on top of Hongyi's LEMS Visual Odometry framework.
 //
 //> (c) LEMS, Brown University
-//> Chiang-Heng Chien (chiang-heng_chien@brown.edu)
+//> Chiang-Heng Chien (chiang-heng_chien@brown.edu), Saul Lopez Lucas (saul_lopez_lucas@brown.edu)
 // =======================================================================================================
 
 //> usage: (Under the bin file) sudo ./main_VO --config_file=../config/tum.yaml
@@ -91,12 +90,11 @@ int main(int argc, char **argv) {
 
 	Dataset::Ptr dataset_ = Dataset::Ptr(new Dataset(config_map, use_GCC_filter));
 
-	// dataset_->PrintDatasetInfo();
-	dataset_->DetectEdges(5);
+	dataset_->PerformEdgeBasedVO();
 
     // CHECK_EQ(dataset_->Init_Fetch_Data(), true);
 	
-	std::cout << "Total Number of Images in the Dataset Sequence: " << dataset_->Total_Num_Of_Imgs << std::endl;
+	// std::cout << "Total Number of Images in the Dataset Sequence: " << dataset_->Total_Num_Of_Imgs << std::endl;
 
 	// //> Pointers to the classes
 	// Frame::Ptr new_frame;
