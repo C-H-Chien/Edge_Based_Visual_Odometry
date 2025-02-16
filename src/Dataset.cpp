@@ -125,16 +125,16 @@ void Dataset::PerformEdgeBasedVO() {
 
     std::vector<std::pair<cv::Mat, cv::Mat>> image_pairs = LoadImages(csv_path, left_path, right_path, num_images);
 
-    std::vector<Eigen::Matrix3d> rotations;
-    std::vector<Eigen::Vector3d> translations;
+    // std::vector<Eigen::Matrix3d> rotations;
+    // std::vector<Eigen::Vector3d> translations;
 
-    LoadGroundTruth(ground_truth_path, rotations, translations, num_images);
-    for (size_t i = 0; i < translations.size(); i++) {
-    std::cout << "Ground Truth Pose " << i + 1 << ":\n";
-    std::cout << "Translation (T): \n" << translations[i].transpose() << std::endl;
-    std::cout << "Rotation (R): \n" << rotations[i] << std::endl;
-    std::cout << "-------------------------\n";
-    }
+    // LoadGroundTruth(ground_truth_path, rotations, translations, num_images);
+    // for (size_t i = 0; i < translations.size(); i++) {
+    // std::cout << "Ground Truth Pose " << i + 1 << ":\n";
+    // std::cout << "Translation (T): \n" << translations[i].transpose() << std::endl;
+    // std::cout << "Rotation (R): \n" << rotations[i] << std::endl;
+    // std::cout << "-------------------------\n";
+    // }
 
     for (const auto& pair : image_pairs) {
         const cv::Mat& left_img = pair.first;
@@ -146,9 +146,9 @@ void Dataset::PerformEdgeBasedVO() {
         
         //////////////UNDISTORT, THEN EXTRACT////////////////////
 
-        cv::Mat left_undistorted, right_undistorted;
-        cv::undistort(left_img, left_undistorted, left_calib, left_dist_coeff_mat);
-        cv::undistort(right_img, right_undistorted, right_calib, right_dist_coeff_mat);
+        // cv::Mat left_undistorted, right_undistorted;
+        // cv::undistort(left_img, left_undistorted, left_calib, left_dist_coeff_mat);
+        // cv::undistort(right_img, right_undistorted, right_calib, right_dist_coeff_mat);
         
         // cv::Mat left_map, right_map;
 
@@ -174,6 +174,10 @@ void Dataset::PerformEdgeBasedVO() {
         // UndistortEdges(right_map, right_undist_edges, right_edge_coords, right_intr, right_dist_coeffs);
 
         //////////////THIRD ORDER DETECTION////////////////////
+
+        cv::Mat left_undistorted, right_undistorted;
+        cv::undistort(left_img, left_undistorted, left_calib, left_dist_coeff_mat);
+        cv::undistort(right_img, right_undistorted, right_calib, right_dist_coeff_mat);
 
         //> CH: stack all the undistorted images
         undistorted_left_img.push_back(left_undistorted);
@@ -202,39 +206,35 @@ void Dataset::PerformEdgeBasedVO() {
 
         Total_Num_Of_Imgs++;
 
-        // Initialize empty binary maps for edges
-        cv::Mat left_edge_map = cv::Mat::zeros(left_undistorted.size(), CV_8UC1);
-        cv::Mat right_edge_map = cv::Mat::zeros(right_undistorted.size(), CV_8UC1);
+        cv::Mat left_edge_map = cv::Mat::zeros(img_height, img_width, CV_8UC1);
+        cv::Mat right_edge_map = cv::Mat::zeros(img_height, img_width, CV_8UC1);
 
-        // Convert edge locations to binary maps
         for (const auto& edge : left_third_order_edges_locations) {
-            if (edge.x >= 0 && edge.x < left_edge_map.cols && edge.y >= 0 && edge.y < left_edge_map.rows) {
-                left_edge_map.at<uchar>(cv::Point(edge.x, edge.y)) = 255;
+            if (edge.x >= 0 && edge.x < img_width && edge.y >= 0 && edge.y < img_height) {
+                left_edge_map.at<uchar>(cv::Point(edge.x, edge.y)) = 255;  
             }
         }
 
         for (const auto& edge : right_third_order_edges_locations) {
-            if (edge.x >= 0 && edge.x < right_edge_map.cols && edge.y >= 0 && edge.y < right_edge_map.rows) {
+            if (edge.x >= 0 && edge.x < img_width && edge.y >= 0 && edge.y < img_height) {
                 right_edge_map.at<uchar>(cv::Point(edge.x, edge.y)) = 255;
             }
         }
 
-        std::vector<cv::Point2f> left_edge_coords;
-        cv::findNonZero(left_edge_map, left_edge_coords);
-        // DisplayMatches(left_edge_map, right_edge_map, left_edge_coords);
+        DisplayMatches(left_edge_map, right_edge_map, left_third_order_edges_locations);
         }
     }
 }
 
-void Dataset::DisplayMatches(const cv::Mat& left_map, const cv::Mat& right_map, std::vector<cv::Point2f> left_edge_coords) {
+void Dataset::DisplayMatches(const cv::Mat& left_map, const cv::Mat& right_map, std::vector<cv::Point2d> left_edge_coords) {
     cv::Mat left_visualization, right_visualization;
     cv::cvtColor(left_map, left_visualization, cv::COLOR_GRAY2BGR);
     cv::cvtColor(right_map, right_visualization, cv::COLOR_GRAY2BGR);
 
-    std::vector<cv::Point2f> selected_left_edges = PickRandomEdges(7, left_edge_coords, 5, left_res[0], left_res[1]);
+    std::vector<cv::Point2d> selected_left_edges = PickRandomEdges(7, left_edge_coords, 5, left_res[0], left_res[1]);
 
     for (const auto& point : selected_left_edges) {
-        cv::circle(left_visualization, point, 5, cv::Scalar(0, 0, 255), cv::FILLED);
+        cv::circle(left_visualization, cv::Point(point.x, point.y), 5, cv::Scalar(0, 0, 255), cv::FILLED);
     }
 
     std::vector<cv::Mat> left_patches;
@@ -242,9 +242,24 @@ void Dataset::DisplayMatches(const cv::Mat& left_map, const cv::Mat& right_map, 
 
     Eigen::Matrix3d fundamental_matrix_21 = ConvertToEigenMatrix(fund_mat_21);
     Eigen::Matrix3d fundamental_matrix_12 = ConvertToEigenMatrix(fund_mat_12);
+ 
     std::vector<Eigen::Vector3d> epipolar_lines_right = CalculateEpipolarLine(fundamental_matrix_21, selected_left_edges);
-    
+
+    matched_left_edges.clear();
+    matched_right_edges.clear();
+
     CalculateMatches(selected_left_edges, left_patches, epipolar_lines_right, left_map, right_map, fundamental_matrix_12, right_visualization);
+
+    // std::cout << "\nNumber of left edges: " << matched_left_edges.size() << std::endl;
+    // std::cout << "Number of right edges: " << matched_right_edges.size() << std::endl;
+    // std::cout << "\nMatched Edge Pairs (Left -> Right):\n";
+    // for (size_t i = 0; i < matched_left_edges.size(); i++) {
+    //     std::cout << "Left Edge: (" << matched_left_edges[i].x << ", " << matched_left_edges[i].y << ")  -->  "
+    //             << "Right Edge: (" << matched_right_edges[i].x << ", " << matched_right_edges[i].y << ")\n";
+    // }
+
+    // CalculateEdgeDepths();
+    // Calculate3DTangent();
 
     cv::Mat merged_visualization;
     cv::hconcat(left_visualization, right_visualization, merged_visualization);
@@ -252,18 +267,18 @@ void Dataset::DisplayMatches(const cv::Mat& left_map, const cv::Mat& right_map, 
     cv::waitKey(0);
 }
 
-void Dataset::CalculateMatches(const std::vector<cv::Point2f>& selected_left_edges, const std::vector<cv::Mat>& left_patches, const std::vector<Eigen::Vector3d>& epipolar_lines_right,
-    const cv::Mat& left_map, const cv::Mat& right_map, const Eigen::Matrix3d& fundamental_matrix_12, cv::Mat& right_visualization) {
+void Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_left_edges, const std::vector<cv::Mat>& left_patches, const std::vector<Eigen::Vector3d>& epipolar_lines_right, const cv::Mat& left_map, const cv::Mat& right_map, const Eigen::Matrix3d& fundamental_matrix_12, cv::Mat& right_visualization) {
 
     for (size_t i = 0; i < selected_left_edges.size(); i++) {
         const auto& left_edge = selected_left_edges[i];
         const auto& left_patch = left_patches[i];
         const auto& epipolar_line = epipolar_lines_right[i];
 
-        std::vector<cv::Point2f> right_candidate_edges = ExtractEpipolarEdges(7, epipolar_line, right_map);
+        std::vector<cv::Point2d> right_candidate_edges = ExtractEpipolarEdges(7, epipolar_line, right_map);
 
         if (right_candidate_edges.size() > 1) {
-            cv::line(right_visualization, right_candidate_edges.front(), right_candidate_edges.back(), cv::Scalar(255, 200, 100), 1);
+            cv::line(right_visualization, cv::Point(static_cast<int>(right_candidate_edges.front().x), static_cast<int>(right_candidate_edges.front().y)), 
+            cv::Point(static_cast<int>(right_candidate_edges.back().x), static_cast<int>(right_candidate_edges.back().y)), cv::Scalar(255, 200, 100), 1);
         }
 
         std::vector<cv::Mat> right_patches;
@@ -273,12 +288,12 @@ void Dataset::CalculateMatches(const std::vector<cv::Point2f>& selected_left_edg
             int best_right_match_idx = CalculateSSDPatch(left_patch, right_patches);
             
             if (best_right_match_idx != -1) {
-                cv::Point2f best_right_match = right_candidate_edges[best_right_match_idx];
+                cv::Point2d best_right_match = right_candidate_edges[best_right_match_idx];
 
                 std::vector<Eigen::Vector3d> right_to_left_epipolar = CalculateEpipolarLine(fundamental_matrix_12, {best_right_match});
                 Eigen::Vector3d epipolar_line_left = right_to_left_epipolar[0];
 
-                std::vector<cv::Point2f> left_candidate_edges = ExtractEpipolarEdges(7, epipolar_line_left, left_map);
+                std::vector<cv::Point2d> left_candidate_edges = ExtractEpipolarEdges(7, epipolar_line_left, left_map);
                 std::vector<cv::Mat> left_candidate_patches;
                 ExtractPatches(7, left_map, left_candidate_edges, left_candidate_patches);
                 
@@ -286,10 +301,11 @@ void Dataset::CalculateMatches(const std::vector<cv::Point2f>& selected_left_edg
                     int best_left_match_idx = CalculateSSDPatch(right_patches[best_right_match_idx], left_candidate_patches);
                     
                     if (best_left_match_idx != -1) {
-                        cv::Point2f best_left_match = left_candidate_edges[best_left_match_idx];
+                        cv::Point2d best_left_match = left_candidate_edges[best_left_match_idx];
 
                         if (best_left_match == left_edge) {
-                            cv::circle(right_visualization, best_right_match, 5, cv::Scalar(0, 0, 255), cv::FILLED);
+                            cv::circle(right_visualization, cv::Point(static_cast<int>(best_right_match.x), static_cast<int>(best_right_match.y)), 5, 
+                            cv::Scalar(0, 0, 255), cv::FILLED);
                         }
                     }
                 }
@@ -342,19 +358,130 @@ int Dataset::CalculateSSDPatch(const cv::Mat& left_patch, const std::vector<cv::
     return best_match_idx; 
 }
 
-void Dataset::ExtractPatches(int patch_size, const cv::Mat& binary_map, const std::vector<cv::Point2f>& selected_edges, std::vector<cv::Mat>& patches) {
+/// IN PROGRESS
+void Dataset::Calculate3DTangent() {
+    std::cout << "Size of matched_left_edges: " << matched_left_edges.size() << std::endl;
+    std::cout << "Size of matched_right_edges: " << matched_right_edges.size() << std::endl;
+    std::cout << "Size of matched_left_orientations: " << matched_left_orientations.size() << std::endl;
+    std::cout << "Size of matched_right_orientations: " << matched_right_orientations.size() << std::endl;
+
+    if (matched_left_edges.size() != matched_right_edges.size() ||
+        matched_left_edges.size() != left_third_order_edges_orientation.size() ||
+        matched_right_edges.size() != right_third_order_edges_orientation.size()) {
+        std::cerr << "ERROR: Mismatch in number of edge matches and orientations!" << std::endl;
+        return;
+    }
+
+    Eigen::Matrix3d R21;
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            R21(i, j) = rot_mat_21[i][j];
+        }
+    }
+
+    left_edge_3D_tangents.clear();
+
+    for (size_t i = 0; i < matched_left_edges.size(); i++) {
+        Eigen::Vector3d gamma_one(matched_left_edges[i].x, matched_left_edges[i].y, 1.0);
+        Eigen::Vector3d gamma_two(matched_right_edges[i].x, matched_right_edges[i].y, 1.0);
+
+        double theta_one = matched_left_orientations[i];
+        double theta_two = matched_right_orientations[i];
+
+        Eigen::Vector3d t_one(std::cos(theta_one), std::sin(theta_one), 1);
+        Eigen::Vector3d t_two(std::cos(theta_two), std::sin(theta_two), 1);
+
+        Eigen::Vector3d t_two_cross_R21_t_one = t_two.cross(R21 * t_one);
+        Eigen::Vector3d t_two_cross_R21_gamma_one = t_two.cross(R21 * gamma_one);
+
+        Eigen::Vector3d numerator = - ((t_two_cross_R21_t_one.dot(gamma_two) * gamma_one) + t_two_cross_R21_gamma_one.dot(gamma_two) * t_one);
+        double denominator = numerator.norm(); 
+
+        Eigen::Vector3d T1 = numerator / denominator;
+
+        left_edge_3D_tangents.push_back(T1);
+    }
+
+    std::cout << "Computed 3D orientations for " << left_edge_3D_tangents.size() << " edges:\n";
+    for (size_t i = 0; i < left_edge_3D_tangents.size(); i++) {
+        std::cout << "Edge " << i + 1 << ": T = [" << left_edge_3D_tangents[i].transpose() << "]\n";
+    }
+}
+
+/// NEEDS FIX (PRODUCING NEGATIVE VALUES!)
+void Dataset::CalculateEdgeDepths() {
+    if (matched_left_edges.size() != matched_right_edges.size()) {
+        std::cerr << "ERROR: Number of left and right edge matches do not match!" << std::endl;
+        return;
+    }
+
+    Eigen::Matrix3d R;
+    Eigen::Vector3d T;
+
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            R(i, j) = rot_mat_12[i][j];
+        }
+        T(i) = trans_vec_12[i];
+    }
+
+    Eigen::Matrix3d K;
+    K << left_intr[0], 0, left_intr[2],
+         0, left_intr[1], left_intr[3],
+         0, 0, 1;
+
+    Eigen::Matrix3d K_inv = K.inverse();
+
+    Eigen::Vector3d e1(1, 0, 0); 
+    Eigen::Vector3d e3(0, 0, 1); 
+
+    left_edge_depths.clear();
+
+    for (size_t i = 0; i < matched_left_edges.size(); i++) {
+        Eigen::Vector3d gamma(matched_left_edges[i].x, matched_left_edges[i].y, 1.0);
+        Eigen::Vector3d gamma_bar(matched_right_edges[i].x, matched_right_edges[i].y, 1.0);
+
+        Eigen::Vector3d gamma_norm = K_inv * gamma;
+        Eigen::Vector3d gamma_bar_norm = K_inv * gamma_bar;
+
+        double e1_T_gamma_bar = (e1.transpose() * gamma_bar_norm)(0, 0);
+        double e3_T_gamma = (e3.transpose() * R * gamma_norm)(0, 0);
+        double e1_T_gamma = (e1.transpose() * R * gamma_norm)(0, 0);
+        double e1_T_T = (e1.transpose() * T)(0, 0);
+        double e3_T_T = (e3.transpose() * T)(0, 0);
+
+        double numerator = e1_T_T - (e3_T_T * e1_T_gamma_bar);
+        double denominator = (e3_T_gamma * e1_T_gamma_bar) - e1_T_gamma;
+
+        if (std::abs(denominator) > 1e-6) {
+            double rho = numerator / denominator;
+            left_edge_depths.push_back(rho);
+        } else {
+            std::cerr << "WARNING: Skipping depth computation for edge " << i << " due to near-zero denominator!" << std::endl;
+            left_edge_depths.push_back(0.0); 
+        }
+    }
+
+    std::cout << "\nComputed depths for " << left_edge_depths.size() << " edges:\n";
+    for (size_t i = 0; i < left_edge_depths.size(); i++) {
+        std::cout << "Edge " << i + 1 << ": Depth = " << left_edge_depths[i] << "\n";
+    }
+}
+
+void Dataset::ExtractPatches(int patch_size, const cv::Mat& binary_map, const std::vector<cv::Point2d>& selected_edges, std::vector<cv::Mat>& patches) {
     int half_patch = patch_size / 2;
     patches.clear();
 
     for (const auto& edge : selected_edges) {
-        int x = static_cast<int>(edge.x);
-        int y = static_cast<int>(edge.y);
+        double x = edge.x;
+        double y = edge.y;
 
         if (x - half_patch >= 0 && x + half_patch < binary_map.cols &&
             y - half_patch >= 0 && y + half_patch < binary_map.rows) {
 
-            cv::Rect patch_rect(x - half_patch, y - half_patch, patch_size, patch_size);
-            cv::Mat patch = binary_map(patch_rect).clone();
+            cv::Mat patch;
+            cv::getRectSubPix(binary_map, cv::Size(patch_size, patch_size), cv::Point2f(x, y), patch);
+
             patches.push_back(patch);
         } 
         else {
@@ -363,8 +490,8 @@ void Dataset::ExtractPatches(int patch_size, const cv::Mat& binary_map, const st
     }
 }
 
-std::vector<cv::Point2f> Dataset::ExtractEpipolarEdges(int patch_size, const Eigen::Vector3d& epipolar_line, const cv::Mat& binary_map) {
-   std::vector<cv::Point2f> edges;
+std::vector<cv::Point2d> Dataset::ExtractEpipolarEdges(int patch_size, const Eigen::Vector3d& epipolar_line, const cv::Mat& binary_map) {
+   std::vector<cv::Point2d> edges;
 
    int width = binary_map.cols;
    int height = binary_map.rows;
@@ -374,9 +501,10 @@ std::vector<cv::Point2f> Dataset::ExtractEpipolarEdges(int patch_size, const Eig
        double y = (-epipolar_line(2) - epipolar_line(0) * x) / epipolar_line(1);
 
        int y_int = static_cast<int>(std::round(y));
-       if (y_int >= half_patch && y_int < height - half_patch) {
+
+       if (y >= half_patch && y < height - half_patch) {
            if (binary_map.at<uchar>(y_int, x) == 255) {
-               edges.emplace_back(x, y_int);
+               edges.emplace_back(x, y);
            }
        }
    }
@@ -384,27 +512,60 @@ std::vector<cv::Point2f> Dataset::ExtractEpipolarEdges(int patch_size, const Eig
    return edges;
 }
 
-std::vector<Eigen::Vector3d> Dataset::CalculateEpipolarLine(const Eigen::Matrix3d& fund_mat, const std::vector<cv::Point2f>& edges) {
+std::vector<Eigen::Vector3d> Dataset::CalculateEpipolarLine(const Eigen::Matrix3d& fund_mat, const std::vector<cv::Point2d>& edges) {
     std::vector<Eigen::Vector3d> epipolar_lines;
 
     for (const auto& point : edges) {
-        Eigen::Vector3d homo_point(point.x, point.y, 1.0);
+        Eigen::Vector3d homo_point(point.x, point.y, 1.0);  
 
-        Eigen::Vector3d epipolar_line = fund_mat * homo_point;
+        Eigen::Vector3d epipolar_line = fund_mat * homo_point; 
 
         epipolar_lines.push_back(epipolar_line);
 
         std::cout << "Epipolar Line Equation for Point (" << point.x << ", " << point.y << "): "
-                    << epipolar_line(0) << "x + " 
-                    << epipolar_line(1) << "y + " 
-                    << epipolar_line(2) << " = 0" << std::endl;
+                  << epipolar_line(0) << "x + " 
+                  << epipolar_line(1) << "y + " 
+                  << epipolar_line(2) << " = 0" << std::endl;
     }
 
     return epipolar_lines;
 }
 
-std::vector<cv::Point2f> Dataset::PickRandomEdges(int patch_size, const std::vector<cv::Point2f>& edges, size_t num_points, int img_width, int img_height) {
-   std::vector<cv::Point2f> valid_edges;
+
+// std::vector<cv::Point2f>, std::vector<double>> Dataset::PickRandomEdges(int patch_size, const std::vector<cv::Point2f>& edges, const std::vector<cv::double>& orientations,size_t num_points, int img_width, int img_height) {
+//    std::vector<cv::Point2f> valid_edges;
+//    std::vector<cv::double> valid_orientations;
+//    int half_patch = patch_size / 2;
+
+//    for (size_t i = 0; i < edges.size(); i++) {
+//        if (edges[i].x >= half_patch && edges[i].x < img_width - half_patch &&
+//            edges[i].y >= half_patch && edges[i].y < img_height - half_patch) {
+//            valid_edges.push_back(edges[i]);
+//            valid_orientations.push_back(orientations[i]);
+//        }
+//    }
+
+//    num_points = std::min(num_points, valid_edges.size());
+
+//    std::vector<cv::Point2f> selected_points;
+//    std::unordered_set<int> used_indices;
+//    std::random_device rd;
+//    std::mt19937 gen(rd());
+//    std::uniform_int_distribution<int> dis(0, valid_edges.size() - 1);
+
+//    while (selected_points.size() < num_points) {
+//        int idx = dis(gen);
+//        if (used_indices.find(idx) == used_indices.end()) {
+//            selected_points.push_back(valid_edges[idx]);
+//            used_indices.insert(idx);
+//        }
+//    }
+
+//    return selected_points;
+// }
+
+std::vector<cv::Point2d> Dataset::PickRandomEdges(int patch_size, const std::vector<cv::Point2d>& edges, size_t num_points, int img_width, int img_height) {
+   std::vector<cv::Point2d> valid_edges;
    int half_patch = patch_size / 2;
 
    for (const auto& edge : edges) {
@@ -416,7 +577,7 @@ std::vector<cv::Point2f> Dataset::PickRandomEdges(int patch_size, const std::vec
 
    num_points = std::min(num_points, valid_edges.size());
 
-   std::vector<cv::Point2f> selected_points;
+   std::vector<cv::Point2d> selected_points;
    std::unordered_set<int> used_indices;
    std::random_device rd;
    std::mt19937 gen(rd());
@@ -442,7 +603,6 @@ Eigen::Matrix3d Dataset::ConvertToEigenMatrix(const std::vector<std::vector<doub
     }
     return eigen_matrix;
 }
-
 
 void Dataset::UndistortEdges(const cv::Mat& dist_edges, cv::Mat& undist_edges, std::vector<cv::Point2f>& edge_locations, const std::vector<double>& intr, 
     const std::vector<double>& dist_coeffs) {
