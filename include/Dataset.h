@@ -86,10 +86,12 @@ private:
     void ExtractPatches(int patch_size, const cv::Mat& binary_map, const std::vector<cv::Point2f>& selected_edges, std::vector<cv::Mat>& patches);
     void UndistortEdges(const cv::Mat& dist_edges, cv::Mat& undist_edges, std::vector<cv::Point2f>& edge_locations, const std::vector<double>& intr, const std::vector<double>& dist_coeffs);
     void DisplayOverlay(const std::string& extract_undist_path, const std::string& undistort_extract_path);
+    void LoadGroundTruth(const std::string& filepath, std::vector<Eigen::Matrix3d>& rotations, std::vector<Eigen::Vector3d>& translations, int num_images);
     std::vector<cv::Point2f> ExtractEpipolarEdges(int patch_size, const Eigen::Vector3d& epipolar_line, const cv::Mat& binary_map);     
     std::vector<Eigen::Vector3d> CalculateEpipolarLine(const Eigen::Matrix3d& fund_mat, const std::vector<cv::Point2f>& edges);
     std::vector<cv::Point2f> PickRandomEdges(int patch_size, const std::vector<cv::Point2f>& edges, size_t num_points, int img_width, int img_height);
     Eigen::Matrix3d ConvertToEigenMatrix(const std::vector<std::vector<double>>& matrix);
+    Eigen::Matrix3d ConvertToRotationMatrix(double q_x, double q_y, double q_z, double q_w);
     std::vector<std::pair<cv::Mat, cv::Mat>> LoadImages(const std::string& csv_path, const std::string& left_path, const std::string& right_path, int num_images);
 
     bool compute_grad_depth = false;

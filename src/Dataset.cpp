@@ -120,8 +120,21 @@ void Dataset::PerformEdgeBasedVO() {
     std::string left_path = dataset_path + "/" + sequence_name + "/mav0/cam0/data/";
     std::string right_path = dataset_path + "/" + sequence_name + "/mav0/cam1/data/";
     std::string csv_path = dataset_path + "/" + sequence_name + "/mav0/cam0/data.csv";
+    std::string ground_truth_path = dataset_path + "/" + sequence_name + "/mav0/state_groundtruth_estimate0/data.csv";
+    int num_images = 5;
 
-    std::vector<std::pair<cv::Mat, cv::Mat>> image_pairs = LoadImages(csv_path, left_path, right_path, 5);
+    std::vector<std::pair<cv::Mat, cv::Mat>> image_pairs = LoadImages(csv_path, left_path, right_path, num_images);
+
+    std::vector<Eigen::Matrix3d> rotations;
+    std::vector<Eigen::Vector3d> translations;
+
+    LoadGroundTruth(ground_truth_path, rotations, translations, num_images);
+    for (size_t i = 0; i < translations.size(); i++) {
+    std::cout << "Ground Truth Pose " << i + 1 << ":\n";
+    std::cout << "Translation (T): \n" << translations[i].transpose() << std::endl;
+    std::cout << "Rotation (R): \n" << rotations[i] << std::endl;
+    std::cout << "-------------------------\n";
+    }
 
     for (const auto& pair : image_pairs) {
         const cv::Mat& left_img = pair.first;
@@ -208,8 +221,7 @@ void Dataset::PerformEdgeBasedVO() {
 
         std::vector<cv::Point2f> left_edge_coords;
         cv::findNonZero(left_edge_map, left_edge_coords);
-        DisplayMatches(left_edge_map, right_edge_map, left_edge_coords);
-
+        // DisplayMatches(left_edge_map, right_edge_map, left_edge_coords);
         }
     }
 }
@@ -488,6 +500,54 @@ void Dataset::DisplayOverlay(const std::string& extract_undist_path, const std::
     cv::imshow("Edge Map Overlay - Blue (EU), Red (UE), Pink (Both)", overlay);
     cv::imwrite("Edge Map Overlay - Blue (EU), Red (UE), Pink (Both).png", overlay);
     cv::waitKey(0);
+}
+
+void Dataset::LoadGroundTruth(const std::string& filepath, std::vector<Eigen::Matrix3d>& rotations, std::vector<Eigen::Vector3d>& translations, int num_images) {
+    std::ifstream file(filepath);
+
+    if (!file.is_open()) {
+        std::cerr << "ERROR: Could not open the Ground Truth file located at " << filepath << "!" << std::endl;
+        return;
+    }
+
+    std::string line;
+    bool first_line = true;
+    while (std::getline(file, line) && rotations.size() < num_images) {
+        if (first_line) {
+            first_line = false;
+            continue;
+        }
+
+        std::istringstream line_stream(line);
+        std::vector<std::string> fields;
+        std::string field;
+        
+        while (std::getline(line_stream, field, ',')) {
+            fields.push_back(field);
+        }
+
+        if(fields.size() < 8) continue;
+        
+        double p_x = std::stod(fields[1]);
+        double p_y = std::stod(fields[2]);
+        double p_z = std::stod(fields[3]);
+        Eigen::Vector3d T(p_x, p_y, p_z);
+
+        double q_x = std::stod(fields[4]);
+        double q_y = std::stod(fields[5]);
+        double q_z = std::stod(fields[6]);
+        double q_w = std::stod(fields[7]);
+        Eigen::Matrix3d R = ConvertToRotationMatrix(q_x, q_y, q_z, q_w);
+
+        translations.push_back(T);
+        rotations.push_back(R);
+    }
+
+}
+
+Eigen::Matrix3d Dataset::ConvertToRotationMatrix(double q_x, double q_y, double q_z, double q_w) {
+    Eigen::Quaterniond q(q_w, q_x, q_y, q_z);
+    return q.toRotationMatrix();
 }
 
 std::vector<std::pair<cv::Mat, cv::Mat>> Dataset::LoadImages(const std::string& csv_path, const std::string& left_path, const std::string& right_path, 
