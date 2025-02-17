@@ -33,12 +33,14 @@ Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(confi
     dataset_path = config_file["dataset_dir"].as<std::string>();
     sequence_name = config_file["sequence_name"].as<std::string>();
     dataset_type = config_file["dataset_type"].as<std::string>();
+    GT_file_name = config_file["state_GT_estimate_file_name"].as<std::string>();
 
     if (dataset_type == "EuRoC") {
         try {
             YAML::Node left_cam = config_file["left_camera"];
             YAML::Node right_cam = config_file["right_camera"];
             YAML::Node stereo = config_file["stereo"];
+            YAML::Node frame_to_body = config_file["frame_to_body"];
 
             // Parsing left camera parameters
             left_res = left_cam["resolution"].as<std::vector<int>>();
@@ -85,6 +87,17 @@ Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(confi
                 std::cerr << "ERROR: Missing right-to-left stereo parameters (R12, T12, F12) in YAML file!" << std::endl;
             }
 
+            //> Parse the transformation from the camera to the body
+            if (frame_to_body["rotation"] && frame_to_body["translation"]) {
+                rot_frame2body_left = Eigen::Map<Eigen::Matrix3d>(frame_to_body["rotation"].as<std::vector<double>>().data()).transpose();
+                transl_frame2body_left = Eigen::Map<Eigen::Vector3d>(frame_to_body["translation"].as<std::vector<double>>().data());
+            } else {
+                LOG_ERROR("Missing relative rotation and translation from the left camera to the body coordinate (should be given by cam0/sensor.yaml)");
+            }
+
+            Load_GT_Poses();
+            exit(1);
+
         } catch (const YAML::Exception &e) {
             std::cerr << "ERROR: Could not parse YAML file! " << e.what() << std::endl;
         }
@@ -114,6 +127,64 @@ Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(confi
     //     utility_tool->get_dG_2D(Gx_2d, Gy_2d, 4*DEPTH_GRAD_GAUSSIAN_SIGMA, DEPTH_GRAD_GAUSSIAN_SIGMA); 
     //     Small_Patch_Radius_Map = cv::Mat::ones(2*GCC_PATCH_HALF_SIZE+1, 2*GCC_PATCH_HALF_SIZE+1, CV_64F);
     // }
+}
+
+void Dataset::Load_GT_Poses() {
+    //> Parse the ground-truth state estimation
+    std::string GT_file_path = dataset_path + sequence_name + "/" + GT_file_name;
+
+    std::ifstream gt_pose_file(GT_file_path);
+    if (!gt_pose_file.is_open()) {
+        LOG_FILE_ERROR(GT_file_path);
+        exit(1);
+    }
+
+    std::string line;
+    bool b_first_line = true;
+    if (dataset_type == "EuRoC") {
+        while (std::getline(gt_pose_file, line)) {
+            //> ignore the first line
+            if (b_first_line) {
+                b_first_line = false;
+                continue;
+            }
+
+            std::stringstream ss(line);
+            std::string gt_val;
+            std::vector<double> csv_row_val;
+
+            //> parse the numbers (get only the )
+            while (std::getline(ss, gt_val, ',')) {
+                try {
+                    double val = std::stod(gt_val);
+                    csv_row_val.push_back(val);
+                } catch (const std::invalid_argument& e) {
+                    std::cerr << "Invalid argument: " << e.what() << " for value (" << gt_val << ") from the file " << GT_file_path << std::endl;
+                } catch (const std::out_of_range& e) {
+                     std::cerr << "Out of range exception: " << e.what() << " for value: " << gt_val << std::endl;
+                }
+            }
+
+            GT_time_stamps.push_back(csv_row_val[0]);
+            Eigen::Vector3d transl_val( csv_row_val[1], csv_row_val[2], csv_row_val[3] );
+            Eigen::Quaterniond quat_val( csv_row_val[4], csv_row_val[5], csv_row_val[6], csv_row_val[7] );
+            Eigen::Matrix3d rot_from_quat = quat_val.toRotationMatrix();
+
+            //> stack into the unaligned GT rotations and translations
+            unaligned_GT_Rot.push_back(rot_from_quat);
+            unaligned_GT_Transl.push_back(transl_val);
+        }
+
+        std::cout << "Here..." << std::endl;
+        for (int i = 100; i < 110; i++) {
+            std::cout << GT_time_stamps[i] << "\t" << (unaligned_GT_Transl[i])(0) << "\t" \
+            << (unaligned_GT_Transl[i])(1) << "\t" << (unaligned_GT_Transl[i])(2) << std::endl;
+        }
+
+    }
+    else {
+        LOG_ERROR("Dataset type not supported!");
+    }
 }
 
 void Dataset::PerformEdgeBasedVO() {

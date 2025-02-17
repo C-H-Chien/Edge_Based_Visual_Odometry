@@ -44,6 +44,11 @@ public:
     std::vector<cv::Point2d> right_third_order_edges_locations;
     std::vector<double> right_third_order_edges_orientation;
 
+    std::vector<Eigen::Matrix3d> unaligned_GT_Rot;
+    std::vector<Eigen::Vector3d> unaligned_GT_Transl;
+    std::vector<Eigen::Matrix3d> aligned_GT_Rot;
+    std::vector<Eigen::Vector3d> aligned_GT_Transl;
+
     // bool Init_Fetch_Data();
     // Frame::Ptr get_Next_Frame();
     // int Current_Frame_Index;
@@ -55,6 +60,11 @@ private:
     std::string dataset_type;
     std::string dataset_path;
     std::string sequence_name;
+    std::string GT_file_name;
+
+    //> Used only for the EuRoC dataset
+    Eigen::Matrix3d rot_frame2body_left;
+    Eigen::Vector3d transl_frame2body_left;
 
     std::vector<int> left_res;
     int left_rate;
@@ -91,6 +101,9 @@ private:
     std::vector<cv::Point2f> PickRandomEdges(int patch_size, const std::vector<cv::Point2f>& edges, size_t num_points, int img_width, int img_height);
     Eigen::Matrix3d ConvertToEigenMatrix(const std::vector<std::vector<double>>& matrix);
     std::vector<std::pair<cv::Mat, cv::Mat>> LoadImages(const std::string& csv_path, const std::string& left_path, const std::string& right_path, int num_images);
+
+    void Load_GT_Poses();
+    std::vector<double> GT_time_stamps;
 
     bool compute_grad_depth = false;
     cv::Mat Gx_2d, Gy_2d;
