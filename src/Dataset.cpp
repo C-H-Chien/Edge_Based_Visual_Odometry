@@ -42,19 +42,17 @@ int ComputeAverage(const std::vector<int>& values) {
 }
 
 Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(config_map), compute_grad_depth(use_GCC_filter) {
-   dataset_path = config_file["dataset_dir"].as<std::string>();
-   output_path = config_file["output_dir"].as<std::string>();
-   sequence_name = config_file["sequence_name"].as<std::string>();
-   dataset_type = config_file["dataset_type"].as<std::string>();
+    dataset_path = config_file["dataset_dir"].as<std::string>();
+    sequence_name = config_file["sequence_name"].as<std::string>();
+    dataset_type = config_file["dataset_type"].as<std::string>();
+    GT_file_name = config_file["state_GT_estimate_file_name"].as<std::string>();
 
-   if (dataset_type == "EuRoC") {
-       try {
-           GT_file_name = config_file["state_GT_estimate_file_name"].as<std::string>();
-
-           YAML::Node left_cam = config_file["left_camera"];
-           YAML::Node right_cam = config_file["right_camera"];
-           YAML::Node stereo = config_file["stereo"];
-           YAML::Node frame_to_body = config_file["frame_to_body"];
+    if (dataset_type == "EuRoC") {
+        try {
+            YAML::Node left_cam = config_file["left_camera"];
+            YAML::Node right_cam = config_file["right_camera"];
+            YAML::Node stereo = config_file["stereo"];
+            YAML::Node frame_to_body = config_file["frame_to_body"];
 
            left_res = left_cam["resolution"].as<std::vector<int>>();
            left_intr = left_cam["intrinsics"].as<std::vector<double>>();
@@ -84,13 +82,14 @@ Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(confi
                }
                trans_vec_12 = stereo["T12"].as<std::vector<double>>();
 
-               for (const auto& row : stereo["F12"]) {
-                   fund_mat_12.push_back(row.as<std::vector<double>>());
-               }
-           } else {
-               std::cerr << "ERROR: Missing right-to-left stereo parameters (R12, T12, F12) in YAML file!" << std::endl;
-           }
+                for (const auto& row : stereo["F12"]) {
+                    fund_mat_12.push_back(row.as<std::vector<double>>());
+                }
+            } else {
+                std::cerr << "ERROR: Missing right-to-left stereo parameters (R12, T12, F12) in YAML file!" << std::endl;
+            }
 
+            //> Parse the transformation from the camera to the body
             if (frame_to_body["rotation"] && frame_to_body["translation"]) {
                 rot_frame2body_left = Eigen::Map<Eigen::Matrix3d>(frame_to_body["rotation"].as<std::vector<double>>().data()).transpose();
                 transl_frame2body_left = Eigen::Map<Eigen::Vector3d>(frame_to_body["translation"].as<std::vector<double>>().data());
@@ -98,71 +97,96 @@ Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(confi
                 LOG_ERROR("Missing relative rotation and translation from the left camera to the body coordinate (should be given by cam0/sensor.yaml)");
             }
 
+            Load_GT_Poses();
+            exit(1);
+
         } catch (const YAML::Exception &e) {
             std::cerr << "ERROR: Could not parse YAML file! " << e.what() << std::endl;
         }
     }
-    else if (dataset_type == "ETH3D")
-       try {
-           YAML::Node left_cam = config_file["left_camera"];
-           YAML::Node right_cam = config_file["right_camera"];
-           YAML::Node stereo = config_file["stereo"];
 
-           left_res = left_cam["resolution"].as<std::vector<int>>();
-           left_intr = left_cam["intrinsics"].as<std::vector<double>>();
-           left_dist_coeffs = left_cam["distortion_coefficients"].as<std::vector<double>>();
+    Total_Num_Of_Imgs = 0;
 
-           right_res = right_cam["resolution"].as<std::vector<int>>();
-           right_intr = right_cam["intrinsics"].as<std::vector<double>>();
-           right_dist_coeffs = right_cam["distortion_coefficients"].as<std::vector<double>>();
+    // Calib = Eigen::Matrix3d::Identity();
+    // Inverse_Calib = Eigen::Matrix3d::Identity();
 
-           if (stereo["R21"] && stereo["T21"] && stereo["F21"]) {
-               for (const auto& row : stereo["R21"]) {
-                   rot_mat_21.push_back(row.as<std::vector<double>>());
-               }
+	// Calib(0,0) = config_file["camera.fx"].as<double>();
+	// Calib(1,1) = config_file["camera.fy"].as<double>();
+	// Calib(0,2) = config_file["camera.cx"].as<double>();
+	// Calib(1,2) = config_file["camera.cy"].as<double>();
 
-               trans_vec_21 = stereo["T21"].as<std::vector<double>>();
+    // Inverse_Calib(0,0) = 1.0 / Calib(0,0);
+    // Inverse_Calib(1,1) = 1.0 / Calib(1,1);
+    // Inverse_Calib(0,2) = -Calib(0,2) / Calib(0,0);
+    // Inverse_Calib(1,2) = -Calib(1,2) / Calib(1,1);
 
-               for (const auto& row : stereo["F21"]) {
-                   fund_mat_21.push_back(row.as<std::vector<double>>());
-               }
-           } else {
-               std::cerr << "ERROR: Missing left-to-right stereo parameters (R21, T21, F21) in YAML file!" << std::endl;
-           }
+    // Current_Frame_Index = 0;
+    // has_Depth = false;
 
-           if (stereo["R12"] && stereo["T12"] && stereo["F12"]) {
-               for (const auto& row : stereo["R12"]) {
-                   rot_mat_12.push_back(row.as<std::vector<double>>());
-               }
-               trans_vec_12 = stereo["T12"].as<std::vector<double>>();
-
-               for (const auto& row : stereo["F12"]) {
-                   fund_mat_12.push_back(row.as<std::vector<double>>());
-               }
-           } else {
-               std::cerr << "ERROR: Missing right-to-left stereo parameters (R12, T12, F12) in YAML file!" << std::endl;
-           }
-           if (stereo["focal_length"] && stereo["baseline"]) {
-            focal_length = stereo["focal_length"].as<double>();
-            baseline = stereo["baseline"].as<double>();
-            } else {
-                std::cerr << "ERROR: Missing stereo parameters (focal_length, baseline) in YAML file!" << std::endl;
-            }
-        } catch (const YAML::Exception &e) {
-            std::cerr << "ERROR: Could not parse YAML file! " << e.what() << std::endl;
-        }
-    
-   Total_Num_Of_Imgs = 0;
+    // if (compute_grad_depth) {
+    //     Gx_2d = cv::Mat::ones(GAUSSIAN_KERNEL_WINDOW_LENGTH, GAUSSIAN_KERNEL_WINDOW_LENGTH, CV_64F);
+    //     Gy_2d = cv::Mat::ones(GAUSSIAN_KERNEL_WINDOW_LENGTH, GAUSSIAN_KERNEL_WINDOW_LENGTH, CV_64F);
+    //     utility_tool->get_dG_2D(Gx_2d, Gy_2d, 4*DEPTH_GRAD_GAUSSIAN_SIGMA, DEPTH_GRAD_GAUSSIAN_SIGMA); 
+    //     Small_Patch_Radius_Map = cv::Mat::ones(2*GCC_PATCH_HALF_SIZE+1, 2*GCC_PATCH_HALF_SIZE+1, CV_64F);
+    // }
 }
 
-void Dataset::write_ncc_vals_to_files( int img_index ) {
-    std::string file_path = OUTPUT_WRITE_PATH + "ncc_vs_err/img_" + std::to_string(img_index) + ".txt";
-    std::ofstream ncc_vs_err_file_out(file_path);
-    for (unsigned i = 0; i < ncc_one_vs_err.size(); i++) {
-        ncc_vs_err_file_out << ncc_one_vs_err[i].first << "\t" << ncc_one_vs_err[i].second << "\t" \
-                            << ncc_two_vs_err[i].first << "\t" << ncc_two_vs_err[i].second << "\n";
+void Dataset::Load_GT_Poses() {
+    //> Parse the ground-truth state estimation
+    std::string GT_file_path = dataset_path + sequence_name + "/" + GT_file_name;
+
+    std::ifstream gt_pose_file(GT_file_path);
+    if (!gt_pose_file.is_open()) {
+        LOG_FILE_ERROR(GT_file_path);
+        exit(1);
     }
-    ncc_vs_err_file_out.close();
+
+    std::string line;
+    bool b_first_line = true;
+    if (dataset_type == "EuRoC") {
+        while (std::getline(gt_pose_file, line)) {
+            //> ignore the first line
+            if (b_first_line) {
+                b_first_line = false;
+                continue;
+            }
+
+            std::stringstream ss(line);
+            std::string gt_val;
+            std::vector<double> csv_row_val;
+
+            //> parse the numbers (get only the )
+            while (std::getline(ss, gt_val, ',')) {
+                try {
+                    double val = std::stod(gt_val);
+                    csv_row_val.push_back(val);
+                } catch (const std::invalid_argument& e) {
+                    std::cerr << "Invalid argument: " << e.what() << " for value (" << gt_val << ") from the file " << GT_file_path << std::endl;
+                } catch (const std::out_of_range& e) {
+                     std::cerr << "Out of range exception: " << e.what() << " for value: " << gt_val << std::endl;
+                }
+            }
+
+            GT_time_stamps.push_back(csv_row_val[0]);
+            Eigen::Vector3d transl_val( csv_row_val[1], csv_row_val[2], csv_row_val[3] );
+            Eigen::Quaterniond quat_val( csv_row_val[4], csv_row_val[5], csv_row_val[6], csv_row_val[7] );
+            Eigen::Matrix3d rot_from_quat = quat_val.toRotationMatrix();
+
+            //> stack into the unaligned GT rotations and translations
+            unaligned_GT_Rot.push_back(rot_from_quat);
+            unaligned_GT_Transl.push_back(transl_val);
+        }
+
+        std::cout << "Here..." << std::endl;
+        for (int i = 100; i < 110; i++) {
+            std::cout << GT_time_stamps[i] << "\t" << (unaligned_GT_Transl[i])(0) << "\t" \
+            << (unaligned_GT_Transl[i])(1) << "\t" << (unaligned_GT_Transl[i])(2) << std::endl;
+        }
+
+    }
+    else {
+        LOG_ERROR("Dataset type not supported!");
+    }
 }
 
 void Dataset::PerformEdgeBasedVO() {

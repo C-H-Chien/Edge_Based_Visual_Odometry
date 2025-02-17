@@ -1,7 +1,7 @@
 # EuRoC Vicon Room 01 Dataset
 
 # Dataset Details
-dataset_dir: "/Users/saulll./Desktop/Edge-Based Visual Odometry/datasets"
+dataset_dir: "/home/chchien/datasets/EuRoC/"
 sequence_name: "V1_01_easy"
 dataset_type: "EuRoC"
 
@@ -46,6 +46,7 @@ stereo:
 
 state_GT_estimate_file_name: "mav0/state_groundtruth_estimate0/data.csv"
 
+#> This comes from sensor.yaml file of cam0
 frame_to_body:
   rotation: [0.0148655429818, -0.999880929698,   0.00414029679422,
              0.999557249008,   0.0149672133247,  0.025715529948,
