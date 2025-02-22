@@ -40,7 +40,6 @@ Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(confi
             YAML::Node right_cam = config_file["right_camera"];
             YAML::Node stereo = config_file["stereo"];
 
-            // Parsing left camera parameters
             left_res = left_cam["resolution"].as<std::vector<int>>();
             left_rate = left_cam["rate_hz"].as<int>();
             left_model = left_cam["camera_model"].as<std::string>();
@@ -48,7 +47,6 @@ Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(confi
             left_dist_model = left_cam["distortion_model"].as<std::string>();
             left_dist_coeffs = left_cam["distortion_coefficients"].as<std::vector<double>>();
 
-            // Parsing right camera parameters
             right_res = right_cam["resolution"].as<std::vector<int>>();
             right_rate = right_cam["rate_hz"].as<int>();
             right_model = right_cam["camera_model"].as<std::string>();
@@ -56,7 +54,6 @@ Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(confi
             right_dist_model = right_cam["distortion_model"].as<std::string>();
             right_dist_coeffs = right_cam["distortion_coefficients"].as<std::vector<double>>();
 
-            // Parsing stereo extrinsic parameters
             if (stereo["R21"] && stereo["T21"] && stereo["F21"]) {
                 for (const auto& row : stereo["R21"]) {
                     rot_mat_21.push_back(row.as<std::vector<double>>());
@@ -173,15 +170,13 @@ void Dataset::PerformEdgeBasedVO() {
         // UndistortEdges(left_map, left_undist_edges, left_edge_coords, left_intr, left_dist_coeffs);
         // UndistortEdges(right_map, right_undist_edges, right_edge_coords, right_intr, right_dist_coeffs);
 
-        //////////////THIRD ORDER DETECTION////////////////////
+        //////////////THIRD ORDER EDGE DETECTION///////////////////
 
         cv::Mat left_undistorted, right_undistorted;
         cv::undistort(left_img, left_undistorted, left_calib, left_dist_coeff_mat);
         cv::undistort(right_img, right_undistorted, right_calib, right_dist_coeff_mat);
 
         //> CH: stack all the undistorted images
-        undistorted_left_img.push_back(left_undistorted);
-        undistorted_right_img.push_back(right_undistorted);
         if (Total_Num_Of_Imgs == 0) {
             img_height = left_undistorted.rows;
             img_width  = left_undistorted.cols;
@@ -206,60 +201,49 @@ void Dataset::PerformEdgeBasedVO() {
 
         Total_Num_Of_Imgs++;
 
-        cv::Mat left_edge_map = cv::Mat::zeros(img_height, img_width, CV_8UC1);
-        cv::Mat right_edge_map = cv::Mat::zeros(img_height, img_width, CV_8UC1);
+        // Initialize empty binary maps for edges
+        cv::Mat left_edge_map = cv::Mat::zeros(left_undistorted.size(), CV_8UC1);
+        cv::Mat right_edge_map = cv::Mat::zeros(right_undistorted.size(), CV_8UC1);
 
+        // Convert edge locations to binary maps
         for (const auto& edge : left_third_order_edges_locations) {
-            if (edge.x >= 0 && edge.x < img_width && edge.y >= 0 && edge.y < img_height) {
-                left_edge_map.at<uchar>(cv::Point(edge.x, edge.y)) = 255;  
+            if (edge.x >= 0 && edge.x < left_edge_map.cols && edge.y >= 0 && edge.y < left_edge_map.rows) {
+                left_edge_map.at<uchar>(cv::Point(edge.x, edge.y)) = 255;
             }
         }
 
         for (const auto& edge : right_third_order_edges_locations) {
-            if (edge.x >= 0 && edge.x < img_width && edge.y >= 0 && edge.y < img_height) {
+            if (edge.x >= 0 && edge.x < right_edge_map.cols && edge.y >= 0 && edge.y < right_edge_map.rows) {
                 right_edge_map.at<uchar>(cv::Point(edge.x, edge.y)) = 255;
             }
         }
 
-        DisplayMatches(left_edge_map, right_edge_map, left_third_order_edges_locations);
+        DisplayMatches(left_undistorted, right_undistorted, left_edge_map, right_edge_map, left_third_order_edges_locations, right_third_order_edges_locations);
         }
     }
 }
 
-void Dataset::DisplayMatches(const cv::Mat& left_map, const cv::Mat& right_map, std::vector<cv::Point2d> left_edge_coords) {
+void Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, const cv::Mat& left_binary_map, const cv::Mat& right_binary_map, 
+    std::vector<cv::Point2d> left_edge_coords, std::vector<cv::Point2d> right_edge_coords) {
     cv::Mat left_visualization, right_visualization;
-    cv::cvtColor(left_map, left_visualization, cv::COLOR_GRAY2BGR);
-    cv::cvtColor(right_map, right_visualization, cv::COLOR_GRAY2BGR);
+    cv::cvtColor(left_binary_map, left_visualization, cv::COLOR_GRAY2BGR);
+    cv::cvtColor(right_binary_map, right_visualization, cv::COLOR_GRAY2BGR);
 
     std::vector<cv::Point2d> selected_left_edges = PickRandomEdges(7, left_edge_coords, 5, left_res[0], left_res[1]);
 
     for (const auto& point : selected_left_edges) {
-        cv::circle(left_visualization, cv::Point(point.x, point.y), 5, cv::Scalar(0, 0, 255), cv::FILLED);
+        cv::circle(left_visualization, point, 5, cv::Scalar(0, 0, 255), cv::FILLED);
     }
 
     std::vector<cv::Mat> left_patches;
-    ExtractPatches(7, left_map, selected_left_edges, left_patches);
+    ExtractPatches(7, left_image, selected_left_edges, left_patches);
 
     Eigen::Matrix3d fundamental_matrix_21 = ConvertToEigenMatrix(fund_mat_21);
     Eigen::Matrix3d fundamental_matrix_12 = ConvertToEigenMatrix(fund_mat_12);
- 
     std::vector<Eigen::Vector3d> epipolar_lines_right = CalculateEpipolarLine(fundamental_matrix_21, selected_left_edges);
-
-    matched_left_edges.clear();
-    matched_right_edges.clear();
-
-    CalculateMatches(selected_left_edges, left_patches, epipolar_lines_right, left_map, right_map, fundamental_matrix_12, right_visualization);
-
-    // std::cout << "\nNumber of left edges: " << matched_left_edges.size() << std::endl;
-    // std::cout << "Number of right edges: " << matched_right_edges.size() << std::endl;
-    // std::cout << "\nMatched Edge Pairs (Left -> Right):\n";
-    // for (size_t i = 0; i < matched_left_edges.size(); i++) {
-    //     std::cout << "Left Edge: (" << matched_left_edges[i].x << ", " << matched_left_edges[i].y << ")  -->  "
-    //             << "Right Edge: (" << matched_right_edges[i].x << ", " << matched_right_edges[i].y << ")\n";
-    // }
-
-    // CalculateEdgeDepths();
-    // Calculate3DTangent();
+    
+    CalculateMatches(selected_left_edges, left_edge_coords, right_edge_coords, left_patches, epipolar_lines_right, left_image, right_image,
+        fundamental_matrix_12, right_visualization);
 
     cv::Mat merged_visualization;
     cv::hconcat(left_visualization, right_visualization, merged_visualization);
@@ -267,22 +251,32 @@ void Dataset::DisplayMatches(const cv::Mat& left_map, const cv::Mat& right_map, 
     cv::waitKey(0);
 }
 
-void Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_left_edges, const std::vector<cv::Mat>& left_patches, const std::vector<Eigen::Vector3d>& epipolar_lines_right, const cv::Mat& left_map, const cv::Mat& right_map, const Eigen::Matrix3d& fundamental_matrix_12, cv::Mat& right_visualization) {
-
+void Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_left_edges, const std::vector<cv::Point2d>& left_edge_coords, const std::vector<cv::Point2d>& right_edge_coords,
+    const std::vector<cv::Mat>& left_patches, const std::vector<Eigen::Vector3d>& epipolar_lines_right,
+    const cv::Mat& left_image, const cv::Mat& right_image, const Eigen::Matrix3d& fundamental_matrix_12, cv::Mat& right_visualization) {
+    double tol = 2.0;
     for (size_t i = 0; i < selected_left_edges.size(); i++) {
         const auto& left_edge = selected_left_edges[i];
         const auto& left_patch = left_patches[i];
         const auto& epipolar_line = epipolar_lines_right[i];
+        double a = epipolar_line(0);
+        double b = epipolar_line(1);
+        double c = epipolar_line(2);
 
-        std::vector<cv::Point2d> right_candidate_edges = ExtractEpipolarEdges(7, epipolar_line, right_map);
-
-        if (right_candidate_edges.size() > 1) {
-            cv::line(right_visualization, cv::Point(static_cast<int>(right_candidate_edges.front().x), static_cast<int>(right_candidate_edges.front().y)), 
-            cv::Point(static_cast<int>(right_candidate_edges.back().x), static_cast<int>(right_candidate_edges.back().y)), cv::Scalar(255, 200, 100), 1);
+        if (b != 0) {
+            cv::Point2d pt1(0, -c / b);
+            cv::Point2d pt2(right_visualization.cols, -(c + a * right_visualization.cols) / b);
+            cv::line(right_visualization, pt1, pt2, cv::Scalar(255, 200, 100), 1);
         }
 
+        std::vector<cv::Point2d> right_candidate_edges = ExtractEpipolarEdges(7, epipolar_line, right_edge_coords);
+
+        // for (const auto& edge : right_candidate_edges) {
+        //     cv::circle(right_visualization, edge, 3, cv::Scalar(0, 0, 255), cv::FILLED);
+        // }
+
         std::vector<cv::Mat> right_patches;
-        ExtractPatches(7, right_map, right_candidate_edges, right_patches);
+        ExtractPatches(7, right_image, right_candidate_edges, right_patches);
         
         if (!left_patch.empty() && !right_patches.empty()) {
             int best_right_match_idx = CalculateSSDPatch(left_patch, right_patches);
@@ -293,9 +287,9 @@ void Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_left_edg
                 std::vector<Eigen::Vector3d> right_to_left_epipolar = CalculateEpipolarLine(fundamental_matrix_12, {best_right_match});
                 Eigen::Vector3d epipolar_line_left = right_to_left_epipolar[0];
 
-                std::vector<cv::Point2d> left_candidate_edges = ExtractEpipolarEdges(7, epipolar_line_left, left_map);
+                std::vector<cv::Point2d> left_candidate_edges = ExtractEpipolarEdges(7, epipolar_line_left, left_edge_coords);
                 std::vector<cv::Mat> left_candidate_patches;
-                ExtractPatches(7, left_map, left_candidate_edges, left_candidate_patches);
+                ExtractPatches(7, left_image, left_candidate_edges, left_candidate_patches);
                 
                 if (!left_candidate_patches.empty()) {
                     int best_left_match_idx = CalculateSSDPatch(right_patches[best_right_match_idx], left_candidate_patches);
@@ -303,9 +297,8 @@ void Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_left_edg
                     if (best_left_match_idx != -1) {
                         cv::Point2d best_left_match = left_candidate_edges[best_left_match_idx];
 
-                        if (best_left_match == left_edge) {
-                            cv::circle(right_visualization, cv::Point(static_cast<int>(best_right_match.x), static_cast<int>(best_right_match.y)), 5, 
-                            cv::Scalar(0, 0, 255), cv::FILLED);
+                        if (cv::norm(best_left_match - left_edge) < tol) {
+                            cv::circle(right_visualization, best_right_match, 5, cv::Scalar(0, 0, 255), cv::FILLED);
                         }
                     }
                 }
@@ -348,7 +341,7 @@ int Dataset::CalculateSSDPatch(const cv::Mat& left_patch, const std::vector<cv::
 
     if (best_match_idx != -1 && second_best_match_idx != -1) {
         double ratio = second_min_ssd / min_ssd;
-        if (ratio > 1.6) {
+        if (ratio > 0.2) {
             return best_match_idx;
         } else {
             return -1;  
@@ -358,117 +351,8 @@ int Dataset::CalculateSSDPatch(const cv::Mat& left_patch, const std::vector<cv::
     return best_match_idx; 
 }
 
-/// IN PROGRESS
-void Dataset::Calculate3DTangent() {
-    std::cout << "Size of matched_left_edges: " << matched_left_edges.size() << std::endl;
-    std::cout << "Size of matched_right_edges: " << matched_right_edges.size() << std::endl;
-    std::cout << "Size of matched_left_orientations: " << matched_left_orientations.size() << std::endl;
-    std::cout << "Size of matched_right_orientations: " << matched_right_orientations.size() << std::endl;
-
-    if (matched_left_edges.size() != matched_right_edges.size() ||
-        matched_left_edges.size() != left_third_order_edges_orientation.size() ||
-        matched_right_edges.size() != right_third_order_edges_orientation.size()) {
-        std::cerr << "ERROR: Mismatch in number of edge matches and orientations!" << std::endl;
-        return;
-    }
-
-    Eigen::Matrix3d R21;
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-            R21(i, j) = rot_mat_21[i][j];
-        }
-    }
-
-    left_edge_3D_tangents.clear();
-
-    for (size_t i = 0; i < matched_left_edges.size(); i++) {
-        Eigen::Vector3d gamma_one(matched_left_edges[i].x, matched_left_edges[i].y, 1.0);
-        Eigen::Vector3d gamma_two(matched_right_edges[i].x, matched_right_edges[i].y, 1.0);
-
-        double theta_one = matched_left_orientations[i];
-        double theta_two = matched_right_orientations[i];
-
-        Eigen::Vector3d t_one(std::cos(theta_one), std::sin(theta_one), 1);
-        Eigen::Vector3d t_two(std::cos(theta_two), std::sin(theta_two), 1);
-
-        Eigen::Vector3d t_two_cross_R21_t_one = t_two.cross(R21 * t_one);
-        Eigen::Vector3d t_two_cross_R21_gamma_one = t_two.cross(R21 * gamma_one);
-
-        Eigen::Vector3d numerator = - ((t_two_cross_R21_t_one.dot(gamma_two) * gamma_one) + t_two_cross_R21_gamma_one.dot(gamma_two) * t_one);
-        double denominator = numerator.norm(); 
-
-        Eigen::Vector3d T1 = numerator / denominator;
-
-        left_edge_3D_tangents.push_back(T1);
-    }
-
-    std::cout << "Computed 3D orientations for " << left_edge_3D_tangents.size() << " edges:\n";
-    for (size_t i = 0; i < left_edge_3D_tangents.size(); i++) {
-        std::cout << "Edge " << i + 1 << ": T = [" << left_edge_3D_tangents[i].transpose() << "]\n";
-    }
-}
-
-/// NEEDS FIX (PRODUCING NEGATIVE VALUES!)
-void Dataset::CalculateEdgeDepths() {
-    if (matched_left_edges.size() != matched_right_edges.size()) {
-        std::cerr << "ERROR: Number of left and right edge matches do not match!" << std::endl;
-        return;
-    }
-
-    Eigen::Matrix3d R;
-    Eigen::Vector3d T;
-
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-            R(i, j) = rot_mat_12[i][j];
-        }
-        T(i) = trans_vec_12[i];
-    }
-
-    Eigen::Matrix3d K;
-    K << left_intr[0], 0, left_intr[2],
-         0, left_intr[1], left_intr[3],
-         0, 0, 1;
-
-    Eigen::Matrix3d K_inv = K.inverse();
-
-    Eigen::Vector3d e1(1, 0, 0); 
-    Eigen::Vector3d e3(0, 0, 1); 
-
-    left_edge_depths.clear();
-
-    for (size_t i = 0; i < matched_left_edges.size(); i++) {
-        Eigen::Vector3d gamma(matched_left_edges[i].x, matched_left_edges[i].y, 1.0);
-        Eigen::Vector3d gamma_bar(matched_right_edges[i].x, matched_right_edges[i].y, 1.0);
-
-        Eigen::Vector3d gamma_norm = K_inv * gamma;
-        Eigen::Vector3d gamma_bar_norm = K_inv * gamma_bar;
-
-        double e1_T_gamma_bar = (e1.transpose() * gamma_bar_norm)(0, 0);
-        double e3_T_gamma = (e3.transpose() * R * gamma_norm)(0, 0);
-        double e1_T_gamma = (e1.transpose() * R * gamma_norm)(0, 0);
-        double e1_T_T = (e1.transpose() * T)(0, 0);
-        double e3_T_T = (e3.transpose() * T)(0, 0);
-
-        double numerator = e1_T_T - (e3_T_T * e1_T_gamma_bar);
-        double denominator = (e3_T_gamma * e1_T_gamma_bar) - e1_T_gamma;
-
-        if (std::abs(denominator) > 1e-6) {
-            double rho = numerator / denominator;
-            left_edge_depths.push_back(rho);
-        } else {
-            std::cerr << "WARNING: Skipping depth computation for edge " << i << " due to near-zero denominator!" << std::endl;
-            left_edge_depths.push_back(0.0); 
-        }
-    }
-
-    std::cout << "\nComputed depths for " << left_edge_depths.size() << " edges:\n";
-    for (size_t i = 0; i < left_edge_depths.size(); i++) {
-        std::cout << "Edge " << i + 1 << ": Depth = " << left_edge_depths[i] << "\n";
-    }
-}
-
-void Dataset::ExtractPatches(int patch_size, const cv::Mat& binary_map, const std::vector<cv::Point2d>& selected_edges, std::vector<cv::Mat>& patches) {
+//UPDATED
+void Dataset::ExtractPatches(int patch_size, const cv::Mat& image, const std::vector<cv::Point2d>& selected_edges, std::vector<cv::Mat>& patches) {
     int half_patch = patch_size / 2;
     patches.clear();
 
@@ -476,12 +360,13 @@ void Dataset::ExtractPatches(int patch_size, const cv::Mat& binary_map, const st
         double x = edge.x;
         double y = edge.y;
 
-        if (x - half_patch >= 0 && x + half_patch < binary_map.cols &&
-            y - half_patch >= 0 && y + half_patch < binary_map.rows) {
+        if (x - half_patch >= 0 && x + half_patch < image.cols &&
+            y - half_patch >= 0 && y + half_patch < image.rows) {
 
             cv::Mat patch;
-            cv::getRectSubPix(binary_map, cv::Size(patch_size, patch_size), cv::Point2f(x, y), patch);
-
+            cv::Point2f center (static_cast<float>(x), static_cast<float>(y));
+            cv::Size size (patch_size, patch_size);
+            cv::getRectSubPix(image, size, center, patch);
             patches.push_back(patch);
         } 
         else {
@@ -490,28 +375,29 @@ void Dataset::ExtractPatches(int patch_size, const cv::Mat& binary_map, const st
     }
 }
 
-std::vector<cv::Point2d> Dataset::ExtractEpipolarEdges(int patch_size, const Eigen::Vector3d& epipolar_line, const cv::Mat& binary_map) {
-   std::vector<cv::Point2d> edges;
+//UPDATED
+std::vector<cv::Point2d> Dataset::ExtractEpipolarEdges(int patch_size, const Eigen::Vector3d& epipolar_line, const std::vector<cv::Point2d>& edge_locations) {
+    std::vector<cv::Point2d> extracted_edges;
 
-   int width = binary_map.cols;
-   int height = binary_map.rows;
+    double threshold = 3.0;
 
-   int half_patch = patch_size / 2;
-   for (int x = half_patch; x < width - half_patch; x++) {
-       double y = (-epipolar_line(2) - epipolar_line(0) * x) / epipolar_line(1);
+    for (const auto& edge : edge_locations) {
+        double x = edge.x;
+        double y = edge.y;
 
-       int y_int = static_cast<int>(std::round(y));
+        double distance = std::abs(epipolar_line(0) * x + epipolar_line(1) * y + epipolar_line(2)) 
+                          / std::sqrt((epipolar_line(0) * epipolar_line(0)) + (epipolar_line(1) * epipolar_line(1)));
 
-       if (y >= half_patch && y < height - half_patch) {
-           if (binary_map.at<uchar>(y_int, x) == 255) {
-               edges.emplace_back(x, y);
-           }
-       }
-   }
+        if (distance < threshold) {
+            extracted_edges.push_back(edge);
+        }
+    }
 
-   return edges;
+    return extracted_edges;
 }
 
+
+//UPDATED
 std::vector<Eigen::Vector3d> Dataset::CalculateEpipolarLine(const Eigen::Matrix3d& fund_mat, const std::vector<cv::Point2d>& edges) {
     std::vector<Eigen::Vector3d> epipolar_lines;
 
@@ -531,39 +417,7 @@ std::vector<Eigen::Vector3d> Dataset::CalculateEpipolarLine(const Eigen::Matrix3
     return epipolar_lines;
 }
 
-
-// std::vector<cv::Point2f>, std::vector<double>> Dataset::PickRandomEdges(int patch_size, const std::vector<cv::Point2f>& edges, const std::vector<cv::double>& orientations,size_t num_points, int img_width, int img_height) {
-//    std::vector<cv::Point2f> valid_edges;
-//    std::vector<cv::double> valid_orientations;
-//    int half_patch = patch_size / 2;
-
-//    for (size_t i = 0; i < edges.size(); i++) {
-//        if (edges[i].x >= half_patch && edges[i].x < img_width - half_patch &&
-//            edges[i].y >= half_patch && edges[i].y < img_height - half_patch) {
-//            valid_edges.push_back(edges[i]);
-//            valid_orientations.push_back(orientations[i]);
-//        }
-//    }
-
-//    num_points = std::min(num_points, valid_edges.size());
-
-//    std::vector<cv::Point2f> selected_points;
-//    std::unordered_set<int> used_indices;
-//    std::random_device rd;
-//    std::mt19937 gen(rd());
-//    std::uniform_int_distribution<int> dis(0, valid_edges.size() - 1);
-
-//    while (selected_points.size() < num_points) {
-//        int idx = dis(gen);
-//        if (used_indices.find(idx) == used_indices.end()) {
-//            selected_points.push_back(valid_edges[idx]);
-//            used_indices.insert(idx);
-//        }
-//    }
-
-//    return selected_points;
-// }
-
+//UPDATED
 std::vector<cv::Point2d> Dataset::PickRandomEdges(int patch_size, const std::vector<cv::Point2d>& edges, size_t num_points, int img_width, int img_height) {
    std::vector<cv::Point2d> valid_edges;
    int half_patch = patch_size / 2;
@@ -584,24 +438,97 @@ std::vector<cv::Point2d> Dataset::PickRandomEdges(int patch_size, const std::vec
    std::uniform_int_distribution<int> dis(0, valid_edges.size() - 1);
 
    while (selected_points.size() < num_points) {
-       int idx = dis(gen);
-       if (used_indices.find(idx) == used_indices.end()) {
-           selected_points.push_back(valid_edges[idx]);
-           used_indices.insert(idx);
+       int index = dis(gen);
+       if (used_indices.find(index) == used_indices.end()) {
+           selected_points.push_back(valid_edges[index]);
+           used_indices.insert(index);
        }
    }
 
    return selected_points;
 }
 
-Eigen::Matrix3d Dataset::ConvertToEigenMatrix(const std::vector<std::vector<double>>& matrix) {
-    Eigen::Matrix3d eigen_matrix;
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-            eigen_matrix(i, j) = matrix[i][j];
-        }
+void Dataset::LoadGroundTruth(const std::string& filepath, std::vector<Eigen::Matrix3d>& rotations, std::vector<Eigen::Vector3d>& translations, int num_images) {
+    std::ifstream file(filepath);
+
+    if (!file.is_open()) {
+        std::cerr << "ERROR: Could not open the Ground Truth file located at " << filepath << "!" << std::endl;
+        return;
     }
-    return eigen_matrix;
+
+    std::string line;
+    bool first_line = true;
+    while (std::getline(file, line) && rotations.size() < num_images) {
+        if (first_line) {
+            first_line = false;
+            continue;
+        }
+
+        std::istringstream line_stream(line);
+        std::vector<std::string> fields;
+        std::string field;
+        
+        while (std::getline(line_stream, field, ',')) {
+            fields.push_back(field);
+        }
+
+        if(fields.size() < 8) continue;
+        
+        double p_x = std::stod(fields[1]);
+        double p_y = std::stod(fields[2]);
+        double p_z = std::stod(fields[3]);
+        Eigen::Vector3d T(p_x, p_y, p_z);
+
+        double q_x = std::stod(fields[4]);
+        double q_y = std::stod(fields[5]);
+        double q_z = std::stod(fields[6]);
+        double q_w = std::stod(fields[7]);
+        Eigen::Matrix3d R = ConvertToRotationMatrix(q_x, q_y, q_z, q_w);
+
+        translations.push_back(T);
+        rotations.push_back(R);
+    }
+
+}
+
+std::vector<std::pair<cv::Mat, cv::Mat>> Dataset::LoadImages(const std::string& csv_path, const std::string& left_path, const std::string& right_path, 
+    int num_images) {
+    std::ifstream csv_file(csv_path);
+    if (!csv_file.is_open()) {
+        std::cerr << "ERROR: Could not open the CSV file located at " << csv_path << "!" << std::endl;
+        return {};
+    }
+
+    std::vector<std::pair<cv::Mat, cv::Mat>> image_pairs;
+    std::string line;
+    bool first_line = true;
+
+    while (std::getline(csv_file, line) && image_pairs.size() < num_images) {
+        if (first_line) {
+            first_line = false;
+            continue;
+        }
+
+        std::istringstream line_stream(line);
+        std::string timestamp;
+        std::getline(line_stream, timestamp, ',');
+        
+        std::string left_img_path = left_path + timestamp + ".png";
+        std::string right_img_path = right_path + timestamp + ".png";
+        
+        cv::Mat left_img = cv::imread(left_img_path, cv::IMREAD_GRAYSCALE);
+        cv::Mat right_img = cv::imread(right_img_path, cv::IMREAD_GRAYSCALE);
+        
+        if (left_img.empty() || right_img.empty()) {
+            std::cerr << "ERROR: Could not load the images: " << left_img_path << " or " << right_img_path << "!" << std::endl;
+            continue;
+        }
+        
+        image_pairs.emplace_back(left_img, right_img);
+    }
+    
+    csv_file.close();
+    return image_pairs;
 }
 
 void Dataset::UndistortEdges(const cv::Mat& dist_edges, cv::Mat& undist_edges, std::vector<cv::Point2f>& edge_locations, const std::vector<double>& intr, 
@@ -662,92 +589,19 @@ void Dataset::DisplayOverlay(const std::string& extract_undist_path, const std::
     cv::waitKey(0);
 }
 
-void Dataset::LoadGroundTruth(const std::string& filepath, std::vector<Eigen::Matrix3d>& rotations, std::vector<Eigen::Vector3d>& translations, int num_images) {
-    std::ifstream file(filepath);
-
-    if (!file.is_open()) {
-        std::cerr << "ERROR: Could not open the Ground Truth file located at " << filepath << "!" << std::endl;
-        return;
-    }
-
-    std::string line;
-    bool first_line = true;
-    while (std::getline(file, line) && rotations.size() < num_images) {
-        if (first_line) {
-            first_line = false;
-            continue;
-        }
-
-        std::istringstream line_stream(line);
-        std::vector<std::string> fields;
-        std::string field;
-        
-        while (std::getline(line_stream, field, ',')) {
-            fields.push_back(field);
-        }
-
-        if(fields.size() < 8) continue;
-        
-        double p_x = std::stod(fields[1]);
-        double p_y = std::stod(fields[2]);
-        double p_z = std::stod(fields[3]);
-        Eigen::Vector3d T(p_x, p_y, p_z);
-
-        double q_x = std::stod(fields[4]);
-        double q_y = std::stod(fields[5]);
-        double q_z = std::stod(fields[6]);
-        double q_w = std::stod(fields[7]);
-        Eigen::Matrix3d R = ConvertToRotationMatrix(q_x, q_y, q_z, q_w);
-
-        translations.push_back(T);
-        rotations.push_back(R);
-    }
-
-}
-
 Eigen::Matrix3d Dataset::ConvertToRotationMatrix(double q_x, double q_y, double q_z, double q_w) {
     Eigen::Quaterniond q(q_w, q_x, q_y, q_z);
     return q.toRotationMatrix();
 }
 
-std::vector<std::pair<cv::Mat, cv::Mat>> Dataset::LoadImages(const std::string& csv_path, const std::string& left_path, const std::string& right_path, 
-    int num_images) {
-    std::ifstream csv_file(csv_path);
-    if (!csv_file.is_open()) {
-        std::cerr << "ERROR: Could not open the CSV file located at " << csv_path << "!" << std::endl;
-        return {};
-    }
-
-    std::vector<std::pair<cv::Mat, cv::Mat>> image_pairs;
-    std::string line;
-    bool first_line = true;
-
-    while (std::getline(csv_file, line) && image_pairs.size() < num_images) {
-        if (first_line) {
-            first_line = false;
-            continue;
+Eigen::Matrix3d Dataset::ConvertToEigenMatrix(const std::vector<std::vector<double>>& matrix) {
+    Eigen::Matrix3d eigen_matrix;
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            eigen_matrix(i, j) = matrix[i][j];
         }
-
-        std::istringstream line_stream(line);
-        std::string timestamp;
-        std::getline(line_stream, timestamp, ',');
-        
-        std::string left_img_path = left_path + timestamp + ".png";
-        std::string right_img_path = right_path + timestamp + ".png";
-        
-        cv::Mat left_img = cv::imread(left_img_path, cv::IMREAD_GRAYSCALE);
-        cv::Mat right_img = cv::imread(right_img_path, cv::IMREAD_GRAYSCALE);
-        
-        if (left_img.empty() || right_img.empty()) {
-            std::cerr << "ERROR: Could not load the images: " << left_img_path << " or " << right_img_path << "!" << std::endl;
-            continue;
-        }
-        
-        image_pairs.emplace_back(left_img, right_img);
     }
-    
-    csv_file.close();
-    return image_pairs;
+    return eigen_matrix;
 }
 
 // void Dataset::PrintDatasetInfo() {
