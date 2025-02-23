@@ -99,20 +99,23 @@ private:
 
     std::vector<cv::Point2d> matched_left_edges;
     std::vector<cv::Point2d> matched_right_edges;
+    std::vector<double> matched_left_orientations;
+    std::vector<double> matched_right_orientations;
     std::vector<double> left_edge_depths; 
+    std::vector<Eigen::Vector3d> left_edge_3D_orientations;
 
     // void PrintDatasetInfo();
-    void DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, const cv::Mat& left_binary_map, const cv::Mat& right_binary_map, std::vector<cv::Point2d> left_edge_coords, std::vector<cv::Point2d> right_edge_coords);    
-    void CalculateMatches(const std::vector<cv::Point2d>& selected_left_edges, const std::vector<cv::Point2d>& left_edge_coords, const std::vector<cv::Point2d>& right_edge_coords,
-    const std::vector<cv::Mat>& left_patches, const std::vector<Eigen::Vector3d>& epipolar_lines_right, const cv::Mat& left_image, const cv::Mat& right_image, const Eigen::Matrix3d& fundamental_matrix_12, cv::Mat& right_visualization);
+    void DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, const cv::Mat& left_binary_map, const cv::Mat& right_binary_map, std::vector<cv::Point2d> left_edge_coords, std::vector<cv::Point2d> right_edge_coords, std::vector<double> left_edge_orientations, std::vector<double> right_edge_orientations);
+    void CalculateMatches(const std::vector<cv::Point2d>& selected_left_edges, const std::vector<double>& selected_left_orientations, const std::vector<cv::Point2d>& left_edge_coords, const std::vector<double>& left_edge_orientations, const std::vector<cv::Point2d>& right_edge_coords, const std::vector<double>& right_edge_orientations, const std::vector<cv::Mat>& left_patches, const std::vector<Eigen::Vector3d>& epipolar_lines_right, const cv::Mat& left_image, const cv::Mat& right_image, const Eigen::Matrix3d& fundamental_matrix_12, cv::Mat& right_visualization);
+    void CalculateOrientations();
     void CalculateDepths();
     int CalculateNCCPatch(const cv::Mat& left_patch, const std::vector<cv::Mat>& right_patches);
     void ExtractPatches(int patch_size, const cv::Mat& image, const std::vector<cv::Point2d>& selected_edges, std::vector<cv::Mat>& patches);
     void UndistortEdges(const cv::Mat& dist_edges, cv::Mat& undist_edges, std::vector<cv::Point2f>& edge_locations, const std::vector<double>& intr, const std::vector<double>& dist_coeffs);
     void DisplayOverlay(const std::string& extract_undist_path, const std::string& undistort_extract_path);
-    std::vector<cv::Point2d> ExtractEpipolarEdges(int patch_size, const Eigen::Vector3d& epipolar_line, const std::vector<cv::Point2d>& edge_locations);  
+    std::pair<std::vector<cv::Point2d>, std::vector<double>> ExtractEpipolarEdges(int patch_size, const Eigen::Vector3d& epipolar_line, const std::vector<cv::Point2d>& edge_locations, const std::vector<double>& edge_orientations);  
     std::vector<Eigen::Vector3d> CalculateEpipolarLine(const Eigen::Matrix3d& fund_mat, const std::vector<cv::Point2d>& edges);
-    std::vector<cv::Point2d> PickRandomEdges(int patch_size, const std::vector<cv::Point2d>& edges, size_t num_points, int img_width, int img_height);
+    std::pair<std::vector<cv::Point2d>, std::vector<double>> PickRandomEdges(int patch_size, const std::vector<cv::Point2d>& edges, const std::vector<double>& orientations, size_t num_points, int img_width, int img_height);
     Eigen::Matrix3d ConvertToEigenMatrix(const std::vector<std::vector<double>>& matrix);
     std::vector<std::pair<cv::Mat, cv::Mat>> LoadImages(const std::string& csv_path, const std::string& left_path, const std::string& right_path, int num_images);
 
