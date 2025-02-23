@@ -33,12 +33,14 @@ Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(confi
     dataset_path = config_file["dataset_dir"].as<std::string>();
     sequence_name = config_file["sequence_name"].as<std::string>();
     dataset_type = config_file["dataset_type"].as<std::string>();
+    GT_file_name = config_file["state_GT_estimate_file_name"].as<std::string>();
 
     if (dataset_type == "EuRoC") {
         try {
             YAML::Node left_cam = config_file["left_camera"];
             YAML::Node right_cam = config_file["right_camera"];
             YAML::Node stereo = config_file["stereo"];
+            YAML::Node frame_to_body = config_file["frame_to_body"];
 
             left_res = left_cam["resolution"].as<std::vector<int>>();
             left_rate = left_cam["rate_hz"].as<int>();
@@ -81,6 +83,17 @@ Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(confi
             } else {
                 std::cerr << "ERROR: Missing right-to-left stereo parameters (R12, T12, F12) in YAML file!" << std::endl;
             }
+
+            //> Parse the transformation from the camera to the body
+            if (frame_to_body["rotation"] && frame_to_body["translation"]) {
+                rot_frame2body_left = Eigen::Map<Eigen::Matrix3d>(frame_to_body["rotation"].as<std::vector<double>>().data()).transpose();
+                transl_frame2body_left = Eigen::Map<Eigen::Vector3d>(frame_to_body["translation"].as<std::vector<double>>().data());
+            } else {
+                LOG_ERROR("Missing relative rotation and translation from the left camera to the body coordinate (should be given by cam0/sensor.yaml)");
+            }
+
+            // Load_GT_Poses();
+            // exit(1);
 
         } catch (const YAML::Exception &e) {
             std::cerr << "ERROR: Could not parse YAML file! " << e.what() << std::endl;
@@ -235,17 +248,20 @@ void Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_ima
     Eigen::Matrix3d fundamental_matrix_21 = ConvertToEigenMatrix(fund_mat_21);
     Eigen::Matrix3d fundamental_matrix_12 = ConvertToEigenMatrix(fund_mat_12);
     std::vector<Eigen::Vector3d> epipolar_lines_right = CalculateEpipolarLine(fundamental_matrix_21, selected_left_edges);
-    
+
     CalculateMatches(selected_left_edges, left_edge_coords, right_edge_coords, left_patches, epipolar_lines_right, left_image, right_image,
         fundamental_matrix_12, right_visualization);
 
+    CalculateDepths();
     cv::Mat merged_visualization;
     cv::hconcat(left_visualization, right_visualization, merged_visualization);
-    cv::imshow("Edge Matching Using SSD, Lowe's Ratio Test, & Bidirectional Consistency", merged_visualization);
+    cv::imshow("Edge Matching Using NCC & Bidirectional Consistency", merged_visualization);
     cv::waitKey(0);
 }
 
 void Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_left_edges, const std::vector<cv::Point2d>& left_edge_coords, const std::vector<cv::Point2d>& right_edge_coords, const std::vector<cv::Mat>& left_patches, const std::vector<Eigen::Vector3d>& epipolar_lines_right, const cv::Mat& left_image, const cv::Mat& right_image, const Eigen::Matrix3d& fundamental_matrix_12, cv::Mat& right_visualization) {
+    matched_left_edges.clear();
+    matched_right_edges.clear();
     double tol = 2.0;
 
     for (size_t i = 0; i < selected_left_edges.size(); i++) {
@@ -292,6 +308,8 @@ void Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_left_edg
 
                         if (cv::norm(best_left_match - left_edge) < tol) {
                             cv::circle(right_visualization, best_right_match, 5, cv::Scalar(0, 0, 255), cv::FILLED);
+                            matched_left_edges.push_back(left_edge);
+                            matched_right_edges.push_back(best_right_match);
                         }
                     }
                 }
@@ -300,6 +318,70 @@ void Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_left_edg
     }
 }
 
+void Dataset::CalculateDepths() {
+    if (matched_left_edges.size() != matched_right_edges.size()) {
+        std::cerr << "ERROR: Number of left and right edge matches do not match!" << std::endl;
+        return;
+    }
+
+    Eigen::Matrix3d R;
+    Eigen::Vector3d T;
+
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            R(i, j) = rot_mat_21[i][j];
+        }
+        T(i) = trans_vec_21[i];
+    }
+
+    Eigen::Matrix3d K_left;
+    K_left << left_intr[0], 0, left_intr[2],
+         0, left_intr[1], left_intr[3],
+         0, 0, 1;
+    
+    Eigen::Matrix3d K_right;
+    K_right << right_intr[0], 0, right_intr[2],
+         0, right_intr[1], right_intr[3],
+         0, 0, 1;
+
+    Eigen::Matrix3d K_left_inv = K_left.inverse();
+    Eigen::Matrix3d K_right_inv = K_right.inverse();
+
+    Eigen::Vector3d e1(1, 0, 0); 
+    Eigen::Vector3d e3(0, 0, 1); 
+
+    left_edge_depths.clear();
+
+    for (size_t i = 0; i < matched_left_edges.size(); i++) {
+        Eigen::Vector3d gamma(matched_left_edges[i].x, matched_left_edges[i].y, 1.0);
+        Eigen::Vector3d gamma_bar(matched_right_edges[i].x, matched_right_edges[i].y, 1.0);
+
+        Eigen::Vector3d gamma_meter = K_left_inv * gamma;
+        Eigen::Vector3d gamma_bar_meter = K_right_inv * gamma_bar;
+
+        double e1_gamma_bar = (e1.transpose() * gamma_bar_meter)(0, 0);
+        double e3_R_gamma = (e3.transpose() * R * gamma_meter)(0, 0);
+        double e1_R_gamma = (e1.transpose() * R * gamma_meter)(0, 0);
+        double e1_T = (e1.transpose() * T)(0, 0);
+        double e3_T = (e3.transpose() * T)(0, 0);
+
+        double numerator = (e1_T * e3_R_gamma) - (e3_T * e1_R_gamma);
+        double denominator = (e3_R_gamma * e1_gamma_bar) - e1_R_gamma;
+
+        if (std::abs(denominator) > 1e-6) {
+            double rho = numerator / denominator;
+            left_edge_depths.push_back(rho);
+        } else {
+            std::cerr << "WARNING: Skipping depth computation for edge " << i << " due to near-zero denominator!" << std::endl;
+            left_edge_depths.push_back(0.0); 
+        }
+    }
+
+    std::cout << "Computed depths for " << left_edge_depths.size() << " edges:\n";
+    for (size_t i = 0; i < left_edge_depths.size(); i++) {
+        std::cout << "Edge " << i + 1 << ": Depth = " << left_edge_depths[i] << " meters\n";
+    }
+}
 //UPDATED
 int Dataset::CalculateNCCPatch(const cv::Mat& left_patch, const std::vector<cv::Mat>& right_patches) {
     if (right_patches.empty()) return -1;
@@ -652,11 +734,6 @@ void Dataset::DisplayOverlay(const std::string& extract_undist_path, const std::
     cv::imshow("Edge Map Overlay - Blue (EU), Red (UE), Pink (Both)", overlay);
     cv::imwrite("Edge Map Overlay - Blue (EU), Red (UE), Pink (Both).png", overlay);
     cv::waitKey(0);
-}
-
-Eigen::Matrix3d Dataset::ConvertToRotationMatrix(double q_x, double q_y, double q_z, double q_w) {
-    Eigen::Quaterniond q(q_w, q_x, q_y, q_z);
-    return q.toRotationMatrix();
 }
 
 Eigen::Matrix3d Dataset::ConvertToEigenMatrix(const std::vector<std::vector<double>>& matrix) {
