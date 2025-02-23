@@ -116,23 +116,17 @@ Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(confi
 void Dataset::PerformEdgeBasedVO() {
     std::string left_path = dataset_path + "/" + sequence_name + "/mav0/cam0/data/";
     std::string right_path = dataset_path + "/" + sequence_name + "/mav0/cam1/data/";
-    std::string csv_path = dataset_path + "/" + sequence_name + "/mav0/cam0/data.csv";
+    std::string img_csv_path = dataset_path + "/" + sequence_name + "/mav0/cam0/data.csv";
     std::string ground_truth_path = dataset_path + "/" + sequence_name + "/mav0/state_groundtruth_estimate0/data.csv";
-    int num_images = 5;
+    int num_images = 20;
 
-    std::vector<std::pair<cv::Mat, cv::Mat>> image_pairs = LoadImages(csv_path, left_path, right_path, num_images);
+    //> Load images
+    std::vector<std::pair<cv::Mat, cv::Mat>> image_pairs = LoadImages(img_csv_path, left_path, right_path, num_images);
 
-    // std::vector<Eigen::Matrix3d> rotations;
-    // std::vector<Eigen::Vector3d> translations;
-
-    // LoadGroundTruth(ground_truth_path, rotations, translations, num_images);
-    // for (size_t i = 0; i < translations.size(); i++) {
-    // std::cout << "Ground Truth Pose " << i + 1 << ":\n";
-    // std::cout << "Translation (T): \n" << translations[i].transpose() << std::endl;
-    // std::cout << "Rotation (R): \n" << rotations[i] << std::endl;
-    // std::cout << "-------------------------\n";
-    // }
-
+    //> Load ground-truth poses
+    Load_GT_Poses(ground_truth_path);
+    Align_Images_and_GT_Poses();
+    
     for (const auto& pair : image_pairs) {
         const cv::Mat& left_img = pair.first;
         const cv::Mat& right_img = pair.second; {
@@ -430,48 +424,48 @@ std::vector<cv::Point2d> Dataset::PickRandomEdges(int patch_size, const std::vec
    return selected_points;
 }
 
-void Dataset::LoadGroundTruth(const std::string& filepath, std::vector<Eigen::Matrix3d>& rotations, std::vector<Eigen::Vector3d>& translations, int num_images) {
-    std::ifstream file(filepath);
+// void Dataset::LoadGroundTruth(const std::string& filepath, std::vector<Eigen::Matrix3d>& rotations, std::vector<Eigen::Vector3d>& translations, int num_images) {
+//     std::ifstream file(filepath);
 
-    if (!file.is_open()) {
-        std::cerr << "ERROR: Could not open the Ground Truth file located at " << filepath << "!" << std::endl;
-        return;
-    }
+//     if (!file.is_open()) {
+//         std::cerr << "ERROR: Could not open the Ground Truth file located at " << filepath << "!" << std::endl;
+//         return;
+//     }
 
-    std::string line;
-    bool first_line = true;
-    while (std::getline(file, line) && rotations.size() < num_images) {
-        if (first_line) {
-            first_line = false;
-            continue;
-        }
+//     std::string line;
+//     bool first_line = true;
+//     while (std::getline(file, line) && rotations.size() < num_images) {
+//         if (first_line) {
+//             first_line = false;
+//             continue;
+//         }
 
-        std::istringstream line_stream(line);
-        std::vector<std::string> fields;
-        std::string field;
+//         std::istringstream line_stream(line);
+//         std::vector<std::string> fields;
+//         std::string field;
         
-        while (std::getline(line_stream, field, ',')) {
-            fields.push_back(field);
-        }
+//         while (std::getline(line_stream, field, ',')) {
+//             fields.push_back(field);
+//         }
 
-        if(fields.size() < 8) continue;
+//         if(fields.size() < 8) continue;
         
-        double p_x = std::stod(fields[1]);
-        double p_y = std::stod(fields[2]);
-        double p_z = std::stod(fields[3]);
-        Eigen::Vector3d T(p_x, p_y, p_z);
+//         double p_x = std::stod(fields[1]);
+//         double p_y = std::stod(fields[2]);
+//         double p_z = std::stod(fields[3]);
+//         Eigen::Vector3d T(p_x, p_y, p_z);
 
-        double q_x = std::stod(fields[4]);
-        double q_y = std::stod(fields[5]);
-        double q_z = std::stod(fields[6]);
-        double q_w = std::stod(fields[7]);
-        Eigen::Matrix3d R = ConvertToRotationMatrix(q_x, q_y, q_z, q_w);
+//         double q_x = std::stod(fields[4]);
+//         double q_y = std::stod(fields[5]);
+//         double q_z = std::stod(fields[6]);
+//         double q_w = std::stod(fields[7]);
+//         Eigen::Matrix3d R = ConvertToRotationMatrix(q_x, q_y, q_z, q_w);
 
-        translations.push_back(T);
-        rotations.push_back(R);
-    }
+//         translations.push_back(T);
+//         rotations.push_back(R);
+//     }
 
-}
+// }
 
 std::vector<std::pair<cv::Mat, cv::Mat>> Dataset::LoadImages(const std::string& csv_path, const std::string& left_path, const std::string& right_path, 
     int num_images) {
@@ -486,6 +480,7 @@ std::vector<std::pair<cv::Mat, cv::Mat>> Dataset::LoadImages(const std::string& 
     bool first_line = true;
 
     while (std::getline(csv_file, line) && image_pairs.size() < num_images) {
+    // while (std::getline(csv_file, line)) {
         if (first_line) {
             first_line = false;
             continue;
@@ -494,6 +489,9 @@ std::vector<std::pair<cv::Mat, cv::Mat>> Dataset::LoadImages(const std::string& 
         std::istringstream line_stream(line);
         std::string timestamp;
         std::getline(line_stream, timestamp, ',');
+
+        //> stach timestamps of images
+        Img_time_stamps.push_back( std::stod(timestamp) );
         
         std::string left_img_path = left_path + timestamp + ".png";
         std::string right_img_path = right_path + timestamp + ".png";
@@ -511,6 +509,91 @@ std::vector<std::pair<cv::Mat, cv::Mat>> Dataset::LoadImages(const std::string& 
     
     csv_file.close();
     return image_pairs;
+}
+
+void Dataset::Load_GT_Poses( std::string GT_Poses_File_Path ) {
+    std::ifstream gt_pose_file(GT_Poses_File_Path);
+    if (!gt_pose_file.is_open()) {
+        LOG_FILE_ERROR(GT_Poses_File_Path);
+        exit(1);
+    }
+
+    std::string line;
+    bool b_first_line = true;
+    if (dataset_type == "EuRoC") {
+        while (std::getline(gt_pose_file, line)) {
+            //> ignore the first line
+            if (b_first_line) {
+                b_first_line = false;
+                continue;
+            }
+
+            std::stringstream ss(line);
+            std::string gt_val;
+            std::vector<double> csv_row_val;
+
+            //> parse the numbers (get only the )
+            while (std::getline(ss, gt_val, ',')) {
+                try {
+                    csv_row_val.push_back(std::stod(gt_val));
+                } catch (const std::invalid_argument& e) {
+                    std::cerr << "Invalid argument: " << e.what() << " for value (" << gt_val << ") from the file " << GT_Poses_File_Path << std::endl;
+                } catch (const std::out_of_range& e) {
+                     std::cerr << "Out of range exception: " << e.what() << " for value: " << gt_val << std::endl;
+                }
+            }
+
+            GT_time_stamps.push_back(csv_row_val[0]);
+            Eigen::Vector3d transl_val( csv_row_val[1], csv_row_val[2], csv_row_val[3] );
+            Eigen::Quaterniond quat_val( csv_row_val[4], csv_row_val[5], csv_row_val[6], csv_row_val[7] );
+            Eigen::Matrix3d rot_from_quat = quat_val.toRotationMatrix();
+
+            //> stack into the unaligned GT rotations and translations
+            unaligned_GT_Rot.push_back(rot_from_quat);
+            unaligned_GT_Transl.push_back(transl_val);
+        }
+
+        // std::cout << "Here..." << std::endl;
+        // for (int i = 100; i < 110; i++) {
+        //     std::cout << GT_time_stamps[i] << "\t" << (unaligned_GT_Transl[i])(0) << "\t" \
+        //     << (unaligned_GT_Transl[i])(1) << "\t" << (unaligned_GT_Transl[i])(2) << std::endl;
+        // }
+    }
+    else {
+        LOG_ERROR("Dataset type not supported!");
+    }
+}
+
+void Dataset::Align_Images_and_GT_Poses() {
+    std::vector<double> time_stamp_diff_val;
+    std::vector<unsigned> time_stamp_diff_indx;
+    for (double img_time_stamp : Img_time_stamps) {
+        // double img_time_stamp = Img_time_stamps[i];
+        time_stamp_diff_val.clear();
+        for ( double gt_time_stamp : GT_time_stamps) {
+            time_stamp_diff_val.push_back(std::abs(img_time_stamp - gt_time_stamp));
+        }
+        auto min_diff = std::min_element(std::begin(time_stamp_diff_val), std::end(time_stamp_diff_val));
+        int min_index;
+        if (min_diff != time_stamp_diff_val.end()) {
+            min_index = std::distance(std::begin(time_stamp_diff_val), min_diff);
+        } else {
+            LOG_ERROR("Empty vector for time stamp difference vector");
+        }
+
+        // if (i == 10) {
+        //     // std::cout << "min_diff = " << min_diff << std::endl;
+        //     std::cout << "min_index = " << min_index << std::endl;
+        //     std::cout << std::setprecision(15) << Img_time_stamps[i] << std::endl;
+        //     std::cout << std::setprecision(15) << GT_time_stamps[min_index] << std::endl;
+        // }
+
+        aligned_GT_Rot.push_back(unaligned_GT_Rot[min_index]);
+        aligned_GT_Transl.push_back(unaligned_GT_Transl[min_index]);
+    }
+
+    //> TEST
+    // std::cout << aligned_GT_Transl[10] << std::endl;
 }
 
 void Dataset::UndistortEdges(const cv::Mat& dist_edges, cv::Mat& undist_edges, std::vector<cv::Point2f>& edge_locations, const std::vector<double>& intr, 

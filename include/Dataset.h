@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 #include <Eigen/Core>
 #include <Eigen/Dense>
@@ -54,6 +55,16 @@ private:
     std::string dataset_path;
     std::string sequence_name;
 
+    void Load_GT_Poses();
+    std::vector<double> GT_time_stamps;
+    std::vector<double> Img_time_stamps;
+
+    //> ground-truth poses
+    std::vector<Eigen::Matrix3d> unaligned_GT_Rot;
+    std::vector<Eigen::Vector3d> unaligned_GT_Transl;
+    std::vector<Eigen::Matrix3d> aligned_GT_Rot;
+    std::vector<Eigen::Vector3d> aligned_GT_Transl;
+
     std::vector<int> left_res;
     int left_rate;
     std::string left_model;
@@ -92,6 +103,9 @@ private:
     Eigen::Matrix3d ConvertToEigenMatrix(const std::vector<std::vector<double>>& matrix);
     Eigen::Matrix3d ConvertToRotationMatrix(double q_x, double q_y, double q_z, double q_w);
     std::vector<std::pair<cv::Mat, cv::Mat>> LoadImages(const std::string& csv_path, const std::string& left_path, const std::string& right_path, int num_images);
+
+    void Load_GT_Poses( std::string GT_Poses_File_Path );
+    void Align_Images_and_GT_Poses();
 
     bool compute_grad_depth = false;
     cv::Mat Gx_2d, Gy_2d;
