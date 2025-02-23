@@ -42,6 +42,11 @@ public:
     std::vector<cv::Point2d> right_third_order_edges_locations;
     std::vector<double> right_third_order_edges_orientation;
 
+    std::vector<Eigen::Matrix3d> unaligned_GT_Rot;
+    std::vector<Eigen::Vector3d> unaligned_GT_Transl;
+    std::vector<Eigen::Matrix3d> aligned_GT_Rot;
+    std::vector<Eigen::Vector3d> aligned_GT_Transl;
+
     // bool Init_Fetch_Data();
     // Frame::Ptr get_Next_Frame();
     // int Current_Frame_Index;
@@ -53,6 +58,11 @@ private:
     std::string dataset_type;
     std::string dataset_path;
     std::string sequence_name;
+    std::string GT_file_name;
+
+    //> Used only for the EuRoC dataset
+    Eigen::Matrix3d rot_frame2body_left;
+    Eigen::Vector3d transl_frame2body_left;
 
     std::vector<int> left_res;
     int left_rate;
@@ -76,22 +86,27 @@ private:
     std::vector<double> trans_vec_12;
     std::vector<std::vector<double>> fund_mat_12;
 
+    std::vector<cv::Point2d> matched_left_edges;
+    std::vector<cv::Point2d> matched_right_edges;
+    std::vector<double> left_edge_depths; 
+
     // void PrintDatasetInfo();
     void DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, const cv::Mat& left_binary_map, const cv::Mat& right_binary_map, std::vector<cv::Point2d> left_edge_coords, std::vector<cv::Point2d> right_edge_coords);    
     void CalculateMatches(const std::vector<cv::Point2d>& selected_left_edges, const std::vector<cv::Point2d>& left_edge_coords, const std::vector<cv::Point2d>& right_edge_coords,
-    const std::vector<cv::Mat>& left_patches, const std::vector<Eigen::Vector3d>& epipolar_lines_right,
-    const cv::Mat& left_image, const cv::Mat& right_image, const Eigen::Matrix3d& fundamental_matrix_12, cv::Mat& right_visualization);
+    const std::vector<cv::Mat>& left_patches, const std::vector<Eigen::Vector3d>& epipolar_lines_right, const cv::Mat& left_image, const cv::Mat& right_image, const Eigen::Matrix3d& fundamental_matrix_12, cv::Mat& right_visualization);
+    void CalculateDepths();
     int CalculateNCCPatch(const cv::Mat& left_patch, const std::vector<cv::Mat>& right_patches);
     void ExtractPatches(int patch_size, const cv::Mat& image, const std::vector<cv::Point2d>& selected_edges, std::vector<cv::Mat>& patches);
     void UndistortEdges(const cv::Mat& dist_edges, cv::Mat& undist_edges, std::vector<cv::Point2f>& edge_locations, const std::vector<double>& intr, const std::vector<double>& dist_coeffs);
     void DisplayOverlay(const std::string& extract_undist_path, const std::string& undistort_extract_path);
-    void LoadGroundTruth(const std::string& filepath, std::vector<Eigen::Matrix3d>& rotations, std::vector<Eigen::Vector3d>& translations, int num_images);
     std::vector<cv::Point2d> ExtractEpipolarEdges(int patch_size, const Eigen::Vector3d& epipolar_line, const std::vector<cv::Point2d>& edge_locations);  
     std::vector<Eigen::Vector3d> CalculateEpipolarLine(const Eigen::Matrix3d& fund_mat, const std::vector<cv::Point2d>& edges);
     std::vector<cv::Point2d> PickRandomEdges(int patch_size, const std::vector<cv::Point2d>& edges, size_t num_points, int img_width, int img_height);
     Eigen::Matrix3d ConvertToEigenMatrix(const std::vector<std::vector<double>>& matrix);
-    Eigen::Matrix3d ConvertToRotationMatrix(double q_x, double q_y, double q_z, double q_w);
     std::vector<std::pair<cv::Mat, cv::Mat>> LoadImages(const std::string& csv_path, const std::string& left_path, const std::string& right_path, int num_images);
+
+    void Load_GT_Poses();
+    std::vector<double> GT_time_stamps;
 
     bool compute_grad_depth = false;
     cv::Mat Gx_2d, Gy_2d;
