@@ -251,10 +251,9 @@ void Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_ima
     cv::waitKey(0);
 }
 
-void Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_left_edges, const std::vector<cv::Point2d>& left_edge_coords, const std::vector<cv::Point2d>& right_edge_coords,
-    const std::vector<cv::Mat>& left_patches, const std::vector<Eigen::Vector3d>& epipolar_lines_right,
-    const cv::Mat& left_image, const cv::Mat& right_image, const Eigen::Matrix3d& fundamental_matrix_12, cv::Mat& right_visualization) {
+void Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_left_edges, const std::vector<cv::Point2d>& left_edge_coords, const std::vector<cv::Point2d>& right_edge_coords, const std::vector<cv::Mat>& left_patches, const std::vector<Eigen::Vector3d>& epipolar_lines_right, const cv::Mat& left_image, const cv::Mat& right_image, const Eigen::Matrix3d& fundamental_matrix_12, cv::Mat& right_visualization) {
     double tol = 2.0;
+
     for (size_t i = 0; i < selected_left_edges.size(); i++) {
         const auto& left_edge = selected_left_edges[i];
         const auto& left_patch = left_patches[i];
@@ -279,7 +278,7 @@ void Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_left_edg
         ExtractPatches(7, right_image, right_candidate_edges, right_patches);
         
         if (!left_patch.empty() && !right_patches.empty()) {
-            int best_right_match_idx = CalculateSSDPatch(left_patch, right_patches);
+            int best_right_match_idx = CalculateNCCPatch(left_patch, right_patches);
             
             if (best_right_match_idx != -1) {
                 cv::Point2d best_right_match = right_candidate_edges[best_right_match_idx];
@@ -292,7 +291,7 @@ void Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_left_edg
                 ExtractPatches(7, left_image, left_candidate_edges, left_candidate_patches);
                 
                 if (!left_candidate_patches.empty()) {
-                    int best_left_match_idx = CalculateSSDPatch(right_patches[best_right_match_idx], left_candidate_patches);
+                    int best_left_match_idx = CalculateNCCPatch(right_patches[best_right_match_idx], left_candidate_patches);
                     
                     if (best_left_match_idx != -1) {
                         cv::Point2d best_left_match = left_candidate_edges[best_left_match_idx];
@@ -307,48 +306,26 @@ void Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_left_edg
     }
 }
 
-int Dataset::CalculateSSDPatch(const cv::Mat& left_patch, const std::vector<cv::Mat>& right_patches) {
+//UPDATED
+int Dataset::CalculateNCCPatch(const cv::Mat& left_patch, const std::vector<cv::Mat>& right_patches) {
     if (right_patches.empty()) return -1;
 
     int best_match_idx = -1;
-    int second_best_match_idx = -1;
-    double min_ssd = std::numeric_limits<double>::max();
-    double second_min_ssd = std::numeric_limits<double>::max();
-
+    double best_score = -1.0;
+    
     for (size_t i = 0; i < right_patches.size(); i++) {
-        const cv::Mat& right_patch = right_patches[i];
-
-        if (left_patch.size() != right_patch.size()) continue;
-
-        cv::Mat diff;
-        cv::absdiff(left_patch, right_patch, diff);
-        cv::Mat squared_diff;
-        cv::multiply(diff, diff, squared_diff);
-
-        double ssd = cv::sum(squared_diff)[0];
-
-        if (ssd < min_ssd) {
-            second_min_ssd = min_ssd;
-            second_best_match_idx = best_match_idx;
-
-            min_ssd = ssd;
+        cv::Mat result;
+        cv::matchTemplate(right_patches[i], left_patch, result, cv::TM_CCORR_NORMED);
+        double score = result.at<float>(0, 0);
+        
+        if (score > best_score) {
+            best_score = score;
             best_match_idx = static_cast<int>(i);
-        } else if (ssd < second_min_ssd) {
-            second_min_ssd = ssd;
-            second_best_match_idx = static_cast<int>(i);
         }
     }
 
-    if (best_match_idx != -1 && second_best_match_idx != -1) {
-        double ratio = second_min_ssd / min_ssd;
-        if (ratio > 0.2) {
-            return best_match_idx;
-        } else {
-            return -1;  
-        }
-    }
-
-    return best_match_idx; 
+    if (best_score < 0.85) return -1;
+    return best_match_idx;
 }
 
 //UPDATED
@@ -367,6 +344,11 @@ void Dataset::ExtractPatches(int patch_size, const cv::Mat& image, const std::ve
             cv::Point2f center (static_cast<float>(x), static_cast<float>(y));
             cv::Size size (patch_size, patch_size);
             cv::getRectSubPix(image, size, center, patch);
+            
+            if (patch.type() != CV_32F) {
+                patch.convertTo(patch, CV_32F);
+            }
+
             patches.push_back(patch);
         } 
         else {

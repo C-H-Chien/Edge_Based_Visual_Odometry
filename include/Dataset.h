@@ -81,7 +81,7 @@ private:
     void CalculateMatches(const std::vector<cv::Point2d>& selected_left_edges, const std::vector<cv::Point2d>& left_edge_coords, const std::vector<cv::Point2d>& right_edge_coords,
     const std::vector<cv::Mat>& left_patches, const std::vector<Eigen::Vector3d>& epipolar_lines_right,
     const cv::Mat& left_image, const cv::Mat& right_image, const Eigen::Matrix3d& fundamental_matrix_12, cv::Mat& right_visualization);
-    int CalculateSSDPatch(const cv::Mat& left_patch, const std::vector<cv::Mat>& right_patches);
+    int CalculateNCCPatch(const cv::Mat& left_patch, const std::vector<cv::Mat>& right_patches);
     void ExtractPatches(int patch_size, const cv::Mat& image, const std::vector<cv::Point2d>& selected_edges, std::vector<cv::Mat>& patches);
     void UndistortEdges(const cv::Mat& dist_edges, cv::Mat& undist_edges, std::vector<cv::Point2f>& edge_locations, const std::vector<double>& intr, const std::vector<double>& dist_coeffs);
     void DisplayOverlay(const std::string& extract_undist_path, const std::string& undistort_extract_path);
