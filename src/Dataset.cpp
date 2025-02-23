@@ -92,9 +92,6 @@ Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(confi
                 LOG_ERROR("Missing relative rotation and translation from the left camera to the body coordinate (should be given by cam0/sensor.yaml)");
             }
 
-            // Load_GT_Poses();
-            // exit(1);
-
         } catch (const YAML::Exception &e) {
             std::cerr << "ERROR: Could not parse YAML file! " << e.what() << std::endl;
         }
