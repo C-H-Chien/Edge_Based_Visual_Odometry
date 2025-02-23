@@ -684,6 +684,20 @@ void Dataset::Load_GT_Poses( std::string GT_Poses_File_Path ) {
     std::string line;
     bool b_first_line = true;
     if (dataset_type == "EuRoC") {
+        //> For EuRoC dataset, the poses read from the csv file need additional transformation to get the pose of the left camera w.r.t. the world coordinate
+        Eigen::Matrix4d Transf_frame2body;
+        Eigen::Matrix4d inv_Transf_frame2body;
+        Transf_frame2body.setIdentity();
+        Transf_frame2body.block<3,3>(0,0) = rot_frame2body_left;
+        Transf_frame2body.block<3,1>(0,3) = transl_frame2body_left;
+        inv_Transf_frame2body = Transf_frame2body.inverse();
+
+        Eigen::Matrix4d Transf_Poses;
+        Eigen::Matrix4d inv_Transf_Poses;
+        Transf_Poses.setIdentity();
+
+        Eigen::Matrix4d frame2world;
+
         while (std::getline(gt_pose_file, line)) {
             //> ignore the first line
             if (b_first_line) {
@@ -711,14 +725,23 @@ void Dataset::Load_GT_Poses( std::string GT_Poses_File_Path ) {
             Eigen::Quaterniond quat_val( csv_row_val[4], csv_row_val[5], csv_row_val[6], csv_row_val[7] );
             Eigen::Matrix3d rot_from_quat = quat_val.toRotationMatrix();
 
+            Transf_Poses.block<3,3>(0,0) = rot_from_quat;
+            Transf_Poses.block<3,1>(0,3) = transl_val;
+            inv_Transf_Poses = Transf_Poses.inverse();
+
+            frame2world = (inv_Transf_frame2body*inv_Transf_Poses).inverse();
+
             //> stack into the unaligned GT rotations and translations
-            unaligned_GT_Rot.push_back(rot_from_quat);
-            unaligned_GT_Transl.push_back(transl_val);
+            unaligned_GT_Rot.push_back(frame2world.block<3,3>(0,0));
+            unaligned_GT_Transl.push_back(frame2world.block<3,1>(0,3));
         }
 
         // std::cout << "Here..." << std::endl;
         // for (int i = 100; i < 110; i++) {
-        //     std::cout << GT_time_stamps[i] << "\t" << (unaligned_GT_Transl[i])(0) << "\t" \
+        //     // std::cout << GT_time_stamps[i] << "\t" << (unaligned_GT_Transl[i])(0) << "\t" \
+        //     << (unaligned_GT_Transl[i])(1) << "\t" << (unaligned_GT_Transl[i])(2) << std::endl;
+        //     std::cout << "Rotation: " << unaligned_GT_Rot[i] << std::endl;
+        //     std::cout << "Translation: " << (unaligned_GT_Transl[i])(0) << "\t" \
         //     << (unaligned_GT_Transl[i])(1) << "\t" << (unaligned_GT_Transl[i])(2) << std::endl;
         // }
     }
@@ -755,8 +778,12 @@ void Dataset::Align_Images_and_GT_Poses() {
         aligned_GT_Transl.push_back(unaligned_GT_Transl[min_index]);
     }
 
-    //> TEST
-    // std::cout << aligned_GT_Transl[10] << std::endl;
+    // std::cout << "Here..." << std::endl;
+    // for (int i = 0; i < 10; i++) {
+    //     std::cout << "Rotation: " << unaligned_GT_Rot[i] << std::endl;
+    //     std::cout << "Translation: " << (unaligned_GT_Transl[i])(0) << "\t" \
+    //     << (unaligned_GT_Transl[i])(1) << "\t" << (unaligned_GT_Transl[i])(2) << std::endl;
+    // }
 }
 
 void Dataset::UndistortEdges(const cv::Mat& dist_edges, cv::Mat& undist_edges, std::vector<cv::Point2f>& edge_locations, const std::vector<double>& intr, 

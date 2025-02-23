@@ -64,11 +64,6 @@ private:
     std::vector<double> GT_time_stamps;
     std::vector<double> Img_time_stamps;
 
-    //> ground-truth poses
-    std::vector<Eigen::Matrix3d> unaligned_GT_Rot;
-    std::vector<Eigen::Vector3d> unaligned_GT_Transl;
-    std::vector<Eigen::Matrix3d> aligned_GT_Rot;
-    std::vector<Eigen::Vector3d> aligned_GT_Transl;
     std::string GT_file_name;
 
     //> Used only for the EuRoC dataset
@@ -121,9 +116,6 @@ private:
 
     void Load_GT_Poses( std::string GT_Poses_File_Path );
     void Align_Images_and_GT_Poses();
-
-    void Load_GT_Poses();
-    std::vector<double> GT_time_stamps;
 
     bool compute_grad_depth = false;
     cv::Mat Gx_2d, Gy_2d;
