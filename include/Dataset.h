@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 #include <Eigen/Core>
 #include <Eigen/Dense>
@@ -64,6 +65,18 @@ public:
 private:
    YAML::Node config_file;
 
+<<<<<<< HEAD
+=======
+    std::string dataset_type;
+    std::string dataset_path;
+    std::string sequence_name;
+
+    void Load_GT_Poses();
+    std::vector<double> GT_time_stamps;
+    std::vector<double> Img_time_stamps;
+
+    std::string GT_file_name;
+>>>>>>> origin/dev
 
    std::string dataset_type;
    std::string dataset_path;
@@ -85,6 +98,11 @@ private:
    std::string left_dist_model;
    std::vector<double> left_dist_coeffs;
 
+<<<<<<< HEAD
+=======
+    void Load_GT_Poses( std::string GT_Poses_File_Path );
+    void Align_Images_and_GT_Poses();
+>>>>>>> origin/dev
 
    std::vector<int> right_res;
    int right_rate;

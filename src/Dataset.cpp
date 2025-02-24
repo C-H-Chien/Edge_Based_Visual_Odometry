@@ -95,18 +95,18 @@ Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(confi
            }
 
 
-           //> Parse the transformation from the camera to the body
-           if (frame_to_body["rotation"] && frame_to_body["translation"]) {
-               rot_frame2body_left = Eigen::Map<Eigen::Matrix3d>(frame_to_body["rotation"].as<std::vector<double>>().data()).transpose();
-               transl_frame2body_left = Eigen::Map<Eigen::Vector3d>(frame_to_body["translation"].as<std::vector<double>>().data());
-           } else {
-               LOG_ERROR("Missing relative rotation and translation from the left camera to the body coordinate (should be given by cam0/sensor.yaml)");
-           }
-       } catch (const YAML::Exception &e) {
-           std::cerr << "ERROR: Could not parse YAML file! " << e.what() << std::endl;
-       }
-   }
+            //> Parse the transformation from the camera to the body
+            if (frame_to_body["rotation"] && frame_to_body["translation"]) {
+                rot_frame2body_left = Eigen::Map<Eigen::Matrix3d>(frame_to_body["rotation"].as<std::vector<double>>().data()).transpose();
+                transl_frame2body_left = Eigen::Map<Eigen::Vector3d>(frame_to_body["translation"].as<std::vector<double>>().data());
+            } else {
+                LOG_ERROR("Missing relative rotation and translation from the left camera to the body coordinate (should be given by cam0/sensor.yaml)");
+            }
 
+        } catch (const YAML::Exception &e) {
+            std::cerr << "ERROR: Could not parse YAML file! " << e.what() << std::endl;
+        }
+    }
 
    Total_Num_Of_Imgs = 0;
 
