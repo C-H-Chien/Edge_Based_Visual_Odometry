@@ -1,7 +1,5 @@
 #ifndef DATASET_H
 #define DATASET_H
-
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
@@ -30,66 +28,38 @@
 
 
 class Dataset {
-
-
 public:
    EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
    typedef std::shared_ptr<Dataset> Ptr;
    Dataset(YAML::Node, bool);
 
-
    void PerformEdgeBasedVO();
-  
+
    unsigned Total_Num_Of_Imgs;
    int img_height, img_width;
-
 
    std::vector<cv::Point2d> left_third_order_edges_locations;
    std::vector<double> left_third_order_edges_orientation;
    std::vector<cv::Point2d> right_third_order_edges_locations;
    std::vector<double> right_third_order_edges_orientation;
 
-
    std::vector<Eigen::Matrix3d> unaligned_GT_Rot;
    std::vector<Eigen::Vector3d> unaligned_GT_Transl;
    std::vector<Eigen::Matrix3d> aligned_GT_Rot;
    std::vector<Eigen::Vector3d> aligned_GT_Transl;
 
-
-   // bool Init_Fetch_Data();
-   // Frame::Ptr get_Next_Frame();
-   // int Current_Frame_Index;
-   // double fx, fy, cx, cy;
-
-
 private:
    YAML::Node config_file;
-
-<<<<<<< HEAD
-=======
-    std::string dataset_type;
-    std::string dataset_path;
-    std::string sequence_name;
-
-    void Load_GT_Poses();
-    std::vector<double> GT_time_stamps;
-    std::vector<double> Img_time_stamps;
-
-    std::string GT_file_name;
->>>>>>> origin/dev
 
    std::string dataset_type;
    std::string dataset_path;
    std::string sequence_name;
 
-
    std::string GT_file_name;
-
 
    //> Used only for the EuRoC dataset
    Eigen::Matrix3d rot_frame2body_left;
    Eigen::Vector3d transl_frame2body_left;
-
 
    std::vector<int> left_res;
    int left_rate;
@@ -98,12 +68,6 @@ private:
    std::string left_dist_model;
    std::vector<double> left_dist_coeffs;
 
-<<<<<<< HEAD
-=======
-    void Load_GT_Poses( std::string GT_Poses_File_Path );
-    void Align_Images_and_GT_Poses();
->>>>>>> origin/dev
-
    std::vector<int> right_res;
    int right_rate;
    std::string right_model;
@@ -111,23 +75,19 @@ private:
    std::string right_dist_model;
    std::vector<double> right_dist_coeffs;
 
-
    std::vector<std::vector<double>> rot_mat_21;
    std::vector<double> trans_vec_21;
    std::vector<std::vector<double>> fund_mat_21;
 
-
    std::vector<std::vector<double>> rot_mat_12;
    std::vector<double> trans_vec_12;
    std::vector<std::vector<double>> fund_mat_12;
-
 
    std::vector<cv::Point2d> matched_left_edges;
    std::vector<cv::Point2d> matched_right_edges;
    std::vector<double> matched_left_orientations;
    std::vector<double> matched_right_orientations;
    std::vector<double> left_edge_depths;
-
 
    // void PrintDatasetInfo();
    void DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, const cv::Mat& left_binary_map, const cv::Mat& right_binary_map, std::vector<cv::Point2d> left_edge_coords, std::vector<cv::Point2d> right_edge_coords, std::vector<double> left_edge_orientations, std::vector<double> right_edge_orientations);
@@ -143,37 +103,21 @@ private:
    std::vector<Eigen::Vector3d> CalculateEpipolarLine(const Eigen::Matrix3d& fund_mat, const std::vector<cv::Point2d>& edges);
    std::pair<std::vector<cv::Point2d>, std::vector<double>> PickRandomEdges(int patch_size, const std::vector<cv::Point2d>& edges, const std::vector<double>& orientations, size_t num_points, int img_width, int img_height);
    Eigen::Matrix3d ConvertToEigenMatrix(const std::vector<std::vector<double>>& matrix);
-   std::vector<std::pair<cv::Mat, cv::Mat>> LoadImages(const std::string& csv_path, const std::string& left_path, const std::string& right_path, int num_images);
-
+   std::vector<std::pair<cv::Mat, cv::Mat>> LoadEuRoCImages(const std::string& csv_path, const std::string& left_path, const std::string& right_path, int num_images);
+   std::vector<std::pair<cv::Mat, cv::Mat>> LoadETH3DImages(const std::string &stereo_pairs_path, int num_images);
 
    void Load_GT_Poses( std::string GT_Poses_File_Path );
    std::vector<double> GT_time_stamps;
    std::vector<double> Img_time_stamps;
    void Align_Images_and_GT_Poses();
 
-
    bool compute_grad_depth = false;
    cv::Mat Gx_2d, Gy_2d;
    cv::Mat Small_Patch_Radius_Map;
    Utility::Ptr utility_tool = nullptr;
 
-
    //> CH: shared pointer to the class of third-order edge detector
    std::shared_ptr< ThirdOrderEdgeDetectionCPU > TOED = nullptr;
-
-
-   // Eigen::Matrix3d Calib;       
-   // Eigen::Matrix3d Inverse_Calib;
-
-
-   // std::vector<std::string> Img_Path_List;
-   // std::vector<std::string> Depth_Path_List;
-   // std::vector<std::string> Img_Time_Stamps;
-
-
-   // bool has_Depth;
-   // cv::Mat grad_Depth_xi_;
-   // cv::Mat grad_Depth_eta_;
 };
 
 

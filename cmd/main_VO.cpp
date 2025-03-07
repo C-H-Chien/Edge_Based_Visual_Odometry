@@ -91,32 +91,5 @@ int main(int argc, char **argv) {
 	Dataset::Ptr dataset_ = Dataset::Ptr(new Dataset(config_map, use_GCC_filter));
 
 	dataset_->PerformEdgeBasedVO();
-
-    // CHECK_EQ(dataset_->Init_Fetch_Data(), true);
-	
-	// std::cout << "Total Number of Images in the Dataset Sequence: " << dataset_->Total_Num_Of_Imgs << std::endl;
-
-	// //> Pointers to the classes
-	// Frame::Ptr new_frame;
-	// Pipeline::Ptr vo_sys = Pipeline::Ptr(new Pipeline);
-
-	// //for (int fi = 0; fi < Total_Num_Of_Imgs; fi++) {
-	// for (int fi = 0; fi < 2; fi++) {
-		
-	// 	//> Fetch the information of the next frame
-	// 	new_frame = dataset_->get_Next_Frame();
-	// 	if (new_frame == nullptr) LOG_ERROR("failed to fetch a frame");
-
-	// 	//vo_sys = Pipeline::Ptr(new Pipeline);
-	// 	bool success = vo_sys->Add_Frame(new_frame);
-	// 	//std::cout << "Number of SIFT Features: " << vo_sys->Num_Of_SIFT_Features << std::endl;
-
-	// 	if (vo_sys->get_Status() == PipelineStatus::STATUS_GET_AND_MATCH_SIFT) 
-	// 		continue;
-	// 	else {
-	// 		//> TODO: add RPE measurements here
-	// 	}
-	// }
-	
 	return 0;
 }

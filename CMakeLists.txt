@@ -1,14 +1,14 @@
 CMAKE_MINIMUM_REQUIRED( VERSION 2.8 )
 message(STATUS "CMake version: ${CMAKE_VERSION}")
 
-set(CMAKE_CXX_STANDARD "11")
+set(CMAKE_CXX_STANDARD "17")
 if(NOT CMAKE_CXX_STANDARD_REQUIRED)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
 endif()
 
 PROJECT(EDGE_BASED_VO)
 
-set(SUAL_BUILD 1)
+set(SAUL_BUILD 1)
 
 set(CMAKE_CXX_FLAGS_DEBUG "-g -Wall" CACHE STRING "" FORCE)
 
@@ -44,7 +44,7 @@ include_directories(/usr/local/include/yaml-cpp)
 include_directories(${EIGEN3_INCLUDE_DIR} ${CSPARSE_INCLUDE_DIR})
 
 
-if(DEFINED SUAL_BUILD)
+if(DEFINED SAUL_BUILD)
     #> for MACOS
     set(THIRD_PARTY_LIBS
         ${OpenCV_LIBS}
