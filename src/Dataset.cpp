@@ -99,9 +99,11 @@ Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(confi
 
            left_res = left_cam["resolution"].as<std::vector<int>>();
            left_intr = left_cam["intrinsics"].as<std::vector<double>>();
+           left_dist_coeffs = left_cam["distortion_coefficients"].as<std::vector<double>>();
 
            right_res = right_cam["resolution"].as<std::vector<int>>();
            right_intr = right_cam["intrinsics"].as<std::vector<double>>();
+           right_dist_coeffs = right_cam["distortion_coefficients"].as<std::vector<double>>();
 
            if (stereo["R21"] && stereo["T21"] && stereo["F21"]) {
                for (const auto& row : stereo["R21"]) {
@@ -138,7 +140,7 @@ Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(confi
 
 
 void Dataset::PerformEdgeBasedVO() {
-    int num_images = 437;
+    int num_images = 10;
     std::vector<std::pair<cv::Mat, cv::Mat>> image_pairs;
 
     if (dataset_type == "EuRoC"){
@@ -227,7 +229,7 @@ void Dataset::PerformEdgeBasedVO() {
            }
        }
 
-    //    DisplayMatches(left_undistorted, right_undistorted, left_edge_map, right_edge_map, left_third_order_edges_locations, right_third_order_edges_locations, left_third_order_edges_orientation, right_third_order_edges_orientation);
+       DisplayMatches(left_undistorted, right_undistorted, left_edge_map, right_edge_map, left_third_order_edges_locations, right_third_order_edges_locations, left_third_order_edges_orientation, right_third_order_edges_orientation);
        }
    }
 }
@@ -258,15 +260,14 @@ void Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_ima
        fundamental_matrix_12, right_visualization);
 
 
-    CalculateDepths();
-    std::vector<Eigen::Vector3d> tangent_vectors = ReconstructOrientations();
-    std::vector<Eigen::Vector3d> reprojected_orientations = ReprojectOrientations(tangent_vectors, aligned_GT_Rot);
+//     CalculateDepths();
+//     std::vector<Eigen::Vector3d> tangent_vectors = ReconstructOrientations();
+//     std::vector<Eigen::Vector3d> reprojected_orientations = ReprojectOrientations(tangent_vectors, aligned_GT_Rot);
 
-   std::cout << "Reprojected Orientations:" << std::endl;
-    for (size_t i = 0; i < reprojected_orientations.size(); i++) {
-        std::cout << "Reprojected Orientation " << (reprojected_orientations[i])(0) << "\t" << (reprojected_orientations[i])(1) << "\t" << (reprojected_orientations[i])(2) << std::endl;
-    }
-
+//    std::cout << "Reprojected Orientations:" << std::endl;
+//     for (size_t i = 0; i < reprojected_orientations.size(); i++) {
+//         std::cout << "Reprojected Orientation " << (reprojected_orientations[i])(0) << "\t" << (reprojected_orientations[i])(1) << "\t" << (reprojected_orientations[i])(2) << std::endl;
+//     }
 
    cv::Mat merged_visualization;
    cv::hconcat(left_visualization, right_visualization, merged_visualization);
