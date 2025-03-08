@@ -131,6 +131,12 @@ Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(confi
            } else {
                std::cerr << "ERROR: Missing right-to-left stereo parameters (R12, T12, F12) in YAML file!" << std::endl;
            }
+           if (stereo["focal_length"] && stereo["baseline"]) {
+            focal_length = stereo["focal_length"].as<double>();
+            baseline = stereo["baseline"].as<double>();
+            } else {
+                std::cerr << "ERROR: Missing stereo parameters (focal_length, baseline) in YAML file!" << std::endl;
+            }
         } catch (const YAML::Exception &e) {
             std::cerr << "ERROR: Could not parse YAML file! " << e.what() << std::endl;
         }
@@ -140,8 +146,9 @@ Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(confi
 
 
 void Dataset::PerformEdgeBasedVO() {
-    int num_images = 10;
+    int num_images = 5;
     std::vector<std::pair<cv::Mat, cv::Mat>> image_pairs;
+    std::vector<cv::Mat> disparity_maps;
 
     if (dataset_type == "EuRoC"){
         std::string left_path = dataset_path + "/" + sequence_name + "/mav0/cam0/data/";
@@ -157,27 +164,14 @@ void Dataset::PerformEdgeBasedVO() {
     else if (dataset_type == "ETH3D"){
         std::string stereo_pairs_path = dataset_path + "/" + sequence_name + "/stereo_pairs";
         image_pairs = LoadETH3DImages(stereo_pairs_path, num_images);
-
-        // for (size_t i = 0; i < image_pairs.size(); ++i) {
-        // cv::Mat left_image = image_pairs[i].first;
-        // cv::Mat right_image = image_pairs[i].second;
-
-        // cv::Mat merged_visualization;
-        // cv::hconcat(left_image, right_image, merged_visualization);
-
-        // cv::imshow("Stereo Image Pair-Chronological Order Check", merged_visualization);
-
-        // std::cout << "Displaying stereo pair " << i + 1 << " of " << image_pairs.size() << std::endl;
-
-        // char key = cv::waitKey(0); 
-        // if (key == 27) break;
-        // }
-        // cv::destroyAllWindows();
+        disparity_maps = LoadETH3DMaps(stereo_pairs_path, num_images);
     }
     
-   for (const auto& pair : image_pairs) {
-       const cv::Mat& left_img = pair.first;
-       const cv::Mat& right_img = pair.second; {
+    for (size_t i = 0; i < image_pairs.size(); ++i) {
+        const cv::Mat& left_img = image_pairs[i].first;
+        const cv::Mat& right_img = image_pairs[i].second;
+        const cv::Mat& disparity_map = disparity_maps[i]; {
+
        cv::Mat left_calib = (cv::Mat_<double>(3, 3) << left_intr[0], 0, left_intr[2], 0, left_intr[1], left_intr[3], 0, 0, 1);
        cv::Mat right_calib = (cv::Mat_<double>(3, 3) << right_intr[0], 0, right_intr[2], 0, right_intr[1], right_intr[3], 0, 0, 1);
        cv::Mat left_dist_coeff_mat(left_dist_coeffs);
@@ -229,7 +223,8 @@ void Dataset::PerformEdgeBasedVO() {
            }
        }
 
-       DisplayMatches(left_undistorted, right_undistorted, left_edge_map, right_edge_map, left_third_order_edges_locations, right_third_order_edges_locations, left_third_order_edges_orientation, right_third_order_edges_orientation);
+       CalculateGTRightEdge(left_third_order_edges_locations, disparity_map);
+    //    DisplayMatches(left_undistorted, right_undistorted, left_edge_map, right_edge_map, left_third_order_edges_locations, right_third_order_edges_locations, left_third_order_edges_orientation, right_third_order_edges_orientation);
        }
    }
 }
@@ -704,6 +699,128 @@ std::vector<std::pair<cv::Mat, cv::Mat>> Dataset::LoadETH3DImages(const std::str
     return image_pairs;
 }
 
+std::vector<cv::Mat> Dataset::LoadETH3DMaps(const std::string &stereo_pairs_path, int num_maps) {
+    std::vector<cv::Mat> disparity_maps;
+    std::vector<std::string> stereo_folders;
+
+    // Iterate through each subfolder
+    for (const auto &entry : std::filesystem::directory_iterator(stereo_pairs_path)) {
+        if (entry.is_directory()) {
+            stereo_folders.push_back(entry.path().string());
+        }
+    }
+
+    // Sort folders to maintain correct order
+    std::sort(stereo_folders.begin(), stereo_folders.end());
+
+    for (int i = 0; i < std::min(num_maps, static_cast<int>(stereo_folders.size())); ++i) {
+        std::string folder_path = stereo_folders[i];
+
+        // Construct disparity map path
+        std::string disparity_map_path = folder_path + "/disparity_map.csv";
+
+        // Load CSV file into OpenCV matrix
+        std::ifstream file(disparity_map_path);
+        if (!file.is_open()) {
+            std::cerr << "ERROR: Could not open disparity map file: " << disparity_map_path << std::endl;
+            continue;
+        }
+
+        std::vector<std::vector<float>> data;
+        std::string line;
+        while (std::getline(file, line)) {
+            std::stringstream ss(line);
+            std::vector<float> row;
+            std::string value;
+            while (std::getline(ss, value, ',')) {
+                try {
+                    float disparity_value = std::stof(value);
+
+                    // Ensure NaN and Inf values are preserved
+                    if (value == "nan" || value == "NaN") {
+                        disparity_value = std::numeric_limits<float>::quiet_NaN();
+                    } else if (value == "inf" || value == "Inf") {
+                        disparity_value = std::numeric_limits<float>::infinity();
+                    } else if (value == "-inf" || value == "-Inf") {
+                        disparity_value = -std::numeric_limits<float>::infinity();
+                    }
+
+                    row.push_back(disparity_value);
+                } catch (const std::exception &e) {
+                    std::cerr << "WARNING: Invalid value in file: " << disparity_map_path << " -> " << value << std::endl;
+                    row.push_back(std::numeric_limits<float>::quiet_NaN()); // Keep NaN instead of 0
+                }
+            }
+            if (!row.empty()) {
+                data.push_back(row);
+            }
+        }
+        file.close();
+
+        // Convert to OpenCV matrix
+        if (!data.empty()) {
+            int rows = data.size();
+            int cols = data[0].size();
+            cv::Mat disparity_map(rows, cols, CV_32F);
+
+            for (int r = 0; r < rows; ++r) {
+                for (int c = 0; c < cols; ++c) {
+                    disparity_map.at<float>(r, c) = data[r][c];
+                }
+            }
+
+            disparity_maps.push_back(disparity_map);
+        }
+    }
+
+    return disparity_maps;
+}
+
+double Bilinear_Interpolation(const cv::Mat &meshGrid, cv::Point2d P) {
+    //> y2 Q12--------Q22
+    //      |          |
+    //      |    P     |
+    //      |          |
+    //  y1 Q11--------Q21
+    //      x1         x2
+
+    cv::Point2d Q12(floor(P.x), floor(P.y));
+    cv::Point2d Q22(ceil(P.x), floor(P.y));
+    cv::Point2d Q11(floor(P.x), ceil(P.y));
+    cv::Point2d Q21(ceil(P.x), ceil(P.y));
+
+    // Ensure points are within bounds
+    if (Q11.x < 0 || Q11.y < 0 || Q21.x >= meshGrid.cols || Q21.y >= meshGrid.rows ||
+        Q12.x < 0 || Q12.y < 0 || Q22.x >= meshGrid.cols || Q22.y >= meshGrid.rows) {
+        return std::numeric_limits<double>::quiet_NaN();  // Return NaN if out of bounds
+    }
+
+    // Retrieve disparity values at integer pixel locations
+    double fQ11 = meshGrid.at<float>(Q11.y, Q11.x);
+    double fQ21 = meshGrid.at<float>(Q21.y, Q21.x);
+    double fQ12 = meshGrid.at<float>(Q12.y, Q12.x);
+    double fQ22 = meshGrid.at<float>(Q22.y, Q22.x);
+
+    // Perform bilinear interpolation
+    double f_x_y1 = ((Q21.x - P.x) / (Q21.x - Q11.x)) * fQ11 + ((P.x - Q11.x) / (Q21.x - Q11.x)) * fQ21;
+    double f_x_y2 = ((Q21.x - P.x) / (Q21.x - Q11.x)) * fQ12 + ((P.x - Q11.x) / (Q21.x - Q11.x)) * fQ22;
+    return ((Q12.y - P.y) / (Q12.y - Q11.y)) * f_x_y1 + ((P.y - Q11.y) / (Q12.y - Q11.y)) * f_x_y2;
+}
+
+void Dataset::CalculateGTRightEdge(const std::vector<cv::Point2d> &left_third_order_edges_locations, const cv::Mat &disparity_map) {
+    std::cout << "Processing " << left_third_order_edges_locations.size() << " sub-pixel edges...\n";
+
+    for (const auto &edge : left_third_order_edges_locations) {
+        double disparity = Bilinear_Interpolation(disparity_map, edge);
+        
+        if (std::isnan(disparity)) {
+            std::cout << "Edge at (" << edge.x << ", " << edge.y << "): Invalid disparity (out of bounds)\n";
+        } else {
+            std::cout << "Edge at (" << edge.x << ", " << edge.y << "): Disparity = " << disparity << "\n";
+        }
+    }
+}
+
 void Dataset::Load_GT_Poses( std::string GT_Poses_File_Path ) {
    std::ifstream gt_pose_file(GT_Poses_File_Path);
    if (!gt_pose_file.is_open()) {
@@ -858,75 +975,71 @@ Eigen::Matrix3d Dataset::ConvertToEigenMatrix(const std::vector<std::vector<doub
    return eigen_matrix;
 }
 
-// void Dataset::PrintDatasetInfo() {
-//     //Stereo Intrinsic Parameters
-//     std::cout << "Left Camera Resolution: " << left_res[0] << "x" << left_res[1] << std::endl;
-//     std::cout << "\nRight Camera Resolution: " << right_res[0] << "x" << right_res[1] << std::endl;
+void Dataset::PrintDatasetInfo() {
+    // Stereo Intrinsic Parameters
+    std::cout << "Left Camera Resolution: " << left_res[0] << "x" << left_res[1] << std::endl;
+    std::cout << "\nRight Camera Resolution: " << right_res[0] << "x" << right_res[1] << std::endl;
 
+    std::cout << "\nLeft Camera Intrinsics: ";
+    for (const auto& value : left_intr) std::cout << value << " ";
+    std::cout << std::endl;
 
-//     std::cout << "\nLeft Camera Intrinsics: ";
-//     for (const auto& value : left_intr) std::cout << value << " ";
-//     std::cout << std::endl;
+    std::cout << "\nRight Camera Intrinsics: ";
+    for (const auto& value : right_intr) std::cout << value << " ";
+    std::cout << std::endl;
 
+    // Stereo Extrinsic Parameters (Left to Right)
+    std::cout << "\nStereo Extrinsic Parameters (Left to Right): \n";
 
-//     std::cout << "\nRight Camera Intrinsics: ";
-//     for (const auto& value : right_intr) std::cout << value << " ";
-//     std::cout << std::endl;
+    std::cout << "\nRotation Matrix: \n";
+    for (const auto& row : rot_mat_21) {
+        for (const auto& value : row) {
+            std::cout << value << " ";
+        }
+        std::cout << std::endl;
+    }
 
+    std::cout << "\nTranslation Vector: \n";
+    for (const auto& value : trans_vec_21) std::cout << value << " ";
+    std::cout << std::endl;
 
-//     // Stereo Extrinsic Parameters (Left to Right)
-//     std::cout << "\nStereo Extrinsic Parameters (Left to Right): \n";
+    std::cout << "\nFundamental Matrix: \n";
+    for (const auto& row : fund_mat_21) {
+        for (const auto& value : row) {
+            std::cout << value << " ";
+        }
+        std::cout << std::endl;
+    }
 
+    // Stereo Extrinsic Parameters (Right to Left)
+    std::cout << "\nStereo Extrinsic Parameters (Right to Left): \n";
 
-//     std::cout << "\nRotation Matrix: \n";
-//     for (const auto& row : rot_mat_21) {
-//         for (const auto& value : row) {
-//             std::cout << value << " ";
-//         }
-//         std::cout << std::endl;
-//     }
+    std::cout << "\nRotation Matrix: \n";
+    for (const auto& row : rot_mat_12) {
+        for (const auto& value : row) {
+            std::cout << value << " ";
+        }
+        std::cout << std::endl;
+    }
 
+    std::cout << "\nTranslation Vector: \n";
+    for (const auto& value : trans_vec_12) std::cout << value << " ";
+    std::cout << std::endl;
 
-//     std::cout << "\nTranslation Vector: \n";
-//     for (const auto& value : trans_vec_21) std::cout << value << " ";
-//     std::cout << std::endl;
+    std::cout << "\nFundamental Matrix: \n";
+    for (const auto& row : fund_mat_12) {
+        for (const auto& value : row) {
+            std::cout << value << " ";
+        }
+        std::cout << std::endl;
+    }
 
+    // Print Focal Length and Baseline
+    std::cout << "\nStereo Camera Parameters: \n";
+    std::cout << "Focal Length: " << focal_length << " pixels" << std::endl;
+    std::cout << "Baseline: " << baseline << " meters" << std::endl;
 
-//     std::cout << "\nFundamental Matrix: \n";
-//     for (const auto& row : fund_mat_21) {
-//         for (const auto& value : row) {
-//             std::cout << value << " ";
-//         }
-//         std::cout << std::endl;
-//     }
-
-
-//     // Stereo Extrinsic Parameters (Right to Left)
-//     std::cout << "\nStereo Extrinsic Parameters (Right to Left): \n";
-
-
-//     std::cout << "\nRotation Matrix: \n";
-//     for (const auto& row : rot_mat_12) {
-//         for (const auto& value : row) {
-//             std::cout << value << " ";
-//         }
-//         std::cout << std::endl;
-//     }
-
-
-//     std::cout << "\nTranslation Vector: \n";
-//     for (const auto& value : trans_vec_12) std::cout << value << " ";
-//     std::cout << std::endl;
-
-
-//     std::cout << "\nFundamental Matrix: \n";
-//     for (const auto& row : fund_mat_12) {
-//         for (const auto& value : row) {
-//             std::cout << value << " ";
-//         }
-//         std::cout << std::endl;
-//     }
-//     std::cout << "\n" << std::endl;
-// }
+    std::cout << "\n" << std::endl;
+}
 
 #endif

@@ -82,6 +82,8 @@ private:
    std::vector<std::vector<double>> rot_mat_12;
    std::vector<double> trans_vec_12;
    std::vector<std::vector<double>> fund_mat_12;
+   double focal_length;
+   double baseline;
 
    std::vector<cv::Point2d> matched_left_edges;
    std::vector<cv::Point2d> matched_right_edges;
@@ -89,7 +91,7 @@ private:
    std::vector<double> matched_right_orientations;
    std::vector<double> left_edge_depths;
 
-   // void PrintDatasetInfo();
+   void PrintDatasetInfo();
    void DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, const cv::Mat& left_binary_map, const cv::Mat& right_binary_map, std::vector<cv::Point2d> left_edge_coords, std::vector<cv::Point2d> right_edge_coords, std::vector<double> left_edge_orientations, std::vector<double> right_edge_orientations);
    void CalculateMatches(const std::vector<cv::Point2d>& selected_left_edges, const std::vector<double>& selected_left_orientations, const std::vector<cv::Point2d>& left_edge_coords, const std::vector<double>& left_edge_orientations, const std::vector<cv::Point2d>& right_edge_coords, const std::vector<double>& right_edge_orientations, const std::vector<cv::Mat>& left_patches, const std::vector<Eigen::Vector3d>& epipolar_lines_right, const cv::Mat& left_image, const cv::Mat& right_image, const Eigen::Matrix3d& fundamental_matrix_12, cv::Mat& right_visualization);
    std::vector<Eigen::Vector3d> ReprojectOrientations(const std::vector<Eigen::Vector3d>& tangent_vectors, std::vector<Eigen::Matrix3d> rot_mat_list);
@@ -105,6 +107,8 @@ private:
    Eigen::Matrix3d ConvertToEigenMatrix(const std::vector<std::vector<double>>& matrix);
    std::vector<std::pair<cv::Mat, cv::Mat>> LoadEuRoCImages(const std::string& csv_path, const std::string& left_path, const std::string& right_path, int num_images);
    std::vector<std::pair<cv::Mat, cv::Mat>> LoadETH3DImages(const std::string &stereo_pairs_path, int num_images);
+   std::vector<cv::Mat> LoadETH3DMaps(const std::string &stereo_pairs_path, int num_maps);
+   void CalculateGTRightEdge(const std::vector<cv::Point2d> &left_third_order_edges_locations, const cv::Mat &disparity_map);
 
    void Load_GT_Poses( std::string GT_Poses_File_Path );
    std::vector<double> GT_time_stamps;
