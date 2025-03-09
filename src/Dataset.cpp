@@ -223,22 +223,35 @@ void Dataset::PerformEdgeBasedVO() {
            }
        }
 
-       CalculateGTRightEdge(left_third_order_edges_locations, disparity_map);
-    //    DisplayMatches(left_undistorted, right_undistorted, left_edge_map, right_edge_map, left_third_order_edges_locations, right_third_order_edges_locations, left_third_order_edges_orientation, right_third_order_edges_orientation);
+       CalculateGTRightEdge(left_third_order_edges_locations, left_third_order_edges_orientation,disparity_map, left_edge_map, right_edge_map);
+       DisplayMatches(left_undistorted, right_undistorted, left_edge_map, right_edge_map, right_third_order_edges_locations, right_third_order_edges_orientation);
        }
    }
 }
 
-void Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, const cv::Mat& left_binary_map, const cv::Mat& right_binary_map,
-   std::vector<cv::Point2d> left_edge_coords, std::vector<cv::Point2d> right_edge_coords, std::vector<double> left_edge_orientations, std::vector<double> right_edge_orientations) {
+void Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, const cv::Mat& left_binary_map, const cv::Mat& right_binary_map, std::vector<cv::Point2d> right_edge_coords, std::vector<double> right_edge_orientations) {
    cv::Mat left_visualization, right_visualization;
    cv::cvtColor(left_binary_map, left_visualization, cv::COLOR_GRAY2BGR);
    cv::cvtColor(right_binary_map, right_visualization, cv::COLOR_GRAY2BGR);
 
-   std::pair<std::vector<cv::Point2d>, std::vector<double>> selected_data = PickRandomEdges(7, left_edge_coords, left_edge_orientations, 5, left_res[0], left_res[1]);
+    std::vector<cv::Point2d> left_edge_coords;
+    std::vector<cv::Point2d> ground_truth_right_edges;
+    std::vector<double> left_edge_orientations;
 
-   std::vector<cv::Point2d> selected_left_edges = selected_data.first;
-   std::vector<double> selected_left_orientations = selected_data.second;
+    for (const auto& data : gt_edge_data) {
+        left_edge_coords.push_back(std::get<0>(data)); 
+        ground_truth_right_edges.push_back(std::get<1>(data)); 
+        left_edge_orientations.push_back(std::get<2>(data)); 
+    }
+
+
+
+    std::vector<cv::Point2d> selected_left_edges;
+    std::vector<double> selected_left_orientations;
+    std::vector<cv::Point2d> selected_ground_truth_right_edges;
+
+    std::tie(selected_left_edges, selected_left_orientations, selected_ground_truth_right_edges) = PickRandomEdges(7, left_edge_coords, ground_truth_right_edges, left_edge_orientations, 50000, left_res[0], left_res[1]);
+
 
    for (const auto& point : selected_left_edges) {
        cv::circle(left_visualization, point, 5, cv::Scalar(0, 0, 255), cv::FILLED);
@@ -251,18 +264,8 @@ void Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_ima
    Eigen::Matrix3d fundamental_matrix_12 = ConvertToEigenMatrix(fund_mat_12);
    std::vector<Eigen::Vector3d> epipolar_lines_right = CalculateEpipolarLine(fundamental_matrix_21, selected_left_edges);
 
-   CalculateMatches(selected_left_edges, selected_left_orientations, left_edge_coords, left_edge_orientations, right_edge_coords, right_edge_orientations, left_patches, epipolar_lines_right, left_image, right_image,
+   CalculateMatches(selected_left_edges, selected_ground_truth_right_edges, selected_left_orientations, left_edge_coords,left_edge_orientations, right_edge_coords, right_edge_orientations, left_patches, epipolar_lines_right, left_image, right_image,
        fundamental_matrix_12, right_visualization);
-
-
-//     CalculateDepths();
-//     std::vector<Eigen::Vector3d> tangent_vectors = ReconstructOrientations();
-//     std::vector<Eigen::Vector3d> reprojected_orientations = ReprojectOrientations(tangent_vectors, aligned_GT_Rot);
-
-//    std::cout << "Reprojected Orientations:" << std::endl;
-//     for (size_t i = 0; i < reprojected_orientations.size(); i++) {
-//         std::cout << "Reprojected Orientation " << (reprojected_orientations[i])(0) << "\t" << (reprojected_orientations[i])(1) << "\t" << (reprojected_orientations[i])(2) << std::endl;
-//     }
 
    cv::Mat merged_visualization;
    cv::hconcat(left_visualization, right_visualization, merged_visualization);
@@ -270,19 +273,23 @@ void Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_ima
    cv::waitKey(0);
 }
 
-void Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_left_edges, const std::vector<double>& selected_left_orientations, const std::vector<cv::Point2d>& left_edge_coords, const std::vector<double>& left_edge_orientations, const std::vector<cv::Point2d>& right_edge_coords, const std::vector<double>& right_edge_orientations, const std::vector<cv::Mat>& left_patches, const std::vector<Eigen::Vector3d>& epipolar_lines_right, const cv::Mat& left_image, const cv::Mat& right_image, const Eigen::Matrix3d& fundamental_matrix_12, cv::Mat& right_visualization) {
+void Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_left_edges, const std::vector<cv::Point2d>& selected_ground_truth_right_edges, const std::vector<double>& selected_left_orientations, const std::vector<cv::Point2d>& left_edge_coords, const std::vector<double>& left_edge_orientations, const std::vector<cv::Point2d>& right_edge_coords, const std::vector<double>& right_edge_orientations, const std::vector<cv::Mat>& left_patches, const std::vector<Eigen::Vector3d>& epipolar_lines_right, const cv::Mat& left_image, const cv::Mat& right_image, const Eigen::Matrix3d& fundamental_matrix_12, cv::Mat& right_visualization) {
    matched_left_edges.clear();
    matched_right_edges.clear();
    matched_left_orientations.clear();
    matched_right_orientations.clear();
   
-   double tol = 2.0;
+   double tol = 0.75;
+   int true_positive = 0;
+   int false_negative = 0;
 
    for (size_t i = 0; i < selected_left_edges.size(); i++) {
        const auto& left_edge = selected_left_edges[i];
+       const auto& ground_truth_right_edge = selected_ground_truth_right_edges[i];
        const auto& left_orientation = selected_left_orientations[i];
        const auto& left_patch = left_patches[i];
        const auto& epipolar_line = epipolar_lines_right[i];
+
        double a = epipolar_line(0);
        double b = epipolar_line(1);
        double c = epipolar_line(2);
@@ -293,9 +300,48 @@ void Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_left_edg
            cv::line(right_visualization, pt1, pt2, cv::Scalar(255, 200, 100), 1);
        }
 
-       std::pair<std::vector<cv::Point2d>, std::vector<double>> right_candidates = ExtractEpipolarEdges(7, epipolar_line, right_edge_coords, right_edge_orientations);
+       std::pair<std::vector<cv::Point2d>, std::vector<double>> right_candidates = ExtractEpipolarEdges(epipolar_line, right_edge_coords, right_edge_orientations);
        std::vector<cv::Point2d> right_candidate_edges = right_candidates.first;
        std::vector<double> right_candidate_orientations = right_candidates.second;
+
+        bool match_found = false;
+        cv::Point2d matched_candidate;
+
+        for (const auto& candidate : right_candidate_edges) {
+            double distance = cv::norm(candidate - ground_truth_right_edge);
+            if (distance <= tol) {
+                match_found = true;
+                matched_candidate = candidate;
+                break;
+            }
+        }
+
+        if (match_found) {
+            // std::cout << "MATCH: Candidate (" << matched_candidate.x << ", " << matched_candidate.y 
+            //         << ") matches Ground Truth (" << ground_truth_right_edge.x 
+            //         << ", " << ground_truth_right_edge.y << ") with tolerance " << tol << "\n";
+            true_positive++;
+        } else {
+        double distance_to_line = std::abs(a * ground_truth_right_edge.x + 
+                                           b * ground_truth_right_edge.y + c) / std::sqrt(a * a + b * b);
+
+        // std::cout << "NO MATCH: Ground Truth Right Edge (" << ground_truth_right_edge.x 
+        //           << ", " << ground_truth_right_edge.y << ")\n";
+        // std::cout << "Distance from Ground Truth to Epipolar Line: " << distance_to_line << "\n";
+
+        // // Print all candidate edges
+        // std::cout << "Right Candidate Edges:\n";
+        // for (const auto& candidate : right_candidate_edges) {
+        //     std::cout << "(" << candidate.x << ", " << candidate.y << ")\n";
+        // }
+            false_negative++;
+        }
+        
+        double recall = 0.0;
+        if ((true_positive + false_negative) > 0) {
+            recall = static_cast<double>(true_positive) / (true_positive + false_negative);
+        }
+        std::cout <<  "TP: " << true_positive << ", FN: " << false_negative << ", Recall: " << recall * 100.0 << "%\n";
 
        std::vector<cv::Mat> right_patches;
        ExtractPatches(7, right_image, right_candidate_edges, right_patches);
@@ -310,7 +356,7 @@ void Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_left_edg
                std::vector<Eigen::Vector3d> right_to_left_epipolar = CalculateEpipolarLine(fundamental_matrix_12, {best_right_match});
                Eigen::Vector3d epipolar_line_left = right_to_left_epipolar[0];
 
-               std::pair<std::vector<cv::Point2d>, std::vector<double>> left_candidates = ExtractEpipolarEdges(7, epipolar_line_left, left_edge_coords, left_edge_orientations);
+               std::pair<std::vector<cv::Point2d>, std::vector<double>> left_candidates = ExtractEpipolarEdges(epipolar_line_left, left_edge_coords, left_edge_orientations);
                std::vector<cv::Point2d> left_candidate_edges = left_candidates.first;
                std::vector<double> left_candidate_orientations = left_candidates.second;
 
@@ -538,11 +584,11 @@ void Dataset::ExtractPatches(int patch_size, const cv::Mat& image, const std::ve
 }
 
 //UPDATED
-std::pair<std::vector<cv::Point2d>, std::vector<double>> Dataset::ExtractEpipolarEdges(int patch_size, const Eigen::Vector3d& epipolar_line, const std::vector<cv::Point2d>& edge_locations, const std::vector<double>& edge_orientations) {
+std::pair<std::vector<cv::Point2d>, std::vector<double>> Dataset::ExtractEpipolarEdges(const Eigen::Vector3d& epipolar_line, const std::vector<cv::Point2d>& edge_locations, const std::vector<double>& edge_orientations) {
    std::vector<cv::Point2d> extracted_edges;
    std::vector<double> extracted_orientations;
 
-   double threshold = 3.0;
+   double threshold = 3;
 
    if (edge_locations.size() != edge_orientations.size()) {
        throw std::runtime_error("Edge locations and orientations size mismatch.");
@@ -576,54 +622,62 @@ std::vector<Eigen::Vector3d> Dataset::CalculateEpipolarLine(const Eigen::Matrix3
 
        epipolar_lines.push_back(epipolar_line);
 
-       std::cout << "Epipolar Line Equation for Point (" << point.x << ", " << point.y << "): "
-                 << epipolar_line(0) << "x + "
-                 << epipolar_line(1) << "y + "
-                 << epipolar_line(2) << " = 0" << std::endl;
+    //    std::cout << "Epipolar Line Equation for Point (" << point.x << ", " << point.y << "): "
+    //              << epipolar_line(0) << "x + "
+    //              << epipolar_line(1) << "y + "
+    //              << epipolar_line(2) << " = 0" << std::endl;
    }
 
    return epipolar_lines;
 }
 
 //UPDATED
-std::pair<std::vector<cv::Point2d>, std::vector<double>> Dataset::PickRandomEdges(int patch_size, const std::vector<cv::Point2d>& edges, const std::vector<double>& orientations, size_t num_points, int img_width, int img_height) {
-  std::vector<double> valid_orientations;
-  std::vector<cv::Point2d> valid_edges;
-  int half_patch = patch_size / 2;
+std::tuple<std::vector<cv::Point2d>, std::vector<double>, std::vector<cv::Point2d>> Dataset::PickRandomEdges(int patch_size, const std::vector<cv::Point2d>& edges, const std::vector<cv::Point2d>& ground_truth_right_edges, const std::vector<double>& orientations, size_t num_points, int img_width, int img_height) {
+    std::vector<cv::Point2d> valid_edges;
+    std::vector<double> valid_orientations;
+    std::vector<cv::Point2d> valid_ground_truth_edges;
+    int half_patch = patch_size / 2;
 
-  if (edges.size() != orientations.size()) {
-       throw std::runtime_error("Edge locations and orientations size mismatch.");
-   }
+    if (edges.size() != orientations.size() || edges.size() != ground_truth_right_edges.size()) {
+        throw std::runtime_error("Edge locations, orientations, and ground truth edges size mismatch.");
+    }
 
-  for (size_t i = 0; i < edges.size(); ++i) {
-       const auto& edge = edges[i];
-       if (edge.x >= half_patch && edge.x < img_width - half_patch &&
-           edge.y >= half_patch && edge.y < img_height - half_patch) {
-           valid_edges.push_back(edge);
-           valid_orientations.push_back(orientations[i]);
-       }
-   }
+    // Filter valid edges based on image boundaries
+    for (size_t i = 0; i < edges.size(); ++i) {
+        const auto& edge = edges[i];
+        if (edge.x >= half_patch && edge.x < img_width - half_patch &&
+            edge.y >= half_patch && edge.y < img_height - half_patch) {
+            valid_edges.push_back(edge);
+            valid_orientations.push_back(orientations[i]);
+            valid_ground_truth_edges.push_back(ground_truth_right_edges[i]); // Keep GT edges aligned
+        }
+    }
 
-  num_points = std::min(num_points, valid_edges.size());
+    // Determine number of points to pick
+    num_points = std::min(num_points, valid_edges.size());
 
-  std::vector<cv::Point2d> selected_points;
-  std::vector<double> selected_orientations;
-  std::unordered_set<int> used_indices;
-  std::random_device rd;
-  std::mt19937 gen(rd());
-  std::uniform_int_distribution<int> dis(0, valid_edges.size() - 1);
+    std::vector<cv::Point2d> selected_points;
+    std::vector<double> selected_orientations;
+    std::vector<cv::Point2d> selected_ground_truth_points;
+    std::unordered_set<int> used_indices;
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<int> dis(0, valid_edges.size() - 1);
 
-  while (selected_points.size() < num_points) {
-      int index = dis(gen);
-      if (used_indices.find(index) == used_indices.end()) {
-          selected_points.push_back(valid_edges[index]);
-          selected_orientations.push_back(valid_orientations[index]);
-          used_indices.insert(index);
-      }
-  }
+    // Randomly select edges and their corresponding GT right edges
+    while (selected_points.size() < num_points) {
+        int index = dis(gen);
+        if (used_indices.find(index) == used_indices.end()) {
+            selected_points.push_back(valid_edges[index]);
+            selected_orientations.push_back(valid_orientations[index]);
+            selected_ground_truth_points.push_back(valid_ground_truth_edges[index]); // Include GT right edge
+            used_indices.insert(index);
+        }
+    }
 
-  return {selected_points, selected_orientations};
+    return {selected_points, selected_orientations, selected_ground_truth_points};
 }
+
 
 std::vector<std::pair<cv::Mat, cv::Mat>> Dataset::LoadEuRoCImages(const std::string& csv_path, const std::string& left_path, const std::string& right_path,
    int num_images) {
@@ -703,23 +757,19 @@ std::vector<cv::Mat> Dataset::LoadETH3DMaps(const std::string &stereo_pairs_path
     std::vector<cv::Mat> disparity_maps;
     std::vector<std::string> stereo_folders;
 
-    // Iterate through each subfolder
     for (const auto &entry : std::filesystem::directory_iterator(stereo_pairs_path)) {
         if (entry.is_directory()) {
             stereo_folders.push_back(entry.path().string());
         }
     }
 
-    // Sort folders to maintain correct order
     std::sort(stereo_folders.begin(), stereo_folders.end());
 
     for (int i = 0; i < std::min(num_maps, static_cast<int>(stereo_folders.size())); ++i) {
         std::string folder_path = stereo_folders[i];
 
-        // Construct disparity map path
         std::string disparity_map_path = folder_path + "/disparity_map.csv";
 
-        // Load CSV file into OpenCV matrix
         std::ifstream file(disparity_map_path);
         if (!file.is_open()) {
             std::cerr << "ERROR: Could not open disparity map file: " << disparity_map_path << std::endl;
@@ -736,7 +786,6 @@ std::vector<cv::Mat> Dataset::LoadETH3DMaps(const std::string &stereo_pairs_path
                 try {
                     float disparity_value = std::stof(value);
 
-                    // Ensure NaN and Inf values are preserved
                     if (value == "nan" || value == "NaN") {
                         disparity_value = std::numeric_limits<float>::quiet_NaN();
                     } else if (value == "inf" || value == "Inf") {
@@ -748,7 +797,7 @@ std::vector<cv::Mat> Dataset::LoadETH3DMaps(const std::string &stereo_pairs_path
                     row.push_back(disparity_value);
                 } catch (const std::exception &e) {
                     std::cerr << "WARNING: Invalid value in file: " << disparity_map_path << " -> " << value << std::endl;
-                    row.push_back(std::numeric_limits<float>::quiet_NaN()); // Keep NaN instead of 0
+                    row.push_back(std::numeric_limits<float>::quiet_NaN()); 
                 }
             }
             if (!row.empty()) {
@@ -757,7 +806,6 @@ std::vector<cv::Mat> Dataset::LoadETH3DMaps(const std::string &stereo_pairs_path
         }
         file.close();
 
-        // Convert to OpenCV matrix
         if (!data.empty()) {
             int rows = data.size();
             int cols = data[0].size();
@@ -777,49 +825,88 @@ std::vector<cv::Mat> Dataset::LoadETH3DMaps(const std::string &stereo_pairs_path
 }
 
 double Bilinear_Interpolation(const cv::Mat &meshGrid, cv::Point2d P) {
-    //> y2 Q12--------Q22
-    //      |          |
-    //      |    P     |
-    //      |          |
-    //  y1 Q11--------Q21
-    //      x1         x2
-
     cv::Point2d Q12(floor(P.x), floor(P.y));
     cv::Point2d Q22(ceil(P.x), floor(P.y));
     cv::Point2d Q11(floor(P.x), ceil(P.y));
     cv::Point2d Q21(ceil(P.x), ceil(P.y));
 
-    // Ensure points are within bounds
     if (Q11.x < 0 || Q11.y < 0 || Q21.x >= meshGrid.cols || Q21.y >= meshGrid.rows ||
         Q12.x < 0 || Q12.y < 0 || Q22.x >= meshGrid.cols || Q22.y >= meshGrid.rows) {
-        return std::numeric_limits<double>::quiet_NaN();  // Return NaN if out of bounds
+        return std::numeric_limits<double>::quiet_NaN(); 
     }
 
-    // Retrieve disparity values at integer pixel locations
     double fQ11 = meshGrid.at<float>(Q11.y, Q11.x);
     double fQ21 = meshGrid.at<float>(Q21.y, Q21.x);
     double fQ12 = meshGrid.at<float>(Q12.y, Q12.x);
     double fQ22 = meshGrid.at<float>(Q22.y, Q22.x);
 
-    // Perform bilinear interpolation
     double f_x_y1 = ((Q21.x - P.x) / (Q21.x - Q11.x)) * fQ11 + ((P.x - Q11.x) / (Q21.x - Q11.x)) * fQ21;
     double f_x_y2 = ((Q21.x - P.x) / (Q21.x - Q11.x)) * fQ12 + ((P.x - Q11.x) / (Q21.x - Q11.x)) * fQ22;
     return ((Q12.y - P.y) / (Q12.y - Q11.y)) * f_x_y1 + ((P.y - Q11.y) / (Q12.y - Q11.y)) * f_x_y2;
 }
 
-void Dataset::CalculateGTRightEdge(const std::vector<cv::Point2d> &left_third_order_edges_locations, const cv::Mat &disparity_map) {
-    std::cout << "Processing " << left_third_order_edges_locations.size() << " sub-pixel edges...\n";
+void Dataset::VisualizeGTRightEdge(const cv::Mat &left_image, const cv::Mat &right_image, const std::vector<std::pair<cv::Point2d, cv::Point2d>> &left_right_edges) {
+    cv::Mat left_visualization, right_visualization;
+    cv::cvtColor(left_image, left_visualization, cv::COLOR_GRAY2BGR);
+    cv::cvtColor(right_image, right_visualization, cv::COLOR_GRAY2BGR);
 
-    for (const auto &edge : left_third_order_edges_locations) {
-        double disparity = Bilinear_Interpolation(disparity_map, edge);
-        
-        if (std::isnan(disparity)) {
-            std::cout << "Edge at (" << edge.x << ", " << edge.y << "): Invalid disparity (out of bounds)\n";
-        } else {
-            std::cout << "Edge at (" << edge.x << ", " << edge.y << "): Disparity = " << disparity << "\n";
+    std::vector<cv::Scalar> vibrant_colors = {
+        cv::Scalar(255, 0, 0),    
+        cv::Scalar(0, 255, 0),   
+        cv::Scalar(0, 0, 255),   
+        cv::Scalar(255, 255, 0), 
+        cv::Scalar(255, 0, 255),
+        cv::Scalar(0, 255, 255),
+        cv::Scalar(255, 165, 0), 
+        cv::Scalar(128, 0, 128),
+        cv::Scalar(0, 128, 255),
+        cv::Scalar(255, 20, 147)
+    };
+
+    std::vector<std::pair<cv::Point2d, cv::Point2d>> sampled_pairs;
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> distr(0, left_right_edges.size() - 1);
+
+    int num_samples = std::min(10, static_cast<int>(left_right_edges.size()));
+    for (int i = 0; i < num_samples; ++i) {
+        sampled_pairs.push_back(left_right_edges[distr(gen)]);
+    }
+
+    for (size_t i = 0; i < sampled_pairs.size(); ++i) {
+        const auto &[left_edge, right_edge] = sampled_pairs[i];
+
+        cv::Scalar color = vibrant_colors[i % vibrant_colors.size()];
+
+        cv::circle(left_visualization, left_edge, 5, color, cv::FILLED); 
+        cv::circle(right_visualization, right_edge, 5, color, cv::FILLED); 
+    }
+
+    cv::Mat merged_visualization;
+    cv::hconcat(left_visualization, right_visualization, merged_visualization);
+
+    cv::imshow("Ground Truth Disparity Edges Visualization", merged_visualization);
+    cv::waitKey(0);
+}
+
+void Dataset::CalculateGTRightEdge(const std::vector<cv::Point2d> &left_third_order_edges_locations, const std::vector<double> &left_third_order_edges_orientation, const cv::Mat &disparity_map, const cv::Mat &left_image, const cv::Mat &right_image) {
+    gt_edge_data.clear();
+
+    for (size_t i = 0; i < left_third_order_edges_locations.size(); i++) {
+        const cv::Point2d &left_edge = left_third_order_edges_locations[i];
+        double orientation = left_third_order_edges_orientation[i];
+
+        double disparity = Bilinear_Interpolation(disparity_map, left_edge);
+
+        if (std::isnan(disparity) || std::isinf(disparity) || disparity < 0) {
+            continue; 
         }
+
+        cv::Point2d right_edge(left_edge.x - disparity, left_edge.y);
+        gt_edge_data.emplace_back(left_edge, right_edge, orientation);
     }
 }
+
 
 void Dataset::Load_GT_Poses( std::string GT_Poses_File_Path ) {
    std::ifstream gt_pose_file(GT_Poses_File_Path);
