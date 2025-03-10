@@ -9,6 +9,7 @@
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 #include <yaml-cpp/yaml.h>
+#include <opencv2/opencv.hpp>
 #include "definitions.h"
 #include "Frame.h"
 #include "utility.h"
@@ -26,7 +27,7 @@
 //> Chiang-Heng Chien (chiang-heng_chien@brown.edu), Saul Lopez Lucas (saul_lopez_lucas@brown.edu)
 // =======================================================================================================
 
-
+extern cv::Mat merged_visualization_global;
 class Dataset {
 public:
    EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
@@ -34,6 +35,7 @@ public:
    Dataset(YAML::Node, bool);
 
    void PerformEdgeBasedVO();
+   static void onMouse(int event, int x, int y, int, void*);
 
    unsigned Total_Num_Of_Imgs;
    int img_height, img_width;
@@ -58,7 +60,6 @@ private:
 
    std::string GT_file_name;
 
-   //> Used only for the EuRoC dataset
    Eigen::Matrix3d rot_frame2body_left;
    Eigen::Vector3d transl_frame2body_left;
 
@@ -85,6 +86,8 @@ private:
    std::vector<std::vector<double>> fund_mat_12;
    double focal_length;
    double baseline;
+   double epipolar_distance_threshold;
+   double max_disparity;
 
    std::vector<cv::Point2d> matched_left_edges;
    std::vector<cv::Point2d> matched_right_edges;
@@ -108,10 +111,11 @@ private:
    Eigen::Matrix3d ConvertToEigenMatrix(const std::vector<std::vector<double>>& matrix);
    std::vector<std::pair<cv::Mat, cv::Mat>> LoadEuRoCImages(const std::string& csv_path, const std::string& left_path, const std::string& right_path, int num_images);
    std::vector<std::pair<cv::Mat, cv::Mat>> LoadETH3DImages(const std::string &stereo_pairs_path, int num_images);
+   std::vector<double> LoadMaximumDisparityValues(const std::string& stereo_pairs_path, int num_images);
    std::vector<cv::Mat> LoadETH3DMaps(const std::string &stereo_pairs_path, int num_maps);
    void VisualizeGTRightEdge(const cv::Mat &left_image, const cv::Mat &right_image, const std::vector<std::pair<cv::Point2d, cv::Point2d>> &edge_pairs);
    void CalculateGTRightEdge(const std::vector<cv::Point2d> &left_third_order_edges_locations, const std::vector<double> &left_third_order_edges_orientation, const cv::Mat &disparity_map, const cv::Mat &left_image, const cv::Mat &right_image);
-
+   cv::Point2d Epipolar_Shift( cv::Point2d original_edge_location, double edge_orientation, std::vector<double> epipolar_line_coeffs, bool& b_pass_epipolar_tengency_check);
 
    void Load_GT_Poses( std::string GT_Poses_File_Path );
    std::vector<double> GT_time_stamps;
