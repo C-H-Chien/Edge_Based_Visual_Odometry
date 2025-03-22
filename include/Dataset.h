@@ -95,6 +95,14 @@ private:
    std::vector<double> matched_right_orientations;
    std::vector<double> left_edge_depths;
 
+   std::vector<int> before_max_disparity_thresholding;
+   std::vector<int> after_max_disparity_thresholding;
+
+   std::vector<int> before_epi_distance_thresholding;
+   std::vector<int> after_epi_distance_thresholding;
+
+   std::vector<double> recall_rates_epi_distance;
+
    void PrintDatasetInfo();
    void DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, const cv::Mat& left_binary_map, const cv::Mat& right_binary_map, std::vector<cv::Point2d> right_edge_coords, std::vector<double> right_edge_orientations);
    void CalculateMatches(const std::vector<cv::Point2d>& selected_left_edges, const std::vector<cv::Point2d>& selected_ground_truth_right_edges, const std::vector<double>& selected_left_orientations, const std::vector<cv::Point2d>& left_edge_coords, const std::vector<double>& left_edge_orientations, const std::vector<cv::Point2d>& right_edge_coords, const std::vector<double>& right_edge_orientations, const std::vector<cv::Mat>& left_patches, const std::vector<Eigen::Vector3d>& epipolar_lines_right, const cv::Mat& left_image, const cv::Mat& right_image, const Eigen::Matrix3d& fundamental_matrix_12, cv::Mat& right_visualization);
