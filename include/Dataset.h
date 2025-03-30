@@ -98,10 +98,21 @@ private:
    std::vector<int> before_max_disparity_thresholding;
    std::vector<int> after_max_disparity_thresholding;
 
+   std::vector<double> recall_rates_max_disp;
+
    std::vector<int> before_epi_distance_thresholding;
    std::vector<int> after_epi_distance_thresholding;
 
    std::vector<double> recall_rates_epi_distance;
+
+   std::vector<int> before_epi_shift;      
+   std::vector<int> after_epi_shift;     
+   std::vector<double> recall_rates_epi_shift;  
+
+   std::vector<int> before_epi_cluster;      
+   std::vector<int> after_epi_cluster;     
+   std::vector<double> recall_rates_epi_cluster;  
+
 
    void PrintDatasetInfo();
    void DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, const cv::Mat& left_binary_map, const cv::Mat& right_binary_map, std::vector<cv::Point2d> right_edge_coords, std::vector<double> right_edge_orientations);
