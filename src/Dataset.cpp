@@ -17,6 +17,7 @@
 #include <chrono>
 #include "Dataset.h"
 #include "definitions.h"
+#include <utility> 
 cv::Mat merged_visualization_global;
 
 // =======================================================================================================
@@ -166,7 +167,7 @@ Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(confi
 }
 
 void Dataset::PerformEdgeBasedVO() {
-    int num_images = 2;
+    int num_images = 247;
     std::vector<std::pair<cv::Mat, cv::Mat>> image_pairs;
     std::vector<cv::Mat> disparity_maps;
     std::vector<double> max_disparity_values;
@@ -205,9 +206,9 @@ void Dataset::PerformEdgeBasedVO() {
         max_disparity_values = LoadMaximumDisparityValues(stereo_pairs_path, num_images);
     }
     
-    int image_skip = 2;
-    for (size_t i = 0; i < image_pairs.size(); i += image_skip) {
-    // for (size_t i = 0; i < image_pairs.size(); ++i) {
+    // int image_skip = 2;
+    // for (size_t i = 0; i < image_pairs.size(); i += image_skip) {
+    for (size_t i = 0; i < image_pairs.size(); ++i) {
         const cv::Mat& left_img = image_pairs[i].first;
         const cv::Mat& right_img = image_pairs[i].second;
         const cv::Mat& disparity_map = disparity_maps[i]; 
@@ -261,211 +262,211 @@ void Dataset::PerformEdgeBasedVO() {
        CalculateGTRightEdge(left_third_order_edges_locations, left_third_order_edges_orientation, disparity_map, left_edge_map, right_edge_map);
        DisplayMatches(left_undistorted, right_undistorted, left_edge_map, right_edge_map, right_third_order_edges_locations, right_third_order_edges_orientation);
 
-        // std::cout << "Image #" << i << "\n";
-        // // std::cout << "Recall Rates for Epipolar Distance: " << recall_rates_epi_distance.size() << "\n";
+        std::cout << "Image #" << i << "\n";
+        // std::cout << "Recall Rates for Epipolar Distance: " << recall_rates_epi_distance.size() << "\n";
 
-        // // std::cout << "Values in before_max_disparity_thresholding:\n";
-        // // for (size_t j = 0; j < before_max_disparity_thresholding.size(); ++j) {
-        // //     std::cout << before_max_disparity_thresholding[j] << " ";
-        // // }
-        // // std::cout << "\n";
+        // std::cout << "Values in before_max_disparity_thresholding:\n";
+        // for (size_t j = 0; j < before_max_disparity_thresholding.size(); ++j) {
+        //     std::cout << before_max_disparity_thresholding[j] << " ";
+        // }
+        // std::cout << "\n";
 
-        // // std::cout << "Values in after_max_disparity_thresholding:\n";
-        // // for (size_t j = 0; j < after_max_disparity_thresholding.size(); ++j) {
-        // //     std::cout << after_max_disparity_thresholding[j] << " ";
-        // // }
-        // // std::cout << "\n";
+        // std::cout << "Values in after_max_disparity_thresholding:\n";
+        // for (size_t j = 0; j < after_max_disparity_thresholding.size(); ++j) {
+        //     std::cout << after_max_disparity_thresholding[j] << " ";
+        // }
+        // std::cout << "\n";
 
-        // int avg_before_max_disp = ComputeAverage(before_max_disparity_thresholding);
-        // int avg_after_max_disp = ComputeAverage(after_max_disparity_thresholding);
-        // double avg_recall_max_disp = ComputeAverageDouble(recall_rates_max_disp);
+        int avg_before_max_disp = ComputeAverage(before_max_disparity_thresholding);
+        int avg_after_max_disp = ComputeAverage(after_max_disparity_thresholding);
+        double avg_recall_max_disp = ComputeAverageDouble(recall_rates_max_disp);
 
-        // int avg_epi_before = ComputeAverage(before_epi_distance_thresholding);
-        // int avg_epi_after = ComputeAverage(after_epi_distance_thresholding);
-        // double avg_recall_epi_distance = ComputeAverageDouble(recall_rates_epi_distance);
+        int avg_epi_before = ComputeAverage(before_epi_distance_thresholding);
+        int avg_epi_after = ComputeAverage(after_epi_distance_thresholding);
+        double avg_recall_epi_distance = ComputeAverageDouble(recall_rates_epi_distance);
 
-        // int avg_before_epi_shift = ComputeAverage(before_epi_shift);
-        // int avg_after_epi_shift = ComputeAverage(after_epi_shift);
-        // double avg_recall_epi_shift = ComputeAverageDouble(recall_rates_epi_shift);
+        int avg_before_epi_shift = ComputeAverage(before_epi_shift);
+        int avg_after_epi_shift = ComputeAverage(after_epi_shift);
+        double avg_recall_epi_shift = ComputeAverageDouble(recall_rates_epi_shift);
 
-        // int avg_before_epi_cluster = ComputeAverage(before_epi_cluster);
-        // int avg_after_epi_cluster = ComputeAverage(after_epi_cluster);
-        // double avg_recall_epi_cluster = ComputeAverageDouble(recall_rates_epi_cluster);
+        int avg_before_epi_cluster = ComputeAverage(before_epi_cluster);
+        int avg_after_epi_cluster = ComputeAverage(after_epi_cluster);
+        double avg_recall_epi_cluster = ComputeAverageDouble(recall_rates_epi_cluster);
 
-        // // std::cout << "Average right_candidate_edges before filtering: " << avg_before_max_disp << "\n";
-        // // std::cout << "Average right_candidate_edges after filtering:  " << avg_after_max_disp << "\n";
+        // std::cout << "Average right_candidate_edges before filtering: " << avg_before_max_disp << "\n";
+        // std::cout << "Average right_candidate_edges after filtering:  " << avg_after_max_disp << "\n";
 
-        // // std::cout << "Average right_candidate_edges before epipolar distance thresholding: " << avg_epi_before << "\n";
-        // // std::cout << "Average right_candidate_edges after epipolar distance thresholding:  " << avg_epi_after << "\n";
+        // std::cout << "Average right_candidate_edges before epipolar distance thresholding: " << avg_epi_before << "\n";
+        // std::cout << "Average right_candidate_edges after epipolar distance thresholding:  " << avg_epi_after << "\n";
 
-        // // std::cout << "Average epipolar distance recall for image " << i << ": " << avg_recall_epi_distance << "%\n";
+        // std::cout << "Average epipolar distance recall for image " << i << ": " << avg_recall_epi_distance << "%\n";
 
-        // per_image_avg_before_max_disp.push_back(avg_before_max_disp);
-        // per_image_avg_after_max_disp.push_back(avg_after_max_disp);
-        // per_image_avg_recall_max_disp.push_back(avg_recall_max_disp);
+        per_image_avg_before_max_disp.push_back(avg_before_max_disp);
+        per_image_avg_after_max_disp.push_back(avg_after_max_disp);
+        per_image_avg_recall_max_disp.push_back(avg_recall_max_disp);
 
-        // per_image_avg_before_epi.push_back(avg_epi_before);
-        // per_image_avg_after_epi.push_back(avg_epi_after);
-        // per_image_avg_recall_epi.push_back(avg_recall_epi_distance);
+        per_image_avg_before_epi.push_back(avg_epi_before);
+        per_image_avg_after_epi.push_back(avg_epi_after);
+        per_image_avg_recall_epi.push_back(avg_recall_epi_distance);
 
-        // per_image_avg_before_epi_shift.push_back(avg_before_epi_shift);
-        // per_image_avg_after_epi_shift.push_back(avg_after_epi_shift);
-        // per_image_avg_recall_epi_shift.push_back(avg_recall_epi_shift);
+        per_image_avg_before_epi_shift.push_back(avg_before_epi_shift);
+        per_image_avg_after_epi_shift.push_back(avg_after_epi_shift);
+        per_image_avg_recall_epi_shift.push_back(avg_recall_epi_shift);
 
-        // per_image_avg_before_epi_cluster.push_back(avg_before_epi_cluster);
-        // per_image_avg_after_epi_cluster.push_back(avg_after_epi_cluster);
-        // per_image_avg_recall_epi_cluster.push_back(avg_recall_epi_cluster);
+        per_image_avg_before_epi_cluster.push_back(avg_before_epi_cluster);
+        per_image_avg_after_epi_cluster.push_back(avg_after_epi_cluster);
+        per_image_avg_recall_epi_cluster.push_back(avg_recall_epi_cluster);
 
-        // before_max_disparity_thresholding.clear();
-        // after_max_disparity_thresholding.clear();
-        // recall_rates_max_disp.clear();
+        before_max_disparity_thresholding.clear();
+        after_max_disparity_thresholding.clear();
+        recall_rates_max_disp.clear();
 
-        // before_epi_distance_thresholding.clear();
-        // after_epi_distance_thresholding.clear();
-        // recall_rates_epi_distance.clear();
+        before_epi_distance_thresholding.clear();
+        after_epi_distance_thresholding.clear();
+        recall_rates_epi_distance.clear();
 
-        // before_epi_shift.clear();
-        // after_epi_shift.clear();
-        // recall_rates_epi_shift.clear();
+        before_epi_shift.clear();
+        after_epi_shift.clear();
+        recall_rates_epi_shift.clear();
 
-        // before_epi_cluster.clear();
-        // after_epi_cluster.clear();
-        // recall_rates_epi_cluster.clear();
+        before_epi_cluster.clear();
+        after_epi_cluster.clear();
+        recall_rates_epi_cluster.clear();
    }
 }
 
-    // std::ofstream csv_file("/Users/saulll./Desktop/Edge-Based Visual Odometry/datasets/delivery_area/edge_statistics.csv");
-    // csv_file 
-    //      << "before_epi_distance,after_epi_distance,average_before_epi_distance,average_after_epi_distance,recall_epi_distance,avg_recall_epi_distance,"
-    //      << "before_max_disp,after_max_disp,average_before_max_disp,average_after_max_disp,recall_max_disp,avg_recall_max_disp,"
-    //      << "before_epi_shift,after_epi_shift,average_before_epi_shift,average_after_epi_shift,recall_epi_shift,avg_recall_epi_shift,"
-    //      << "before_epi_cluster,after_epi_cluster,average_before_epi_cluster,average_after_epi_cluster,recall_epi_cluster,avg_recall_epi_cluster\n";
+    std::ofstream csv_file("/Users/saulll./Desktop/Edge-Based Visual Odometry/datasets/delivery_area/edge_statistics.csv");
+    csv_file 
+         << "before_epi_distance,after_epi_distance,average_before_epi_distance,average_after_epi_distance,recall_epi_distance,avg_recall_epi_distance,"
+         << "before_max_disp,after_max_disp,average_before_max_disp,average_after_max_disp,recall_max_disp,avg_recall_max_disp,"
+         << "before_epi_shift,after_epi_shift,average_before_epi_shift,average_after_epi_shift,recall_epi_shift,avg_recall_epi_shift,"
+         << "before_epi_cluster,after_epi_cluster,average_before_epi_cluster,average_after_epi_cluster,recall_epi_cluster,avg_recall_epi_cluster\n";
 
-    // int total_avg_before_max_disp = 0;
-    // int total_avg_after_max_disp = 0;
-    // double total_avg_recall_max_disp = 0;
+    int total_avg_before_max_disp = 0;
+    int total_avg_after_max_disp = 0;
+    double total_avg_recall_max_disp = 0;
 
-    // int total_avg_before_epi = 0;
-    // int total_avg_after_epi = 0;
-    // double total_avg_recall_epi_distance = 0;
+    int total_avg_before_epi = 0;
+    int total_avg_after_epi = 0;
+    double total_avg_recall_epi_distance = 0;
 
-    // int total_before_epi_shift = 0;
-    // int total_after_epi_shift = 0;
-    // double total_recall_epi_shift = 0;
+    int total_before_epi_shift = 0;
+    int total_after_epi_shift = 0;
+    double total_recall_epi_shift = 0;
 
-    // int total_before_epi_cluster = 0;
-    // int total_after_epi_cluster = 0;
-    // double total_recall_epi_cluster = 0;
+    int total_before_epi_cluster = 0;
+    int total_after_epi_cluster = 0;
+    double total_recall_epi_cluster = 0;
 
-    // size_t num_rows = per_image_avg_before_max_disp.size();
+    size_t num_rows = per_image_avg_before_max_disp.size();
 
-    // for (size_t i = 0; i < num_rows; ++i) {
-    //     total_avg_before_max_disp += per_image_avg_before_max_disp[i];
-    //     total_avg_after_max_disp += per_image_avg_after_max_disp[i];
-    //     total_avg_recall_max_disp += per_image_avg_recall_max_disp[i];
+    for (size_t i = 0; i < num_rows; ++i) {
+        total_avg_before_max_disp += per_image_avg_before_max_disp[i];
+        total_avg_after_max_disp += per_image_avg_after_max_disp[i];
+        total_avg_recall_max_disp += per_image_avg_recall_max_disp[i];
 
-    //     total_avg_before_epi += per_image_avg_before_epi[i];
-    //     total_avg_after_epi += per_image_avg_after_epi[i];
-    //     total_avg_recall_epi_distance += per_image_avg_recall_epi[i];
+        total_avg_before_epi += per_image_avg_before_epi[i];
+        total_avg_after_epi += per_image_avg_after_epi[i];
+        total_avg_recall_epi_distance += per_image_avg_recall_epi[i];
 
-    //     total_before_epi_shift += per_image_avg_before_epi_shift[i];
-    //     total_after_epi_shift += per_image_avg_after_epi_shift[i];
-    //     total_recall_epi_shift += per_image_avg_recall_epi_shift[i];
+        total_before_epi_shift += per_image_avg_before_epi_shift[i];
+        total_after_epi_shift += per_image_avg_after_epi_shift[i];
+        total_recall_epi_shift += per_image_avg_recall_epi_shift[i];
 
-    //     total_before_epi_cluster += per_image_avg_before_epi_cluster[i];
-    //     total_after_epi_cluster += per_image_avg_after_epi_cluster[i];
-    //     total_recall_epi_cluster += per_image_avg_recall_epi_cluster[i];
+        total_before_epi_cluster += per_image_avg_before_epi_cluster[i];
+        total_after_epi_cluster += per_image_avg_after_epi_cluster[i];
+        total_recall_epi_cluster += per_image_avg_recall_epi_cluster[i];
 
-    //     csv_file 
-    //         << per_image_avg_before_epi[i] << ","        
-    //         << per_image_avg_after_epi[i] << ","        
-    //         << ","                                      
-    //         << ","                                   
-    //         << per_image_avg_recall_epi[i] << ","        
-    //         << ","
-    //         << per_image_avg_before_max_disp[i] << ","    
-    //         << per_image_avg_after_max_disp[i] << ","  
-    //         << ","                                   
-    //         << ","
-    //         << per_image_avg_recall_max_disp[i] << ","        
-    //         << ","                                                                               
-    //         << per_image_avg_before_epi_shift[i] << "," 
-    //         << per_image_avg_after_epi_shift[i] << ","   
-    //         << ","                                        
-    //         << ","                                    
-    //         << per_image_avg_recall_epi_shift[i] << "," 
-    //         << ","                                       
-    //         << per_image_avg_before_epi_cluster[i] << ","
-    //         << per_image_avg_after_epi_cluster[i] << ","  
-    //         << ","                                       
-    //         << ","                                    
-    //         << per_image_avg_recall_epi_cluster[i] << ","
-    //         << "\n";                                     
-    // }
+        csv_file 
+            << per_image_avg_before_epi[i] << ","        
+            << per_image_avg_after_epi[i] << ","        
+            << ","                                      
+            << ","                                   
+            << per_image_avg_recall_epi[i] << ","        
+            << ","
+            << per_image_avg_before_max_disp[i] << ","    
+            << per_image_avg_after_max_disp[i] << ","  
+            << ","                                   
+            << ","
+            << per_image_avg_recall_max_disp[i] << ","        
+            << ","                                                                               
+            << per_image_avg_before_epi_shift[i] << "," 
+            << per_image_avg_after_epi_shift[i] << ","   
+            << ","                                        
+            << ","                                    
+            << per_image_avg_recall_epi_shift[i] << "," 
+            << ","                                       
+            << per_image_avg_before_epi_cluster[i] << ","
+            << per_image_avg_after_epi_cluster[i] << ","  
+            << ","                                       
+            << ","                                    
+            << per_image_avg_recall_epi_cluster[i] << ","
+            << "\n";                                     
+    }
 
-    // int avg_of_avgs_before_max_disp = 0;
-    // int avg_of_avgs_after_max_disp = 0;
-    // double avg_of_avgs_recall_max_disp = 0;
+    int avg_of_avgs_before_max_disp = 0;
+    int avg_of_avgs_after_max_disp = 0;
+    double avg_of_avgs_recall_max_disp = 0;
 
-    // int avg_of_avgs_before_epi = 0;
-    // int avg_of_avgs_after_epi = 0;
-    // double avg_of_avgs_recall_epi = 0;
+    int avg_of_avgs_before_epi = 0;
+    int avg_of_avgs_after_epi = 0;
+    double avg_of_avgs_recall_epi = 0;
 
-    // int avg_before_epi_shift = 0;
-    // int avg_after_epi_shift = 0; 
-    // double avg_recall_epi_shift = 0; 
+    int avg_before_epi_shift = 0;
+    int avg_after_epi_shift = 0; 
+    double avg_recall_epi_shift = 0; 
 
 
-    // int avg_before_epi_cluster = 0;
-    // int avg_after_epi_cluster = 0; 
-    // double avg_recall_epi_cluster = 0; 
+    int avg_before_epi_cluster = 0;
+    int avg_after_epi_cluster = 0; 
+    double avg_recall_epi_cluster = 0; 
 
-    // if (num_rows > 0) {
-    //     avg_of_avgs_before_max_disp = total_avg_before_max_disp / num_rows;
-    //     avg_of_avgs_after_max_disp = total_avg_after_max_disp / num_rows;
-    //     avg_of_avgs_recall_max_disp = total_avg_recall_max_disp / num_rows;
+    if (num_rows > 0) {
+        avg_of_avgs_before_max_disp = total_avg_before_max_disp / num_rows;
+        avg_of_avgs_after_max_disp = total_avg_after_max_disp / num_rows;
+        avg_of_avgs_recall_max_disp = total_avg_recall_max_disp / num_rows;
 
-    //     avg_of_avgs_before_epi = total_avg_before_epi / num_rows;
-    //     avg_of_avgs_after_epi = total_avg_after_epi / num_rows;
-    //     avg_of_avgs_recall_epi = total_avg_recall_epi_distance / num_rows;
+        avg_of_avgs_before_epi = total_avg_before_epi / num_rows;
+        avg_of_avgs_after_epi = total_avg_after_epi / num_rows;
+        avg_of_avgs_recall_epi = total_avg_recall_epi_distance / num_rows;
 
-    //     avg_before_epi_shift = total_before_epi_shift / num_rows;
-    //     avg_after_epi_shift = total_after_epi_shift / num_rows;
-    //     avg_recall_epi_shift = total_recall_epi_shift / num_rows;
+        avg_before_epi_shift = total_before_epi_shift / num_rows;
+        avg_after_epi_shift = total_after_epi_shift / num_rows;
+        avg_recall_epi_shift = total_recall_epi_shift / num_rows;
 
-    //     avg_before_epi_cluster = total_before_epi_cluster / num_rows;
-    //     avg_after_epi_cluster = total_after_epi_cluster / num_rows;
-    //     avg_recall_epi_cluster = total_recall_epi_cluster / num_rows;
-    // }
+        avg_before_epi_cluster = total_before_epi_cluster / num_rows;
+        avg_after_epi_cluster = total_after_epi_cluster / num_rows;
+        avg_recall_epi_cluster = total_recall_epi_cluster / num_rows;
+    }
 
-    // csv_file 
-    //     << ","                                   
-    //     << ","                                                                     
-    //     << avg_of_avgs_before_epi << ","       
-    //     << avg_of_avgs_after_epi << ","         
-    //     << ","                                     
-    //     << avg_of_avgs_recall_epi << ","              
-    //     << ","                                     
-    //     << ","
-    //     << avg_of_avgs_before_max_disp << ","   
-    //     << avg_of_avgs_after_max_disp << ","
-    //     << ","                                     
-    //     << avg_of_avgs_recall_max_disp << ","        
-    //     << ","                                    
-    //     << ","                                          
-    //     << avg_before_epi_shift << ","              
-    //     << avg_after_epi_shift << ","               
-    //     << ","                                 
-    //     << avg_recall_epi_shift << ","              
-    //     << ","                                     
-    //     << ","                                      
-    //     << avg_before_epi_cluster << ","            
-    //     << avg_after_epi_cluster << ","            
-    //     << ","                                     
-    //     << avg_recall_epi_cluster << "\n";         
+    csv_file 
+        << ","                                   
+        << ","                                                                     
+        << avg_of_avgs_before_epi << ","       
+        << avg_of_avgs_after_epi << ","         
+        << ","                                     
+        << avg_of_avgs_recall_epi << ","              
+        << ","                                     
+        << ","
+        << avg_of_avgs_before_max_disp << ","   
+        << avg_of_avgs_after_max_disp << ","
+        << ","                                     
+        << avg_of_avgs_recall_max_disp << ","        
+        << ","                                    
+        << ","                                          
+        << avg_before_epi_shift << ","              
+        << avg_after_epi_shift << ","               
+        << ","                                 
+        << avg_recall_epi_shift << ","              
+        << ","                                     
+        << ","                                      
+        << avg_before_epi_cluster << ","            
+        << avg_after_epi_cluster << ","            
+        << ","                                     
+        << avg_recall_epi_cluster << "\n";         
        
-    // csv_file.close();
-    // std::cout << "Finished writing to edge_statistics.csv file!\n";
+    csv_file.close();
+    std::cout << "Finished writing to edge_statistics.csv file!\n";
 }
 
 void Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, const cv::Mat& left_binary_map, const cv::Mat& right_binary_map, std::vector<cv::Point2d> right_edge_coords, std::vector<double> right_edge_orientations) {
@@ -487,12 +488,12 @@ void Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_ima
     std::vector<double> selected_left_orientations;
     std::vector<cv::Point2d> selected_ground_truth_right_edges;
 
-    std::tie(selected_left_edges, selected_left_orientations, selected_ground_truth_right_edges) = PickRandomEdges(20, left_edge_coords, ground_truth_right_edges, 
-        left_edge_orientations, 10, left_res[0], left_res[1]);
+    // std::tie(selected_left_edges, selected_left_orientations, selected_ground_truth_right_edges) = PickRandomEdges(20, left_edge_coords, ground_truth_right_edges, 
+    //     left_edge_orientations, 10, left_res[0], left_res[1]);
 
-    // selected_left_edges = left_edge_coords;
-    // selected_left_orientations = left_edge_orientations;
-    // selected_ground_truth_right_edges = ground_truth_right_edges;
+    selected_left_edges = left_edge_coords;
+    selected_left_orientations = left_edge_orientations;
+    selected_ground_truth_right_edges = ground_truth_right_edges;
 
     // selected_left_edges.push_back(cv::Point2d(706.002, 424.508));
     // selected_left_orientations.push_back(-0.334778);
@@ -506,20 +507,20 @@ void Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_ima
     // selected_left_orientations.push_back(1.63606);
     // selected_ground_truth_right_edges.push_back(cv::Point2d(685.448, 206.013));
 
-    std::cout << "Selected Left Edges:\n";
-    for (const auto& point : selected_left_edges) {
-        std::cout << "X: " << point.x << ", Y: " << point.y << std::endl;
-    }
+    // std::cout << "Selected Left Edges:\n";
+    // for (const auto& point : selected_left_edges) {
+    //     std::cout << "X: " << point.x << ", Y: " << point.y << std::endl;
+    // }
 
-    std::cout << "\nSelected Left Orientations:\n";
-    for (size_t i = 0; i < selected_left_orientations.size(); i++) {
-        std::cout << "Orientation: " << selected_left_orientations[i] << std::endl;
-    }
+    // std::cout << "\nSelected Left Orientations:\n";
+    // for (size_t i = 0; i < selected_left_orientations.size(); i++) {
+    //     std::cout << "Orientation: " << selected_left_orientations[i] << std::endl;
+    // }
 
-    std::cout << "\nSelected Ground Truth Right Edges:\n";
-    for (const auto& point : selected_ground_truth_right_edges) {
-        std::cout << "X: " << point.x << ", Y: " << point.y << std::endl;
-    }
+    // std::cout << "\nSelected Ground Truth Right Edges:\n";
+    // for (const auto& point : selected_ground_truth_right_edges) {
+    //     std::cout << "X: " << point.x << ", Y: " << point.y << std::endl;
+    // }
 
 //    for (const auto& point : selected_left_edges) {
 //        cv::circle(left_visualization, point, 5, cv::Scalar(0, 0, 255), cv::FILLED);
@@ -594,17 +595,18 @@ void Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_left_edg
         double b1_line = -1;
 
         double m_epipolar = -a1_line / b1_line; 
-        double angle_diff_rad = std::abs(left_orientation - std::atan(m_epipolar));
+        double angle_diff_rad = abs(left_orientation - atan(m_epipolar));
         double angle_diff_deg = angle_diff_rad * (180.0 / M_PI);
-        if (angle_diff_deg > 180.0) {
-            angle_diff_deg -= 180.0;
+        if (angle_diff_deg > 180) {
+            angle_diff_deg -= 180;
         }
 
-        bool pass_tangency_check = (std::abs(angle_diff_deg - 0) > 4.0 && std::abs(angle_diff_deg - 180.0) > 4.0);
+        bool pass_tangency_check = (abs(angle_diff_deg - 0) > 6 && abs(angle_diff_deg - 180) > 6);
         if (!pass_tangency_check) {
-            std::cout << "Left Edge #" << i << " failed tangency check. Skipping.\n";
+            // std::cout << "Left Edge #" << i << " failed tangency check. Skipping.\n";
             continue;
         }
+        // std::cout << "Left edge #" << i << " passed tangency check. Location: X = "<< left_edge.x << ", Y = " << left_edge.y << std::endl;
 
     //   std::cout << "a: " << a << ", b: " << b << ", c: " << c << std::endl;
 
@@ -893,26 +895,26 @@ void Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_left_edg
 
     after_epi_cluster.push_back(cluster_center_edges.size());
 
-    // std::cout << "\n[DEBUG] Pairwise Distances Between Cluster Center Edges:\n";
+    // // std::cout << "\n[DEBUG] Pairwise Distances Between Cluster Center Edges:\n";
 
-    // std::cout << "\nFinal Cluster Center Edges:\n";
-    // for (size_t i = 0; i < cluster_center_edges.size(); ++i) {
-    //     std::cout << "Cluster #" << (i + 1) << ": X: " << cluster_center_edges[i].x 
-    //             << ", Y: " << cluster_center_edges[i].y 
-    //             << ", Orientation: " << cluster_orientation_edges[i] << std::endl;
-    // }
+    // // std::cout << "\nFinal Cluster Center Edges:\n";
+    // // for (size_t i = 0; i < cluster_center_edges.size(); ++i) {
+    // //     std::cout << "Cluster #" << (i + 1) << ": X: " << cluster_center_edges[i].x 
+    // //             << ", Y: " << cluster_center_edges[i].y 
+    // //             << ", Orientation: " << cluster_orientation_edges[i] << std::endl;
+    // // }
 
-    // std::cout << "\n--- Calculating Distance Between Clusters ---\n";
-    // for (size_t i = 0; i < cluster_center_edges.size() - 1; ++i) {
-    //     double distance = cv::norm(cluster_center_edges[i] - cluster_center_edges[i + 1]);
-        // std::cout << "Distance between Cluster " << i
-        //         << " (X: " << cluster_center_edges[i].x << ", Y: " << cluster_center_edges[i].y << ")"
-        //         << " and Cluster " << (i + 1)
-        //         << " (X: " << cluster_center_edges[i + 1].x << ", Y: " << cluster_center_edges[i + 1].y << ")"
-        //         << " = " << distance << " pixels\n";
-    //}
+    // // std::cout << "\n--- Calculating Distance Between Clusters ---\n";
+    // // for (size_t i = 0; i < cluster_center_edges.size() - 1; ++i) {
+    // //     double distance = cv::norm(cluster_center_edges[i] - cluster_center_edges[i + 1]);
+    //     // std::cout << "Distance between Cluster " << i
+    //     //         << " (X: " << cluster_center_edges[i].x << ", Y: " << cluster_center_edges[i].y << ")"
+    //     //         << " and Cluster " << (i + 1)
+    //     //         << " (X: " << cluster_center_edges[i + 1].x << ", Y: " << cluster_center_edges[i + 1].y << ")"
+    //     //         << " = " << distance << " pixels\n";
+    // //}
 
-    ///////////////////////////////CLUSTER CENTER EDGES THRESHOLD RECALL//////////////////////////
+    // ///////////////////////////////CLUSTER CENTER EDGES THRESHOLD RECALL//////////////////////////
        bool cluster_match_found = false;
 
        for (const auto& cluster_center : cluster_center_edges) {
@@ -1079,67 +1081,6 @@ void Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_left_edg
     //            }
     //        }
     //    }
-    }
-}
-int Dataset::CalculateNCCPatch(const cv::Mat& left_patch, const std::vector<cv::Mat>& right_patches) {
-    double NCC_threshold = 0.85; 
-    double ratio_threshold = 1.1; 
-
-    if (right_patches.empty()) {
-        std::cout << "No right patches found. Returning -1.\n";
-        return -1;
-    }
-
-    int best_match_idx = -1;
-    int second_best_match_idx = -1;
-    double best_score = -1.0;
-    double second_best_score = -1.0;
-
-    std::cout << "\n--- Calculating NCC Scores ---\n";
-
-    for (size_t i = 0; i < right_patches.size(); i++) {
-        cv::Mat result;
-        cv::matchTemplate(left_patch, right_patches[i], result, cv::TM_CCORR_NORMED);
-        double score = result.at<float>(0, 0);
-
-        std::cout << "Match " << i << " Score: " << score << "\n";
-
-        if (score > best_score) {
-            second_best_score = best_score;
-            second_best_match_idx = best_match_idx;
-
-            best_score = score;
-            best_match_idx = static_cast<int>(i);
-        } else if (score > second_best_score) {
-            second_best_score = score;
-            second_best_match_idx = static_cast<int>(i);
-        }
-    }
-
-    std::cout << "Best Score: " << best_score 
-              << " (Idx: " << best_match_idx << ")\n";
-    std::cout << "Second Best Score: " << second_best_score 
-              << " (Idx: " << second_best_match_idx << ")\n";
-
-    if (best_score < NCC_threshold) {
-        std::cout << "Best match below NCC threshold. Rejecting match.\n";
-        return -1;
-    }
-
-    if (second_best_score <= 0) {
-        std::cout << "Second best score is zero or negative. Rejecting match.\n";
-        return -1;
-    }
-
-    double ratio = best_score / second_best_score;
-    std::cout << "Lowe's Ratio: " << ratio << " (Threshold: " << ratio_threshold << ")\n";
-
-    if (ratio >= ratio_threshold) {
-        std::cout << "Match PASSES Lowe's Ratio Test. Accepting match.\n";
-        return best_match_idx;
-    } else {
-        std::cout << "Match FAILS Lowe's Ratio Test. Rejecting match.\n";
-        return -1;
     }
 }
 
@@ -1588,7 +1529,7 @@ cv::Point2d Dataset::Epipolar_Shift( cv::Point2d original_edge_location, double 
         angle_diff_deg -= 180;
     }
 
-    b_pass_epipolar_tengency_check = (epipolar_shift_displacement < 6 && abs(angle_diff_deg - 0) > 4 && abs(angle_diff_deg - 180) > 4) ? (true) : (false);
+    b_pass_epipolar_tengency_check = (epipolar_shift_displacement < 4 && abs(angle_diff_deg - 0) > 6 && abs(angle_diff_deg - 180) > 6) ? (true) : (false);
 
     return corrected_edge;
 }

@@ -136,7 +136,7 @@ private:
    void VisualizeGTRightEdge(const cv::Mat &left_image, const cv::Mat &right_image, const std::vector<std::pair<cv::Point2d, cv::Point2d>> &edge_pairs);
    void CalculateGTRightEdge(const std::vector<cv::Point2d> &left_third_order_edges_locations, const std::vector<double> &left_third_order_edges_orientation, const cv::Mat &disparity_map, const cv::Mat &left_image, const cv::Mat &right_image);
    cv::Point2d Epipolar_Shift( cv::Point2d original_edge_location, double edge_orientation, std::vector<double> epipolar_line_coeffs, bool& b_pass_epipolar_tengency_check);
-
+   std::pair<cv::Point2d, cv::Point2d> GetOrthogonalPoints(const cv::Point2d& edge_point, double orientation, double shift_distance);
    void Load_GT_Poses( std::string GT_Poses_File_Path );
    std::vector<double> GT_time_stamps;
    std::vector<double> Img_time_stamps;
