@@ -188,6 +188,8 @@ void Dataset::PerformEdgeBasedVO() {
     std::vector<int> per_image_avg_after_epi_cluster;
     std::vector<double> per_image_avg_recall_epi_cluster;
 
+    std::vector<double> per_image_avg_recall_ncc_threshold;
+
     if (dataset_type == "EuRoC"){
         std::string left_path = dataset_path + "/" + sequence_name + "/mav0/cam0/data/";
         std::string right_path = dataset_path + "/" + sequence_name + "/mav0/cam1/data/";
@@ -215,6 +217,7 @@ void Dataset::PerformEdgeBasedVO() {
         max_disparity = max_disparity_values[i];
         {
 
+       std::cout << "Image #" << i << "\n";
        cv::Mat left_calib = (cv::Mat_<double>(3, 3) << left_intr[0], 0, left_intr[2], 0, left_intr[1], left_intr[3], 0, 0, 1);
        cv::Mat right_calib = (cv::Mat_<double>(3, 3) << right_intr[0], 0, right_intr[2], 0, right_intr[1], right_intr[3], 0, 0, 1);
        cv::Mat left_dist_coeff_mat(left_dist_coeffs);
@@ -262,7 +265,6 @@ void Dataset::PerformEdgeBasedVO() {
        CalculateGTRightEdge(left_third_order_edges_locations, left_third_order_edges_orientation, disparity_map, left_edge_map, right_edge_map);
        DisplayMatches(left_undistorted, right_undistorted, left_edge_map, right_edge_map, right_third_order_edges_locations, right_third_order_edges_orientation);
 
-        std::cout << "Image #" << i << "\n";
         // std::cout << "Recall Rates for Epipolar Distance: " << recall_rates_epi_distance.size() << "\n";
 
         // std::cout << "Values in before_max_disparity_thresholding:\n";
@@ -293,6 +295,8 @@ void Dataset::PerformEdgeBasedVO() {
         int avg_after_epi_cluster = ComputeAverage(after_epi_cluster);
         double avg_recall_epi_cluster = ComputeAverageDouble(recall_rates_epi_cluster);
 
+        double avg_recall_ncc_threshold = ComputeAverageDouble(recall_rates_ncc_threshold);
+
         // std::cout << "Average right_candidate_edges before filtering: " << avg_before_max_disp << "\n";
         // std::cout << "Average right_candidate_edges after filtering:  " << avg_after_max_disp << "\n";
 
@@ -317,6 +321,8 @@ void Dataset::PerformEdgeBasedVO() {
         per_image_avg_after_epi_cluster.push_back(avg_after_epi_cluster);
         per_image_avg_recall_epi_cluster.push_back(avg_recall_epi_cluster);
 
+        per_image_avg_recall_ncc_threshold.push_back(avg_recall_ncc_threshold);
+
         before_max_disparity_thresholding.clear();
         after_max_disparity_thresholding.clear();
         recall_rates_max_disp.clear();
@@ -332,6 +338,8 @@ void Dataset::PerformEdgeBasedVO() {
         before_epi_cluster.clear();
         after_epi_cluster.clear();
         recall_rates_epi_cluster.clear();
+
+        recall_rates_ncc_threshold.clear();
    }
 }
 
@@ -340,7 +348,8 @@ void Dataset::PerformEdgeBasedVO() {
          << "before_epi_distance,after_epi_distance,average_before_epi_distance,average_after_epi_distance,recall_epi_distance,avg_recall_epi_distance,"
          << "before_max_disp,after_max_disp,average_before_max_disp,average_after_max_disp,recall_max_disp,avg_recall_max_disp,"
          << "before_epi_shift,after_epi_shift,average_before_epi_shift,average_after_epi_shift,recall_epi_shift,avg_recall_epi_shift,"
-         << "before_epi_cluster,after_epi_cluster,average_before_epi_cluster,average_after_epi_cluster,recall_epi_cluster,avg_recall_epi_cluster\n";
+         << "before_epi_cluster,after_epi_cluster,average_before_epi_cluster,average_after_epi_cluster,recall_epi_cluster,avg_recall_epi_cluster,"
+         << "recall_ncc_threshold, avg_recall_ncc_threshold\n";
 
     int total_avg_before_max_disp = 0;
     int total_avg_after_max_disp = 0;
@@ -357,6 +366,8 @@ void Dataset::PerformEdgeBasedVO() {
     int total_before_epi_cluster = 0;
     int total_after_epi_cluster = 0;
     double total_recall_epi_cluster = 0;
+
+    double total_recall_ncc_threshold = 0;
 
     size_t num_rows = per_image_avg_before_max_disp.size();
 
@@ -376,6 +387,8 @@ void Dataset::PerformEdgeBasedVO() {
         total_before_epi_cluster += per_image_avg_before_epi_cluster[i];
         total_after_epi_cluster += per_image_avg_after_epi_cluster[i];
         total_recall_epi_cluster += per_image_avg_recall_epi_cluster[i];
+
+        total_recall_ncc_threshold += per_image_avg_recall_ncc_threshold[i];
 
         csv_file 
             << per_image_avg_before_epi[i] << ","        
@@ -401,6 +414,8 @@ void Dataset::PerformEdgeBasedVO() {
             << ","                                       
             << ","                                    
             << per_image_avg_recall_epi_cluster[i] << ","
+            << ","
+            << per_image_avg_recall_ncc_threshold[i] << ","
             << "\n";                                     
     }
 
@@ -421,6 +436,8 @@ void Dataset::PerformEdgeBasedVO() {
     int avg_after_epi_cluster = 0; 
     double avg_recall_epi_cluster = 0; 
 
+    double avg_recall_ncc_threshold = 0;
+
     if (num_rows > 0) {
         avg_of_avgs_before_max_disp = total_avg_before_max_disp / num_rows;
         avg_of_avgs_after_max_disp = total_avg_after_max_disp / num_rows;
@@ -437,6 +454,8 @@ void Dataset::PerformEdgeBasedVO() {
         avg_before_epi_cluster = total_before_epi_cluster / num_rows;
         avg_after_epi_cluster = total_after_epi_cluster / num_rows;
         avg_recall_epi_cluster = total_recall_epi_cluster / num_rows;
+
+        avg_recall_ncc_threshold = total_recall_ncc_threshold / num_rows;
     }
 
     csv_file 
@@ -463,7 +482,9 @@ void Dataset::PerformEdgeBasedVO() {
         << avg_before_epi_cluster << ","            
         << avg_after_epi_cluster << ","            
         << ","                                     
-        << avg_recall_epi_cluster << "\n";         
+        << avg_recall_epi_cluster << ","
+        << ","
+        << avg_recall_ncc_threshold << "\n";          
        
     csv_file.close();
     std::cout << "Finished writing to edge_statistics.csv file!\n";
@@ -522,19 +543,43 @@ void Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_ima
     //     std::cout << "X: " << point.x << ", Y: " << point.y << std::endl;
     // }
 
-//    for (const auto& point : selected_left_edges) {
-//        cv::circle(left_visualization, point, 5, cv::Scalar(0, 0, 255), cv::FILLED);
-//    }
+    //    for (const auto& point : selected_left_edges) {
+    //        cv::circle(left_visualization, point, 5, cv::Scalar(0, 0, 255), cv::FILLED);
+    //    }
 
-   std::vector<cv::Mat> left_patches;
-   ExtractPatches(9, left_image, selected_left_edges, left_patches);
+    double shift_magnitude = 10.0;
+    auto [left_shifted_one, left_shifted_two] = CalculateOrthogonalShifts(selected_left_edges, selected_left_orientations, shift_magnitude);
+
+    int patch_size = 9;
+
+    // Outputs
+    std::vector<cv::Point2d> filtered_left_edges;
+    std::vector<double> filtered_left_orientations;
+    std::vector<cv::Point2d> filtered_gt_right_edges;
+    std::vector<cv::Mat> left_patch_set_one;
+    std::vector<cv::Mat> left_patch_set_two;
+
+    ExtractPatches(
+        patch_size,
+        left_image,
+        selected_left_edges,
+        selected_left_orientations,
+        selected_ground_truth_right_edges,
+        left_shifted_one,
+        left_shifted_two,
+        filtered_left_edges,
+        filtered_left_orientations,
+        filtered_gt_right_edges,
+        left_patch_set_one,
+        left_patch_set_two
+    );
 
    Eigen::Matrix3d fundamental_matrix_21 = ConvertToEigenMatrix(fund_mat_21);
    Eigen::Matrix3d fundamental_matrix_12 = ConvertToEigenMatrix(fund_mat_12);
-   std::vector<Eigen::Vector3d> epipolar_lines_right = CalculateEpipolarLine(fundamental_matrix_21, selected_left_edges);
+   std::vector<Eigen::Vector3d> epipolar_lines_right = CalculateEpipolarLine(fundamental_matrix_21, filtered_left_edges);
 
-   CalculateMatches(selected_left_edges, selected_ground_truth_right_edges, selected_left_orientations, left_edge_coords, left_edge_orientations, right_edge_coords, 
-    right_edge_orientations, left_patches, epipolar_lines_right, left_image, right_image, fundamental_matrix_12, right_visualization);
+   CalculateMatches(filtered_left_edges, filtered_gt_right_edges, filtered_left_orientations, left_edge_coords, left_edge_orientations, right_edge_coords, 
+    right_edge_orientations, left_patch_set_one, left_patch_set_two, epipolar_lines_right, left_image, right_image, fundamental_matrix_12, right_visualization);
 
 //    cv::hconcat(left_visualization, right_visualization, merged_visualization_global);
 //    cv::namedWindow("Edge Matching Using NCC & Bidirectional Consistency");
@@ -545,7 +590,7 @@ void Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_ima
 
 void Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_left_edges, const std::vector<cv::Point2d>& selected_ground_truth_right_edges,
    const std::vector<double>& selected_left_orientations, const std::vector<cv::Point2d>& left_edge_coords, const std::vector<double>& left_edge_orientations,
-   const std::vector<cv::Point2d>& right_edge_coords, const std::vector<double>& right_edge_orientations, const std::vector<cv::Mat>& left_patches,
+   const std::vector<cv::Point2d>& right_edge_coords, const std::vector<double>& right_edge_orientations, const std::vector<cv::Mat>& left_patch_set_one, const std::vector<cv::Mat>& left_patch_set_two,
    const std::vector<Eigen::Vector3d>& epipolar_lines_right, const cv::Mat& left_image, const cv::Mat& right_image, const Eigen::Matrix3d& fundamental_matrix_12,
    cv::Mat& right_visualization) {
     matched_left_edges.clear();
@@ -573,13 +618,29 @@ void Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_left_edg
     int NCC_true_negative = 0;
     int NCC_false_negative = 0;
     
+    // int skip = 100;
+    std::cout << "Sizes:\n";
+    std::cout << "  selected_left_edges: " << selected_left_edges.size() << "\n";
+    std::cout << "  selected_ground_truth_right_edges: " << selected_ground_truth_right_edges.size() << "\n";
+    std::cout << "  selected_left_orientations: " << selected_left_orientations.size() << "\n";
+    std::cout << "  left_patch_set_one: " << left_patch_set_one.size() << "\n";
+    std::cout << "  left_patch_set_two: " << left_patch_set_two.size() << "\n";
+    std::cout << "  epipolar_lines_right: " << epipolar_lines_right.size() << "\n";
+
+    std::vector<cv::Point2d> ground_truth_right_edges;
+
+    for (const auto& data : gt_edge_data) {
+        ground_truth_right_edges.push_back(std::get<1>(data)); 
+    }
+
     int skip = 100;
   for (size_t i = 0; i < selected_left_edges.size(); i += skip) {
       const auto& left_edge = selected_left_edges[i];
-      const auto& ground_truth_right_edge = selected_ground_truth_right_edges[i];
       const auto& left_orientation = selected_left_orientations[i];
-      const auto& left_patch = left_patches[i];
+      const auto& ground_truth_right_edge = selected_ground_truth_right_edges[i];
       const auto& epipolar_line = epipolar_lines_right[i];
+      const auto& left_patch_one = left_patch_set_one[i];
+      const auto& left_patch_two = left_patch_set_two[i];
 
       epipolar_distance_threshold = 0.5;
 
@@ -942,145 +1003,214 @@ void Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_left_edg
                }
         }
 
-       double cluster_recall = 0.0;
-       if ((cluster_true_positive + cluster_false_negative) > 0) {
-           cluster_recall = static_cast<double>(cluster_true_positive) / (cluster_true_positive + cluster_false_negative);
-       }
-       recall_rates_epi_cluster.push_back(cluster_recall * 100.0);
+        double cluster_recall = 0.0;
+        if ((cluster_true_positive + cluster_false_negative) > 0) {
+        cluster_recall = static_cast<double>(cluster_true_positive) / (cluster_true_positive + cluster_false_negative);
+        }
+        recall_rates_epi_cluster.push_back(cluster_recall * 100.0);
 
-    //    std::cout << "Cluster TP: " << cluster_true_positive << ", Cluster TN: " << cluster_true_negative << ", Cluster FN: " << cluster_false_negative << ", Cluster Recall: " << cluster_recall * 100.0 << "%\n";
+        double orthogonal_shift_magnitude = 10.0;
+        int patch_size = 9;
 
-    //    std::vector<cv::Mat> right_patches;
-    //    ExtractPatches(9, right_image, cluster_center_edges, right_patches);
-      
-    //    if (!left_patch.empty() && !right_patches.empty()) {
-    //        int best_right_match_idx = CalculateNCCPatch(left_patch, right_patches);
-    //        bool ncc_match_found = false;
-          
-    //        if (best_right_match_idx != -1) {
-    //             cv::Point2d best_right_match = cluster_center_edges[best_right_match_idx];
-    //            double best_right_orientation = cluster_orientation_edges[best_right_match_idx];
+        auto [shifted_points_one, shifted_points_two] = CalculateOrthogonalShifts(
+            cluster_center_edges,
+            cluster_orientation_edges,
+            orthogonal_shift_magnitude
+        );
 
-    //             ///////////////////////////////NCC THRESHOLD RECALL//////////////////////////
-    //             // if (cv::norm(best_right_match - ground_truth_right_edge) <= 2.0) {
-    //             //     ncc_match_found = true;
-    //             // }
+        std::vector<cv::Point2d> filtered_right_edges;
+        std::vector<double> filtered_right_orientations;
+        std::vector<cv::Mat> right_patch_set_one;
+        std::vector<cv::Mat> right_patch_set_two;
 
-    //             // if (ncc_match_found) {
-    //             //     NCC_true_positive++;
-    //             // } else {
-    //             //     bool cluster_gt_right_edge_exists = false;
-    //             //     for (const auto& cluster_center : cluster_center_edges) {
-    //             //         if (cv::norm(cluster_center - ground_truth_right_edge) <= 0.5) {
-    //             //             cluster_gt_right_edge_exists = true;
-    //             //             break;
-    //             //         }
-    //             //     }
+        ExtractPatches(
+            patch_size,
+            right_image,
+            cluster_center_edges,
+            cluster_orientation_edges,
+            ground_truth_right_edges,
+            shifted_points_one,
+            shifted_points_two,
+            filtered_right_edges,
+            filtered_right_orientations,
+            ground_truth_right_edges,
+            right_patch_set_one,
+            right_patch_set_two
+        );
 
-    //             //     if (!cluster_gt_right_edge_exists) {
-    //             //         NCC_true_negative++;
-    //             //     } else {
-    //             //         NCC_false_negative++;
-    //             //     }
-    //             // }
+        double ncc_threshold = -1;
 
-    //             // double NCC_recall = 0.0;
-    //             // if ((NCC_true_positive + NCC_false_negative) > 0) {
-    //             //     NCC_recall = static_cast<double>(NCC_true_positive) / (NCC_true_positive + NCC_false_negative);}
+        if (!left_patch_one.empty() && !left_patch_two.empty() && !right_patch_set_one.empty() && !right_patch_set_two.empty()){
+            int best_right_match_index = ComputeNCCScores(left_patch_one, left_patch_two, right_patch_set_one, right_patch_set_two, ncc_threshold);
+            bool ncc_match_found = false;
 
-    //             // std::cout << "NCC TP: " << NCC_true_positive << ", NCC TN: " << NCC_true_negative << ", NCC FN: " << NCC_false_negative << ", NCC Recall: " << NCC_recall * 100.0 << "%\n";
+            if (best_right_match_index != -1) {
+                const cv::Point2d& best_cluster_center = cluster_center_edges[best_right_match_index];
+                double best_cluster_orientation = cluster_orientation_edges[best_right_match_index];
 
-    //            std::vector<Eigen::Vector3d> right_to_left_epipolar = CalculateEpipolarLine(fundamental_matrix_12, {best_right_match});
-    //            Eigen::Vector3d epipolar_line_left = right_to_left_epipolar[0];
+                ///////////////////////////////NCC THRESHOLD RECALL//////////////////////////
+                if (cv::norm(best_cluster_center - ground_truth_right_edge) <= 3.0) {
+                    ncc_match_found = true;
+                }
+            }
+            
+            if (ncc_match_found) {
+                NCC_true_positive++;
+            } else {
+                bool cluster_gt_right_edge_exists = false;
+                for (const auto& test_candidate : test_right_candidate_edges) {
+                    if (cv::norm(test_candidate - ground_truth_right_edge) <= 0.5) {
+                        cluster_gt_right_edge_exists = true;
+                        break;
+                    }
+                }
 
-    //            std::pair<std::vector<cv::Point2d>, std::vector<double>> left_candidates_data = ExtractEpipolarEdges(epipolar_line_left, left_edge_coords, left_edge_orientations, epipolar_distance_threshold);
-    //            std::vector<cv::Point2d> left_candidate_edges = left_candidates_data.first;
-    //            std::vector<double> left_candidate_orientations = left_candidates_data.second;
+                if (!cluster_gt_right_edge_exists) {
+                    NCC_true_negative++;
+                } else {
+                    NCC_false_negative++;
+                }
+            }
 
-    //             std::vector<cv::Point2d> filtered_left_candidate_edges;
-    //             std::vector<double> filtered_left_candidate_orientations;
+            double ncc_recall = 0.0;
+            if ((NCC_true_positive + NCC_false_negative) > 0) {
+                ncc_recall = static_cast<double>(NCC_true_positive) / (NCC_true_positive + NCC_false_negative);
+            }
+            recall_rates_ncc_threshold.push_back(ncc_recall * 100.0);
+        } 
+    }   
+}
 
-    //             for (size_t j = 0; j < left_candidate_edges.size(); ++j) {
-    //                 double disparity = left_candidate_edges[j].x - best_right_match.x;
+int Dataset::ComputeNCCScores(const cv::Mat& left_patch_one, const cv::Mat& left_patch_two, const std::vector<cv::Mat>& right_patch_set_one, const std::vector<cv::Mat>& right_patch_set_two, double ncc_threshold){
+    double best_ncc = -1.0;
+    int best_index = -1;
 
-    //                 if (disparity <= max_disparity) {
-    //                     filtered_left_candidate_edges.push_back(left_candidate_edges[j]);
-    //                     filtered_left_candidate_orientations.push_back(left_candidate_orientations[j]);
-    //                 }
-    //             }
+    for (size_t i = 0; i < right_patch_set_one.size(); ++i) {
+        const cv::Mat& right_patch_one = right_patch_set_one[i];
+        const cv::Mat& right_patch_two = right_patch_set_two[i];
 
-    //             left_candidate_edges = std::move(filtered_left_candidate_edges);
-    //             left_candidate_orientations = std::move(filtered_left_candidate_orientations);
+        double ncc_one = 0.0, ncc_two = 0.0;
 
-    //             std::vector<cv::Point2d> valid_shifted_left_edges;
-    //             std::vector<double> valid_shifted_left_orientations;
+        if (left_patch_one.size() == right_patch_one.size() && left_patch_two.size() == right_patch_two.size()) {
+            ncc_one = ComputeNCC(left_patch_one, right_patch_one);
+            ncc_two = ComputeNCC(left_patch_two, right_patch_two);
+        } else {
+            std::cerr << "WARNING: Patch size mismatch at index " << i << ". Skipping NCC.\n";
+            continue;
+        }
 
-    //             double left_a = epipolar_line_left(0);
-    //             double left_b = epipolar_line_left(1);
-    //             double left_c = epipolar_line_left(2);
+        if (ncc_one >= ncc_threshold && ncc_two >= ncc_threshold) {
+            // std::cout << "Right Edge " << i << ": NCC1 = " << ncc_one << ", NCC2 = " << ncc_two << " --> PASSES threshold.\n";
+            double best_local_ncc = std::max(ncc_one, ncc_two);
+            if (best_local_ncc > best_ncc) {
+                best_ncc = best_local_ncc;
+                best_index = static_cast<int>(i);
+            }
+        } else {
+            // std::cout << "Right Edge " << i << ": NCC1 = " << ncc_one << ", NCC2 = " << ncc_two << " --> Fails threshold.\n";
+        }
+    }
 
-    //             std::vector<double> left_epipolar_coefficients {left_a, left_b, left_c};
+        return best_index;
+    }
 
-    //             for (size_t i = 0; i < left_candidate_edges.size(); ++i) {
-    //                 bool passes_tangency_check = false;
+double Dataset::ComputeNCC(const cv::Mat& patch_one, const cv::Mat& patch_two){
+    cv::Scalar mean_one, stddev_one, mean_two, stddev_two;
+    cv::meanStdDev(patch_one, mean_one, stddev_one);
+    cv::meanStdDev(patch_two, mean_two, stddev_two);
 
-    //                 cv::Point2d left_corrected_edge = Epipolar_Shift(left_candidate_edges[i], left_candidate_orientations[i], left_epipolar_coefficients, passes_tangency_check);
+    if (stddev_one[0] == 0 || stddev_two[0] == 0) {
+        return 0.0;
+    }
 
-    //                 if (passes_tangency_check){
-    //                     valid_shifted_left_edges.push_back(left_corrected_edge);
-    //                     valid_shifted_left_orientations.push_back(left_candidate_orientations[i]);
-    //                 }
-    //             }
+    cv::Mat norm_one = (patch_one - mean_one[0]) / stddev_one[0];
+    cv::Mat norm_two = (patch_two - mean_two[0]) / stddev_two[0];
 
-    //             std::vector<std::pair<std::vector<cv::Point2d>, std::vector<double>>> left_clustered_edges = ClusterEpipolarShiftedEdges(valid_shifted_left_edges, valid_shifted_left_orientations);
+    double ncc = (norm_one.dot(norm_two)) / static_cast<double>(patch_one.total());
+    return ncc;
+}
 
-    //             std::vector<cv::Point2d> left_cluster_center_edges;
-    //             std::vector<double> left_cluster_orientation_edges;
+std::pair<std::vector<cv::Point2d>, std::vector<cv::Point2d>> Dataset::CalculateOrthogonalShifts(const std::vector<cv::Point2d>& edge_points, const std::vector<double>& orientations, double shift_magnitude){
+   std::vector<cv::Point2d> shifted_points_one;
+   std::vector<cv::Point2d> shifted_points_two;
 
-    //             for (size_t i = 0; i < left_clustered_edges.size(); ++i) {
-    //                 const auto& left_cluster_edges = left_clustered_edges[i].first;
-    //                 const auto& left_cluster_orientations = left_clustered_edges[i].second;
+   if (edge_points.size() != orientations.size()) {
+       std::cerr << "ERROR: Mismatch between number of edge points and orientations." << std::endl;
+       return {shifted_points_one, shifted_points_two};
+   }
 
-    //                 if (left_cluster_edges.empty()) continue;
+   for (size_t i = 0; i < edge_points.size(); i++) {
+       const auto& edge_point = edge_points[i];
+       double theta = orientations[i];
 
-    //                 cv::Point2d left_sum_point(0.0, 0.0);
-    //                 double left_sum_orientation = 0.0;
+       double orthogonal_x1 = std::sin(theta);
+       double orthogonal_y1 = -std::cos(theta);
+       double orthogonal_x2 = -std::sin(theta);
+       double orthogonal_y2 = std::cos(theta);
 
-    //                 for (size_t j = 0; j < left_cluster_edges.size(); ++j) {
-    //                     left_sum_point += left_cluster_edges[j];
-    //                 }
+       double shifted_x1 = edge_point.x + shift_magnitude * orthogonal_x1;
+       double shifted_y1 = edge_point.y + shift_magnitude * orthogonal_y1;
+       double shifted_x2 = edge_point.x + shift_magnitude * orthogonal_x2;
+       double shifted_y2 = edge_point.y + shift_magnitude * orthogonal_y2;
 
-    //                 for (size_t j = 0; j < left_cluster_orientations.size(); ++j) {
-    //                     left_sum_orientation += left_cluster_orientations[j];
-    //                 }
+       shifted_points_one.emplace_back(shifted_x1, shifted_y1);
+       shifted_points_two.emplace_back(shifted_x2, shifted_y2);
+   }
 
-    //                 cv::Point2d left_avg_point = left_sum_point * (1.0 / left_cluster_edges.size());
-    //                 double left_avg_orientation = left_sum_orientation / left_cluster_orientations.size();
+   return {shifted_points_one, shifted_points_two};
+}
 
-    //                 left_cluster_center_edges.push_back(left_avg_point);
-    //                 left_cluster_orientation_edges.push_back(left_avg_orientation);
-    //             }
+void Dataset::ExtractPatches(
+    int patch_size,
+    const cv::Mat& image,
+    const std::vector<cv::Point2d>& edges,
+    const std::vector<double>& orientations,
+    const std::vector<cv::Point2d>& right_edges,
+    const std::vector<cv::Point2d>& shifted_one,
+    const std::vector<cv::Point2d>& shifted_two,
+    std::vector<cv::Point2d>& filtered_edges_out,
+    std::vector<double>& filtered_orientations_out,
+    std::vector<cv::Point2d>& filtered_right_edges_out,
+    std::vector<cv::Mat>& patch_set_one_out,
+    std::vector<cv::Mat>& patch_set_two_out
+){
+    int half_patch = patch_size / 2;
 
-    //            std::vector<cv::Mat> left_candidate_patches;
-    //            ExtractPatches(9, left_image, left_cluster_center_edges, left_candidate_patches);
-              
-    //            if (!left_candidate_patches.empty()) {
-    //                int best_left_match_idx = CalculateNCCPatch(right_patches[best_right_match_idx], left_candidate_patches);
-                  
-    //                if (best_left_match_idx != -1) {
-    //                    cv::Point2d best_left_match = left_candidate_edges[best_left_match_idx];
+    for (int i = 0; i < shifted_one.size(); ++i) {
+        double x1 = shifted_one[i].x;
+        double y1 = shifted_one[i].y;
+        double x2 = shifted_two[i].x;
+        double y2 = shifted_two[i].y;
 
-    //                    if (cv::norm(best_left_match - left_edge) <= bidirectional_consistency_tol) {
-    //                        cv::circle(right_visualization, best_right_match, 5, cv::Scalar(0, 0, 255), cv::FILLED);
-    //                        matched_left_edges.push_back(left_edge);
-    //                        matched_left_orientations.push_back(left_orientation);
-    //                        matched_right_edges.push_back(best_right_match);
-    //                        matched_right_orientations.push_back(best_right_orientation);
-    //                    }
-    //                }
-    //            }
-    //        }
-    //    }
+        bool in_bounds_one = (x1 - half_patch >= 0 && x1 + half_patch < image.cols &&
+                            y1 - half_patch >= 0 && y1 + half_patch < image.rows);
+        bool in_bounds_two = (x2 - half_patch >= 0 && x2 + half_patch < image.cols &&
+                            y2 - half_patch >= 0 && y2 + half_patch < image.rows);
+
+        if (in_bounds_one && in_bounds_two) {
+            cv::Point2f center1(static_cast<float>(x1), static_cast<float>(y1));
+            cv::Point2f center2(static_cast<float>(x2), static_cast<float>(y2));
+            cv::Size size(patch_size, patch_size);
+
+            cv::Mat patch1, patch2;
+            cv::getRectSubPix(image, size, center1, patch1);
+            cv::getRectSubPix(image, size, center2, patch2);
+
+            if (patch1.type() != CV_32F) {
+                patch1.convertTo(patch1, CV_32F);
+            }
+            if (patch2.type() != CV_32F) {
+                patch2.convertTo(patch2, CV_32F);
+            }
+
+            filtered_edges_out.push_back(edges[i]);
+            filtered_orientations_out.push_back(orientations[i]);
+            filtered_right_edges_out.push_back(right_edges[i]);
+            patch_set_one_out.push_back(patch1);
+            patch_set_two_out.push_back(patch2);
+        } else {
+            // std::cerr << "WARNING: Skipped pair due to boundary constraints! "<< "Point #1: (" << x1 << ", " << y1 << "), "<< "Point #2: (" << x2 << ", " << y2 << ")\n";
+        }
     }
 }
 
@@ -1135,34 +1265,6 @@ std::vector<std::pair<std::vector<cv::Point2d>, std::vector<double>>> Dataset::C
     }
 
     return clusters;
-}
-
-void Dataset::ExtractPatches(int patch_size, const cv::Mat& image, const std::vector<cv::Point2d>& selected_edges, std::vector<cv::Mat>& patches) {
-   int half_patch = patch_size / 2;
-   patches.clear();
-
-   for (const auto& edge : selected_edges) {
-       double x = edge.x;
-       double y = edge.y;
-
-       if (x - half_patch >= 0 && x + half_patch < image.cols &&
-           y - half_patch >= 0 && y + half_patch < image.rows) {
-
-           cv::Mat patch;
-           cv::Point2f center (static_cast<float>(x), static_cast<float>(y));
-           cv::Size size (patch_size, patch_size);
-           cv::getRectSubPix(image, size, center, patch);
-          
-           if (patch.type() != CV_32F) {
-               patch.convertTo(patch, CV_32F);
-           }
-
-           patches.push_back(patch);
-       }
-       else {
-           std::cerr << "WARNING: Skipped patch at (" << x << ", " << y << ") due to boundary constraints!" << std::endl;
-       }
-   }
 }
 
 std::pair<std::vector<cv::Point2d>, std::vector<double>>Dataset::ExtractEpipolarEdges(const Eigen::Vector3d& epipolar_line, const std::vector<cv::Point2d>& edge_locations, const std::vector<double>& edge_orientations, double distance_threshold) {
@@ -1278,7 +1380,6 @@ std::vector<Eigen::Vector3d> Dataset::ReprojectOrientations(const std::vector<Ei
    return reprojected_orientations;
 }
 
-//FIXED
 std::vector<Eigen::Vector3d> Dataset::ReconstructOrientations() {
    if (matched_left_edges.size() != matched_right_edges.size() ||
        matched_left_edges.size() != matched_left_orientations.size() ||
@@ -1333,7 +1434,6 @@ std::vector<Eigen::Vector3d> Dataset::ReconstructOrientations() {
    return reconstructed_orientations;
 }
 
-//FIXED
 void Dataset::CalculateDepths() {
    if (matched_left_edges.size() != matched_right_edges.size()) {
        std::cerr << "ERROR: Number of left and right edge matches do not match!" << std::endl;
