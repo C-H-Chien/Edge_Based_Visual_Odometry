@@ -56,6 +56,7 @@ private:
 
    std::string dataset_type;
    std::string dataset_path;
+   std::string output_path;
    std::string sequence_name;
 
    std::string GT_file_name;
@@ -151,6 +152,13 @@ private:
    std::vector<std::pair<cv::Mat, cv::Mat>> LoadETH3DImages(const std::string &stereo_pairs_path, int num_images);
    std::vector<double> LoadMaximumDisparityValues(const std::string& stereo_pairs_path, int num_images);
    std::vector<cv::Mat> LoadETH3DMaps(const std::string &stereo_pairs_path, int num_maps);
+   void WriteEdgesToCSV(const std::string& filepath, const std::vector<cv::Point2d>& locations, const std::vector<double>& orientations);
+   void ReadEdgesFromCSV(const std::string& filepath, std::vector<cv::Point2d>& locations, std::vector<double>& orientations);
+   void ProcessEdges(const cv::Mat& image,
+                    const std::string& csv_path,
+                    std::shared_ptr<ThirdOrderEdgeDetectionCPU>& toed,
+                    std::vector<cv::Point2d>& locations,
+                    std::vector<double>& orientations);
    void VisualizeGTRightEdge(const cv::Mat &left_image, const cv::Mat &right_image, const std::vector<std::pair<cv::Point2d, cv::Point2d>> &edge_pairs);
    void CalculateGTRightEdge(const std::vector<cv::Point2d> &left_third_order_edges_locations, const std::vector<double> &left_third_order_edges_orientation, const cv::Mat &disparity_map, const cv::Mat &left_image, const cv::Mat &right_image);
    cv::Point2d Epipolar_Shift( cv::Point2d original_edge_location, double edge_orientation, std::vector<double> epipolar_line_coeffs, bool& b_pass_epipolar_tengency_check);
