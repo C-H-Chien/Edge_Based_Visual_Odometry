@@ -265,210 +265,210 @@ void Dataset::PerformEdgeBasedVO() {
        CalculateGTRightEdge(left_third_order_edges_locations, left_third_order_edges_orientation, disparity_map, left_edge_map, right_edge_map);
        DisplayMatches(left_undistorted, right_undistorted, left_edge_map, right_edge_map, right_third_order_edges_locations, right_third_order_edges_orientation);
 
-        // int avg_before_max_disp = ComputeAverage(before_max_disparity_thresholding);
-        // int avg_after_max_disp = ComputeAverage(after_max_disparity_thresholding);
-        // double avg_recall_max_disp = ComputeAverageDouble(recall_rates_max_disp);
+        int avg_before_max_disp = ComputeAverage(before_max_disparity_thresholding);
+        int avg_after_max_disp = ComputeAverage(after_max_disparity_thresholding);
+        double avg_recall_max_disp = ComputeAverageDouble(recall_rates_max_disp);
 
-        // int avg_epi_before = ComputeAverage(before_epi_distance_thresholding);
-        // int avg_epi_after = ComputeAverage(after_epi_distance_thresholding);
-        // double avg_recall_epi_distance = ComputeAverageDouble(recall_rates_epi_distance);
+        int avg_epi_before = ComputeAverage(before_epi_distance_thresholding);
+        int avg_epi_after = ComputeAverage(after_epi_distance_thresholding);
+        double avg_recall_epi_distance = ComputeAverageDouble(recall_rates_epi_distance);
 
-        // int avg_before_epi_shift = ComputeAverage(before_epi_shift);
-        // int avg_after_epi_shift = ComputeAverage(after_epi_shift);
-        // double avg_recall_epi_shift = ComputeAverageDouble(recall_rates_epi_shift);
+        int avg_before_epi_shift = ComputeAverage(before_epi_shift);
+        int avg_after_epi_shift = ComputeAverage(after_epi_shift);
+        double avg_recall_epi_shift = ComputeAverageDouble(recall_rates_epi_shift);
 
-        // int avg_before_epi_cluster = ComputeAverage(before_epi_cluster);
-        // int avg_after_epi_cluster = ComputeAverage(after_epi_cluster);
-        // double avg_recall_epi_cluster = ComputeAverageDouble(recall_rates_epi_cluster);
+        int avg_before_epi_cluster = ComputeAverage(before_epi_cluster);
+        int avg_after_epi_cluster = ComputeAverage(after_epi_cluster);
+        double avg_recall_epi_cluster = ComputeAverageDouble(recall_rates_epi_cluster);
 
-        // double avg_recall_ncc_threshold = ComputeAverageDouble(recall_rates_ncc_threshold);
+        double avg_recall_ncc_threshold = ComputeAverageDouble(recall_rates_ncc_threshold);
 
-        // per_image_avg_before_max_disp.push_back(avg_before_max_disp);
-        // per_image_avg_after_max_disp.push_back(avg_after_max_disp);
-        // per_image_avg_recall_max_disp.push_back(avg_recall_max_disp);
+        per_image_avg_before_max_disp.push_back(avg_before_max_disp);
+        per_image_avg_after_max_disp.push_back(avg_after_max_disp);
+        per_image_avg_recall_max_disp.push_back(avg_recall_max_disp);
 
-        // per_image_avg_before_epi.push_back(avg_epi_before);
-        // per_image_avg_after_epi.push_back(avg_epi_after);
-        // per_image_avg_recall_epi.push_back(avg_recall_epi_distance);
+        per_image_avg_before_epi.push_back(avg_epi_before);
+        per_image_avg_after_epi.push_back(avg_epi_after);
+        per_image_avg_recall_epi.push_back(avg_recall_epi_distance);
 
-        // per_image_avg_before_epi_shift.push_back(avg_before_epi_shift);
-        // per_image_avg_after_epi_shift.push_back(avg_after_epi_shift);
-        // per_image_avg_recall_epi_shift.push_back(avg_recall_epi_shift);
+        per_image_avg_before_epi_shift.push_back(avg_before_epi_shift);
+        per_image_avg_after_epi_shift.push_back(avg_after_epi_shift);
+        per_image_avg_recall_epi_shift.push_back(avg_recall_epi_shift);
 
-        // per_image_avg_before_epi_cluster.push_back(avg_before_epi_cluster);
-        // per_image_avg_after_epi_cluster.push_back(avg_after_epi_cluster);
-        // per_image_avg_recall_epi_cluster.push_back(avg_recall_epi_cluster);
+        per_image_avg_before_epi_cluster.push_back(avg_before_epi_cluster);
+        per_image_avg_after_epi_cluster.push_back(avg_after_epi_cluster);
+        per_image_avg_recall_epi_cluster.push_back(avg_recall_epi_cluster);
 
-        // per_image_avg_recall_ncc_threshold.push_back(avg_recall_ncc_threshold);
+        per_image_avg_recall_ncc_threshold.push_back(avg_recall_ncc_threshold);
 
-        // before_max_disparity_thresholding.clear();
-        // after_max_disparity_thresholding.clear();
-        // recall_rates_max_disp.clear();
+        before_max_disparity_thresholding.clear();
+        after_max_disparity_thresholding.clear();
+        recall_rates_max_disp.clear();
 
-        // before_epi_distance_thresholding.clear();
-        // after_epi_distance_thresholding.clear();
-        // recall_rates_epi_distance.clear();
+        before_epi_distance_thresholding.clear();
+        after_epi_distance_thresholding.clear();
+        recall_rates_epi_distance.clear();
 
-        // before_epi_shift.clear();
-        // after_epi_shift.clear();
-        // recall_rates_epi_shift.clear();
+        before_epi_shift.clear();
+        after_epi_shift.clear();
+        recall_rates_epi_shift.clear();
 
-        // before_epi_cluster.clear();
-        // after_epi_cluster.clear();
-        // recall_rates_epi_cluster.clear();
+        before_epi_cluster.clear();
+        after_epi_cluster.clear();
+        recall_rates_epi_cluster.clear();
 
-        // recall_rates_ncc_threshold.clear();
+        recall_rates_ncc_threshold.clear();
    }
 }
 
-    // std::string edge_stat_dir = output_path + "/edge stats";
-    // std::filesystem::create_directories(edge_stat_dir);
-    // std::ofstream csv_file(edge_stat_dir + "/edge_data.csv");
+    std::string edge_stat_dir = output_path + "/edge stats";
+    std::filesystem::create_directories(edge_stat_dir);
+    std::ofstream csv_file(edge_stat_dir + "/edge_data.csv");
 
-    // csv_file 
-    //      << "before_epi_distance,after_epi_distance,average_before_epi_distance,average_after_epi_distance,recall_epi_distance,avg_recall_epi_distance,"
-    //      << "before_max_disp,after_max_disp,average_before_max_disp,average_after_max_disp,recall_max_disp,avg_recall_max_disp,"
-    //      << "before_epi_shift,after_epi_shift,average_before_epi_shift,average_after_epi_shift,recall_epi_shift,avg_recall_epi_shift,"
-    //      << "before_epi_cluster,after_epi_cluster,average_before_epi_cluster,average_after_epi_cluster,recall_epi_cluster,avg_recall_epi_cluster,"
-    //      << "recall_ncc_threshold, avg_recall_ncc_threshold\n";
+    csv_file 
+         << "before_epi_distance,after_epi_distance,average_before_epi_distance,average_after_epi_distance,recall_epi_distance,avg_recall_epi_distance,"
+         << "before_max_disp,after_max_disp,average_before_max_disp,average_after_max_disp,recall_max_disp,avg_recall_max_disp,"
+         << "before_epi_shift,after_epi_shift,average_before_epi_shift,average_after_epi_shift,recall_epi_shift,avg_recall_epi_shift,"
+         << "before_epi_cluster,after_epi_cluster,average_before_epi_cluster,average_after_epi_cluster,recall_epi_cluster,avg_recall_epi_cluster,"
+         << "recall_ncc_threshold, avg_recall_ncc_threshold\n";
 
-    // int total_avg_before_max_disp = 0;
-    // int total_avg_after_max_disp = 0;
-    // double total_avg_recall_max_disp = 0;
+    int total_avg_before_max_disp = 0;
+    int total_avg_after_max_disp = 0;
+    double total_avg_recall_max_disp = 0;
 
-    // int total_avg_before_epi = 0;
-    // int total_avg_after_epi = 0;
-    // double total_avg_recall_epi_distance = 0;
+    int total_avg_before_epi = 0;
+    int total_avg_after_epi = 0;
+    double total_avg_recall_epi_distance = 0;
 
-    // int total_before_epi_shift = 0;
-    // int total_after_epi_shift = 0;
-    // double total_recall_epi_shift = 0;
+    int total_before_epi_shift = 0;
+    int total_after_epi_shift = 0;
+    double total_recall_epi_shift = 0;
 
-    // int total_before_epi_cluster = 0;
-    // int total_after_epi_cluster = 0;
-    // double total_recall_epi_cluster = 0;
+    int total_before_epi_cluster = 0;
+    int total_after_epi_cluster = 0;
+    double total_recall_epi_cluster = 0;
 
-    // double total_recall_ncc_threshold = 0;
+    double total_recall_ncc_threshold = 0;
 
-    // size_t num_rows = per_image_avg_before_max_disp.size();
+    size_t num_rows = per_image_avg_before_max_disp.size();
 
-    // for (size_t i = 0; i < num_rows; ++i) {
-    //     total_avg_before_max_disp += per_image_avg_before_max_disp[i];
-    //     total_avg_after_max_disp += per_image_avg_after_max_disp[i];
-    //     total_avg_recall_max_disp += per_image_avg_recall_max_disp[i];
+    for (size_t i = 0; i < num_rows; ++i) {
+        total_avg_before_max_disp += per_image_avg_before_max_disp[i];
+        total_avg_after_max_disp += per_image_avg_after_max_disp[i];
+        total_avg_recall_max_disp += per_image_avg_recall_max_disp[i];
 
-    //     total_avg_before_epi += per_image_avg_before_epi[i];
-    //     total_avg_after_epi += per_image_avg_after_epi[i];
-    //     total_avg_recall_epi_distance += per_image_avg_recall_epi[i];
+        total_avg_before_epi += per_image_avg_before_epi[i];
+        total_avg_after_epi += per_image_avg_after_epi[i];
+        total_avg_recall_epi_distance += per_image_avg_recall_epi[i];
 
-    //     total_before_epi_shift += per_image_avg_before_epi_shift[i];
-    //     total_after_epi_shift += per_image_avg_after_epi_shift[i];
-    //     total_recall_epi_shift += per_image_avg_recall_epi_shift[i];
+        total_before_epi_shift += per_image_avg_before_epi_shift[i];
+        total_after_epi_shift += per_image_avg_after_epi_shift[i];
+        total_recall_epi_shift += per_image_avg_recall_epi_shift[i];
 
-    //     total_before_epi_cluster += per_image_avg_before_epi_cluster[i];
-    //     total_after_epi_cluster += per_image_avg_after_epi_cluster[i];
-    //     total_recall_epi_cluster += per_image_avg_recall_epi_cluster[i];
+        total_before_epi_cluster += per_image_avg_before_epi_cluster[i];
+        total_after_epi_cluster += per_image_avg_after_epi_cluster[i];
+        total_recall_epi_cluster += per_image_avg_recall_epi_cluster[i];
 
-    //     total_recall_ncc_threshold += per_image_avg_recall_ncc_threshold[i];
+        total_recall_ncc_threshold += per_image_avg_recall_ncc_threshold[i];
 
-    //     csv_file 
-    //         << per_image_avg_before_epi[i] << ","        
-    //         << per_image_avg_after_epi[i] << ","        
-    //         << ","                                      
-    //         << ","                                   
-    //         << per_image_avg_recall_epi[i] << ","        
-    //         << ","
-    //         << per_image_avg_before_max_disp[i] << ","    
-    //         << per_image_avg_after_max_disp[i] << ","  
-    //         << ","                                   
-    //         << ","
-    //         << per_image_avg_recall_max_disp[i] << ","        
-    //         << ","                                                                               
-    //         << per_image_avg_before_epi_shift[i] << "," 
-    //         << per_image_avg_after_epi_shift[i] << ","   
-    //         << ","                                        
-    //         << ","                                    
-    //         << per_image_avg_recall_epi_shift[i] << "," 
-    //         << ","                                       
-    //         << per_image_avg_before_epi_cluster[i] << ","
-    //         << per_image_avg_after_epi_cluster[i] << ","  
-    //         << ","                                       
-    //         << ","                                    
-    //         << per_image_avg_recall_epi_cluster[i] << ","
-    //         << ","
-    //         << per_image_avg_recall_ncc_threshold[i] << ","
-    //         << "\n";                                     
-    // }
+        csv_file 
+            << per_image_avg_before_epi[i] << ","        
+            << per_image_avg_after_epi[i] << ","        
+            << ","                                      
+            << ","                                   
+            << per_image_avg_recall_epi[i] << ","        
+            << ","
+            << per_image_avg_before_max_disp[i] << ","    
+            << per_image_avg_after_max_disp[i] << ","  
+            << ","                                   
+            << ","
+            << per_image_avg_recall_max_disp[i] << ","        
+            << ","                                                                               
+            << per_image_avg_before_epi_shift[i] << "," 
+            << per_image_avg_after_epi_shift[i] << ","   
+            << ","                                        
+            << ","                                    
+            << per_image_avg_recall_epi_shift[i] << "," 
+            << ","                                       
+            << per_image_avg_before_epi_cluster[i] << ","
+            << per_image_avg_after_epi_cluster[i] << ","  
+            << ","                                       
+            << ","                                    
+            << per_image_avg_recall_epi_cluster[i] << ","
+            << ","
+            << per_image_avg_recall_ncc_threshold[i] << ","
+            << "\n";                                     
+    }
 
-    // int avg_of_avgs_before_max_disp = 0;
-    // int avg_of_avgs_after_max_disp = 0;
-    // double avg_of_avgs_recall_max_disp = 0;
+    int avg_of_avgs_before_max_disp = 0;
+    int avg_of_avgs_after_max_disp = 0;
+    double avg_of_avgs_recall_max_disp = 0;
 
-    // int avg_of_avgs_before_epi = 0;
-    // int avg_of_avgs_after_epi = 0;
-    // double avg_of_avgs_recall_epi = 0;
+    int avg_of_avgs_before_epi = 0;
+    int avg_of_avgs_after_epi = 0;
+    double avg_of_avgs_recall_epi = 0;
 
-    // int avg_before_epi_shift = 0;
-    // int avg_after_epi_shift = 0; 
-    // double avg_recall_epi_shift = 0; 
+    int avg_before_epi_shift = 0;
+    int avg_after_epi_shift = 0; 
+    double avg_recall_epi_shift = 0; 
 
 
-    // int avg_before_epi_cluster = 0;
-    // int avg_after_epi_cluster = 0; 
-    // double avg_recall_epi_cluster = 0; 
+    int avg_before_epi_cluster = 0;
+    int avg_after_epi_cluster = 0; 
+    double avg_recall_epi_cluster = 0; 
 
-    // double avg_recall_ncc_threshold = 0;
+    double avg_recall_ncc_threshold = 0;
 
-    // if (num_rows > 0) {
-    //     avg_of_avgs_before_max_disp = total_avg_before_max_disp / num_rows;
-    //     avg_of_avgs_after_max_disp = total_avg_after_max_disp / num_rows;
-    //     avg_of_avgs_recall_max_disp = total_avg_recall_max_disp / num_rows;
+    if (num_rows > 0) {
+        avg_of_avgs_before_max_disp = total_avg_before_max_disp / num_rows;
+        avg_of_avgs_after_max_disp = total_avg_after_max_disp / num_rows;
+        avg_of_avgs_recall_max_disp = total_avg_recall_max_disp / num_rows;
 
-    //     avg_of_avgs_before_epi = total_avg_before_epi / num_rows;
-    //     avg_of_avgs_after_epi = total_avg_after_epi / num_rows;
-    //     avg_of_avgs_recall_epi = total_avg_recall_epi_distance / num_rows;
+        avg_of_avgs_before_epi = total_avg_before_epi / num_rows;
+        avg_of_avgs_after_epi = total_avg_after_epi / num_rows;
+        avg_of_avgs_recall_epi = total_avg_recall_epi_distance / num_rows;
 
-    //     avg_before_epi_shift = total_before_epi_shift / num_rows;
-    //     avg_after_epi_shift = total_after_epi_shift / num_rows;
-    //     avg_recall_epi_shift = total_recall_epi_shift / num_rows;
+        avg_before_epi_shift = total_before_epi_shift / num_rows;
+        avg_after_epi_shift = total_after_epi_shift / num_rows;
+        avg_recall_epi_shift = total_recall_epi_shift / num_rows;
 
-    //     avg_before_epi_cluster = total_before_epi_cluster / num_rows;
-    //     avg_after_epi_cluster = total_after_epi_cluster / num_rows;
-    //     avg_recall_epi_cluster = total_recall_epi_cluster / num_rows;
+        avg_before_epi_cluster = total_before_epi_cluster / num_rows;
+        avg_after_epi_cluster = total_after_epi_cluster / num_rows;
+        avg_recall_epi_cluster = total_recall_epi_cluster / num_rows;
 
-    //     avg_recall_ncc_threshold = total_recall_ncc_threshold / num_rows;
-    // }
+        avg_recall_ncc_threshold = total_recall_ncc_threshold / num_rows;
+    }
 
-    // csv_file 
-    //     << ","                                   
-    //     << ","                                                                     
-    //     << avg_of_avgs_before_epi << ","       
-    //     << avg_of_avgs_after_epi << ","         
-    //     << ","                                     
-    //     << avg_of_avgs_recall_epi << ","              
-    //     << ","                                     
-    //     << ","
-    //     << avg_of_avgs_before_max_disp << ","   
-    //     << avg_of_avgs_after_max_disp << ","
-    //     << ","                                     
-    //     << avg_of_avgs_recall_max_disp << ","        
-    //     << ","                                    
-    //     << ","                                          
-    //     << avg_before_epi_shift << ","              
-    //     << avg_after_epi_shift << ","               
-    //     << ","                                 
-    //     << avg_recall_epi_shift << ","              
-    //     << ","                                     
-    //     << ","                                      
-    //     << avg_before_epi_cluster << ","            
-    //     << avg_after_epi_cluster << ","            
-    //     << ","                                     
-    //     << avg_recall_epi_cluster << ","
-    //     << ","
-    //     << avg_recall_ncc_threshold << "\n";          
+    csv_file 
+        << ","                                   
+        << ","                                                                     
+        << avg_of_avgs_before_epi << ","       
+        << avg_of_avgs_after_epi << ","         
+        << ","                                     
+        << avg_of_avgs_recall_epi << ","              
+        << ","                                     
+        << ","
+        << avg_of_avgs_before_max_disp << ","   
+        << avg_of_avgs_after_max_disp << ","
+        << ","                                     
+        << avg_of_avgs_recall_max_disp << ","        
+        << ","                                    
+        << ","                                          
+        << avg_before_epi_shift << ","              
+        << avg_after_epi_shift << ","               
+        << ","                                 
+        << avg_recall_epi_shift << ","              
+        << ","                                     
+        << ","                                      
+        << avg_before_epi_cluster << ","            
+        << avg_after_epi_cluster << ","            
+        << ","                                     
+        << avg_recall_epi_cluster << ","
+        << ","
+        << avg_recall_ncc_threshold << "\n";          
        
-    // csv_file.close();
-    // std::cout << "Finished writing to edge_statistics.csv file!\n";
+    csv_file.close();
+    std::cout << "Finished writing to edge_statistics.csv file!\n";
     auto end_time = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
 
