@@ -498,9 +498,8 @@ int ThirdOrderEdgeDetectionCPU::non_maximum_suppresion()
                 //> returning the structure used by the odometry
                 edge_location.x = subpix_edge_pts_final(edge_pt_list_idx, 0);
                 edge_location.y = subpix_edge_pts_final(edge_pt_list_idx, 1);
-                toed_locations.push_back( edge_location );
-                toed_orientations.push_back( subpix_edge_pts_final(edge_pt_list_idx, 2) );
-
+                toed_locations.push_back(edge_location);
+                toed_orientations.push_back(subpix_edge_pts_final(edge_pt_list_idx, 2));
                 // -- 5) add up the edge point list index --
                 edge_pt_list_idx++;
             }

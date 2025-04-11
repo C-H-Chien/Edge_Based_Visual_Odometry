@@ -246,7 +246,6 @@ void Dataset::PerformEdgeBasedVO() {
 
         Total_Num_Of_Imgs++;
 
-
        cv::Mat left_edge_map = cv::Mat::zeros(left_undistorted.size(), CV_8UC1);
        cv::Mat right_edge_map = cv::Mat::zeros(right_undistorted.size(), CV_8UC1);
 
@@ -468,7 +467,7 @@ void Dataset::PerformEdgeBasedVO() {
         << avg_recall_ncc_threshold << "\n";          
        
     csv_file.close();
-    std::cout << "Finished writing to edge_statistics.csv file!\n";
+    std::cout << "Finished writing to edge_data.csv file!\n";
     auto end_time = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
 
@@ -637,7 +636,7 @@ void Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_left_edg
             angle_diff_deg -= 180;
         }
 
-        bool pass_tangency_check = (abs(angle_diff_deg - 0) > 6 && abs(angle_diff_deg - 180) > 6);
+        bool pass_tangency_check = (abs(angle_diff_deg - 0) > 2 && abs(angle_diff_deg - 180) > 2);
         if (!pass_tangency_check) {
             // std::cout << "Left Edge #" << i << " failed tangency check. Skipping.\n";
             continue;
@@ -916,15 +915,15 @@ void Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_left_edg
             if (ncc_match_found) {
                 NCC_true_positive++;
             } else {
-                bool cluster_gt_right_edge_exists = false;
+                bool ncc_gt_right_edge_exists = false;
                 for (const auto& test_candidate : test_right_candidate_edges) {
                     if (cv::norm(test_candidate - ground_truth_right_edge) <= 0.5) {
-                        cluster_gt_right_edge_exists = true;
+                        ncc_gt_right_edge_exists = true;
                         break;
                     }
                 }
 
-                if (!cluster_gt_right_edge_exists) {
+                if (!ncc_gt_right_edge_exists) {
                     NCC_true_negative++;
                 } else {
                     NCC_false_negative++;
@@ -1463,35 +1462,41 @@ void Dataset::CalculateGTRightEdge(const std::vector<cv::Point2d> &left_third_or
     csv_file.flush();
 }
 
-cv::Point2d Dataset::Epipolar_Shift( cv::Point2d original_edge_location, double edge_orientation, std::vector<double> epipolar_line_coeffs, bool& b_pass_epipolar_tengency_check){
+cv::Point2d Dataset::Epipolar_Shift( 
+    cv::Point2d original_edge_location, double edge_orientation,
+    std::vector<double> epipolar_line_coeffs, bool& b_pass_epipolar_tengency_check )
+{
     cv::Point2d corrected_edge;
-
     assert(epipolar_line_coeffs.size() == 3);
     double EL_coeff_A = epipolar_line_coeffs[0];
     double EL_coeff_B = epipolar_line_coeffs[1];
     double EL_coeff_C = epipolar_line_coeffs[2];
-
     double a1_line  = -epipolar_line_coeffs[0] / epipolar_line_coeffs[1];
     double b1_line  = -1;
     double c1_line  = -epipolar_line_coeffs[2] / epipolar_line_coeffs[1];
-
+    
+    //> Parameters of the line passing through the original edge along its direction (tangent) vector
     double a_edgeH2 = tan(edge_orientation);
     double b_edgeH2 = -1;
     double c_edgeH2 = -(a_edgeH2*original_edge_location.x - original_edge_location.y); //−(a⋅x2−y2)
 
+    //> Find the intersected point of the two lines
     corrected_edge.x = (b1_line * c_edgeH2 - b_edgeH2 * c1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line);
     corrected_edge.y = (c1_line * a_edgeH2 - c_edgeH2 * a1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line);
-
+    
+    //> Find (i) the displacement between the original edge and the corrected edge, and 
+    //       (ii) the intersection angle between the epipolar line and the line passing through the original edge along its direction vector
     double epipolar_shift_displacement = cv::norm(corrected_edge - original_edge_location);
-    double m_epipolar = -a1_line / b1_line;
+    double m_epipolar = -a1_line / b1_line; //> Slope of epipolar line
     double angle_diff_rad = abs(edge_orientation - atan(m_epipolar));
     double angle_diff_deg = angle_diff_rad * (180.0 / M_PI);
     if (angle_diff_deg > 180){
         angle_diff_deg -= 180;
     }
 
-    b_pass_epipolar_tengency_check = (epipolar_shift_displacement < 4 && abs(angle_diff_deg - 0) > 6 && abs(angle_diff_deg - 180) > 6) ? (true) : (false);
-
+    //> check if the corrected edge passes the epoplar tengency test (intersection angle < 4 degrees and displacement < 6 pixels)
+    b_pass_epipolar_tengency_check = (epipolar_shift_displacement < 8 && abs(angle_diff_deg - 0) > 2 && abs(angle_diff_deg - 180) > 2) ? (true) : (false);
+    
     return corrected_edge;
 }
 
