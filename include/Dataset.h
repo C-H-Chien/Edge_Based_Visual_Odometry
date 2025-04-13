@@ -142,8 +142,7 @@ private:
     std::vector<double>& filtered_orientations_out,
     std::vector<cv::Point2d>& filtered_right_edges_out,
     std::vector<cv::Mat>& patch_set_one_out,
-    std::vector<cv::Mat>& patch_set_two_out
-);
+    std::vector<cv::Mat>& patch_set_two_out);
    std::pair<std::vector<cv::Point2d>, std::vector<double>> ExtractEpipolarEdges(const Eigen::Vector3d& epipolar_line, const std::vector<cv::Point2d>& edge_locations, const std::vector<double>& edge_orientations, double distance_threshold); 
    std::vector<Eigen::Vector3d> CalculateEpipolarLine(const Eigen::Matrix3d& fund_mat, const std::vector<cv::Point2d>& edges);
    std::tuple<std::vector<cv::Point2d>, std::vector<double>, std::vector<cv::Point2d>> PickRandomEdges(int patch_size, const std::vector<cv::Point2d>& edges, const std::vector<cv::Point2d>& ground_truth_right_edges, const std::vector<double>& orientations, size_t num_points, int img_width, int img_height);

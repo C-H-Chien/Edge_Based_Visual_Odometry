@@ -246,6 +246,7 @@ void Dataset::PerformEdgeBasedVO() {
 
         Total_Num_Of_Imgs++;
 
+
        cv::Mat left_edge_map = cv::Mat::zeros(left_undistorted.size(), CV_8UC1);
        cv::Mat right_edge_map = cv::Mat::zeros(right_undistorted.size(), CV_8UC1);
 
@@ -467,7 +468,7 @@ void Dataset::PerformEdgeBasedVO() {
         << avg_recall_ncc_threshold << "\n";          
        
     csv_file.close();
-    std::cout << "Finished writing to edge_data.csv file!\n";
+    std::cout << "Finished writing to edge_statistics.csv file!\n";
     auto end_time = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
 
@@ -636,7 +637,7 @@ void Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_left_edg
             angle_diff_deg -= 180;
         }
 
-        bool pass_tangency_check = (abs(angle_diff_deg - 0) > 2 && abs(angle_diff_deg - 180) > 2);
+        bool pass_tangency_check = (abs(angle_diff_deg - 0) > 6 && abs(angle_diff_deg - 180) > 6);
         if (!pass_tangency_check) {
             // std::cout << "Left Edge #" << i << " failed tangency check. Skipping.\n";
             continue;
@@ -915,15 +916,15 @@ void Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_left_edg
             if (ncc_match_found) {
                 NCC_true_positive++;
             } else {
-                bool ncc_gt_right_edge_exists = false;
+                bool cluster_gt_right_edge_exists = false;
                 for (const auto& test_candidate : test_right_candidate_edges) {
                     if (cv::norm(test_candidate - ground_truth_right_edge) <= 0.5) {
-                        ncc_gt_right_edge_exists = true;
+                        cluster_gt_right_edge_exists = true;
                         break;
                     }
                 }
 
-                if (!ncc_gt_right_edge_exists) {
+                if (!cluster_gt_right_edge_exists) {
                     NCC_true_negative++;
                 } else {
                     NCC_false_negative++;
@@ -1484,7 +1485,7 @@ cv::Point2d Dataset::Epipolar_Shift(
     corrected_edge.x = (b1_line * c_edgeH2 - b_edgeH2 * c1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line);
     corrected_edge.y = (c1_line * a_edgeH2 - c_edgeH2 * a1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line);
     
-    //> Find (i) the displacement between the original edge and the corrected edge, and 
+    //> Find (i) the displacement between the original edge and the corrected edge, and \
     //       (ii) the intersection angle between the epipolar line and the line passing through the original edge along its direction vector
     double epipolar_shift_displacement = cv::norm(corrected_edge - original_edge_location);
     double m_epipolar = -a1_line / b1_line; //> Slope of epipolar line
@@ -1499,7 +1500,6 @@ cv::Point2d Dataset::Epipolar_Shift(
     
     return corrected_edge;
 }
-
 std::vector<double> Dataset::LoadMaximumDisparityValues(const std::string& stereo_pairs_path, int num_pairs) {
     std::vector<double> max_disparities;
     std::string csv_filename = stereo_pairs_path + "/maximum_disparity_values.csv";
