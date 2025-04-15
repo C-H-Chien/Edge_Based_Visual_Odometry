@@ -30,29 +30,6 @@ cv::Mat merged_visualization_global;
 //> (c) LEMS, Brown University
 //> Chiang-Heng Chien (chiang-heng_chien@brown.edu), Saul Lopez Lucas (saul_lopez_lucas@brown.edu)
 // =======================================================================================================
-
-int ComputeAverage(const std::vector<int>& values) {
-    if (values.empty()) return 0;
-
-    int sum = 0;
-    for (int val : values) {
-        sum += val;
-    }
-
-    return sum / values.size();
-}
-
-double ComputeAverageDouble(const std::vector<double>& values) {
-    if (values.empty()) return 0.0;
-
-    double sum = 0.0;
-    for (double val : values) {
-        sum += val;
-    }
-
-    return sum / values.size();
-}
-
 Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(config_map), compute_grad_depth(use_GCC_filter) {
    dataset_path = config_file["dataset_dir"].as<std::string>();
    output_path = config_file["output_dir"].as<std::string>();
@@ -173,23 +150,7 @@ void Dataset::PerformEdgeBasedVO() {
     std::vector<cv::Mat> disparity_maps;
     std::vector<double> max_disparity_values;
 
-    std::vector<int> per_image_avg_before_max_disp;
-    std::vector<int> per_image_avg_after_max_disp;
-    std::vector<double> per_image_avg_recall_max_disp;
-
-    std::vector<int> per_image_avg_before_epi;
-    std::vector<int> per_image_avg_after_epi;
-    std::vector<double> per_image_avg_recall_epi; 
-
-    std::vector<int> per_image_avg_before_epi_shift;
-    std::vector<int> per_image_avg_after_epi_shift;
-    std::vector<double> per_image_avg_recall_epi_shift;
-
-    std::vector<int> per_image_avg_before_epi_cluster;
-    std::vector<int> per_image_avg_after_epi_cluster;
-    std::vector<double> per_image_avg_recall_epi_cluster;
-
-    std::vector<double> per_image_avg_recall_ncc_threshold;
+    std::vector<RecallMetrics> all_recall_metrics;
 
     if (dataset_type == "EuRoC"){
         std::string left_path = dataset_path + "/" + sequence_name + "/mav0/cam0/data/";
@@ -210,27 +171,28 @@ void Dataset::PerformEdgeBasedVO() {
 
     auto start_time = std::chrono::high_resolution_clock::now();
 
-    for (size_t i = 0; i < image_pairs.size(); i++) {
+    // for (size_t i = 0; i < image_pairs.size(); i++) {
+    for (size_t i = 96; i < 97; i++) {
         const cv::Mat& left_img = image_pairs[i].first;
         const cv::Mat& right_img = image_pairs[i].second;
         const cv::Mat& disparity_map = disparity_maps[i]; 
         {
 
-       std::cout << "Image #" << i << "\n";
-       cv::Mat left_calib = (cv::Mat_<double>(3, 3) << left_intr[0], 0, left_intr[2], 0, left_intr[1], left_intr[3], 0, 0, 1);
-       cv::Mat right_calib = (cv::Mat_<double>(3, 3) << right_intr[0], 0, right_intr[2], 0, right_intr[1], right_intr[3], 0, 0, 1);
-       cv::Mat left_dist_coeff_mat(left_dist_coeffs);
-       cv::Mat right_dist_coeff_mat(right_dist_coeffs);
-    
-       cv::Mat left_undistorted, right_undistorted;
-       cv::undistort(left_img, left_undistorted, left_calib, left_dist_coeff_mat);
-       cv::undistort(right_img, right_undistorted, right_calib, right_dist_coeff_mat);
+        std::cout << "Image #" << i << "\n";
+        cv::Mat left_calib = (cv::Mat_<double>(3, 3) << left_intr[0], 0, left_intr[2], 0, left_intr[1], left_intr[3], 0, 0, 1);
+        cv::Mat right_calib = (cv::Mat_<double>(3, 3) << right_intr[0], 0, right_intr[2], 0, right_intr[1], right_intr[3], 0, 0, 1);
+        cv::Mat left_dist_coeff_mat(left_dist_coeffs);
+        cv::Mat right_dist_coeff_mat(right_dist_coeffs);
 
-       if (Total_Num_Of_Imgs == 0) {
-           img_height = left_undistorted.rows;
-           img_width  = left_undistorted.cols;
-           TOED = std::shared_ptr<ThirdOrderEdgeDetectionCPU>(new ThirdOrderEdgeDetectionCPU( img_height, img_width ));
-       }
+        cv::Mat left_undistorted, right_undistorted;
+        cv::undistort(left_img, left_undistorted, left_calib, left_dist_coeff_mat);
+        cv::undistort(right_img, right_undistorted, right_calib, right_dist_coeff_mat);
+
+        if (Total_Num_Of_Imgs == 0) {
+            img_height = left_undistorted.rows;
+            img_width  = left_undistorted.cols;
+            TOED = std::shared_ptr<ThirdOrderEdgeDetectionCPU>(new ThirdOrderEdgeDetectionCPU( img_height, img_width ));
+        }
 
         std::string edge_dir = output_path + "/edges";
         std::filesystem::create_directories(edge_dir);
@@ -247,238 +209,70 @@ void Dataset::PerformEdgeBasedVO() {
         Total_Num_Of_Imgs++;
 
 
-       cv::Mat left_edge_map = cv::Mat::zeros(left_undistorted.size(), CV_8UC1);
-       cv::Mat right_edge_map = cv::Mat::zeros(right_undistorted.size(), CV_8UC1);
+        cv::Mat left_edge_map = cv::Mat::zeros(left_undistorted.size(), CV_8UC1);
+        cv::Mat right_edge_map = cv::Mat::zeros(right_undistorted.size(), CV_8UC1);
 
-       for (const auto& edge : left_third_order_edges_locations) {
-           if (edge.x >= 0 && edge.x < left_edge_map.cols && edge.y >= 0 && edge.y < left_edge_map.rows) {
-               left_edge_map.at<uchar>(cv::Point(edge.x, edge.y)) = 255;
-           }
-       }
+        for (const auto& edge : left_third_order_edges_locations) {
+            if (edge.x >= 0 && edge.x < left_edge_map.cols && edge.y >= 0 && edge.y < left_edge_map.rows) {
+                left_edge_map.at<uchar>(cv::Point(edge.x, edge.y)) = 255;
+            }
+        }
 
-       for (const auto& edge : right_third_order_edges_locations) {
-           if (edge.x >= 0 && edge.x < right_edge_map.cols && edge.y >= 0 && edge.y < right_edge_map.rows) {
-               right_edge_map.at<uchar>(cv::Point(edge.x, edge.y)) = 255;
-           }
-       }
+        for (const auto& edge : right_third_order_edges_locations) {
+            if (edge.x >= 0 && edge.x < right_edge_map.cols && edge.y >= 0 && edge.y < right_edge_map.rows) {
+                right_edge_map.at<uchar>(cv::Point(edge.x, edge.y)) = 255;
+            }
+        }
 
-       CalculateGTRightEdge(left_third_order_edges_locations, left_third_order_edges_orientation, disparity_map, left_edge_map, right_edge_map);
-       DisplayMatches(left_undistorted, right_undistorted, left_edge_map, right_edge_map, right_third_order_edges_locations, right_third_order_edges_orientation);
+        CalculateGTRightEdge(left_third_order_edges_locations, left_third_order_edges_orientation, disparity_map, left_edge_map, right_edge_map);
+        RecallMetrics metrics = DisplayMatches(left_undistorted, right_undistorted, left_edge_map, right_edge_map, right_third_order_edges_locations, right_third_order_edges_orientation);
+        
+        all_recall_metrics.push_back(metrics);
+        }                                  
+    
+    }
 
-        int avg_before_max_disp = ComputeAverage(before_max_disparity_thresholding);
-        int avg_after_max_disp = ComputeAverage(after_max_disparity_thresholding);
-        double avg_recall_max_disp = ComputeAverageDouble(recall_rates_max_disp);
+    double total_epi_recall = 0.0;
+    double total_disp_recall = 0.0;
+    double total_shift_recall = 0.0;
 
-        int avg_epi_before = ComputeAverage(before_epi_distance_thresholding);
-        int avg_epi_after = ComputeAverage(after_epi_distance_thresholding);
-        double avg_recall_epi_distance = ComputeAverageDouble(recall_rates_epi_distance);
+    for (const RecallMetrics& m : all_recall_metrics) {
+        total_epi_recall += m.epi_distance_recall;
+        total_disp_recall += m.max_disparity_recall;
+        total_shift_recall += m.epi_shift_recall;
+    }
 
-        int avg_before_epi_shift = ComputeAverage(before_epi_shift);
-        int avg_after_epi_shift = ComputeAverage(after_epi_shift);
-        double avg_recall_epi_shift = ComputeAverageDouble(recall_rates_epi_shift);
+    int total_images = static_cast<int>(all_recall_metrics.size());
 
-        int avg_before_epi_cluster = ComputeAverage(before_epi_cluster);
-        int avg_after_epi_cluster = ComputeAverage(after_epi_cluster);
-        double avg_recall_epi_cluster = ComputeAverageDouble(recall_rates_epi_cluster);
+    double avg_epi_recall   = (total_images > 0) ? total_epi_recall / total_images : 0.0;
+    double avg_disp_recall  = (total_images > 0) ? total_disp_recall / total_images : 0.0;
+    double avg_shift_recall = (total_images > 0) ? total_shift_recall / total_images : 0.0;
 
-        double avg_recall_ncc_threshold = ComputeAverageDouble(recall_rates_ncc_threshold);
-
-        per_image_avg_before_max_disp.push_back(avg_before_max_disp);
-        per_image_avg_after_max_disp.push_back(avg_after_max_disp);
-        per_image_avg_recall_max_disp.push_back(avg_recall_max_disp);
-
-        per_image_avg_before_epi.push_back(avg_epi_before);
-        per_image_avg_after_epi.push_back(avg_epi_after);
-        per_image_avg_recall_epi.push_back(avg_recall_epi_distance);
-
-        per_image_avg_before_epi_shift.push_back(avg_before_epi_shift);
-        per_image_avg_after_epi_shift.push_back(avg_after_epi_shift);
-        per_image_avg_recall_epi_shift.push_back(avg_recall_epi_shift);
-
-        per_image_avg_before_epi_cluster.push_back(avg_before_epi_cluster);
-        per_image_avg_after_epi_cluster.push_back(avg_after_epi_cluster);
-        per_image_avg_recall_epi_cluster.push_back(avg_recall_epi_cluster);
-
-        per_image_avg_recall_ncc_threshold.push_back(avg_recall_ncc_threshold);
-
-        before_max_disparity_thresholding.clear();
-        after_max_disparity_thresholding.clear();
-        recall_rates_max_disp.clear();
-
-        before_epi_distance_thresholding.clear();
-        after_epi_distance_thresholding.clear();
-        recall_rates_epi_distance.clear();
-
-        before_epi_shift.clear();
-        after_epi_shift.clear();
-        recall_rates_epi_shift.clear();
-
-        before_epi_cluster.clear();
-        after_epi_cluster.clear();
-        recall_rates_epi_cluster.clear();
-
-        recall_rates_ncc_threshold.clear();
-   }
-}
 
     std::string edge_stat_dir = output_path + "/edge stats";
     std::filesystem::create_directories(edge_stat_dir);
-    std::ofstream csv_file(edge_stat_dir + "/edge_data.csv");
+    std::ofstream csv_file(edge_stat_dir + "/recall_metrics.csv");
+    csv_file << "ImageIndex,EpiDistanceRecall,MaxDisparityRecall,EpiShiftRecall\n";
 
-    csv_file 
-         << "before_epi_distance,after_epi_distance,average_before_epi_distance,average_after_epi_distance,recall_epi_distance,avg_recall_epi_distance,"
-         << "before_max_disp,after_max_disp,average_before_max_disp,average_after_max_disp,recall_max_disp,avg_recall_max_disp,"
-         << "before_epi_shift,after_epi_shift,average_before_epi_shift,average_after_epi_shift,recall_epi_shift,avg_recall_epi_shift,"
-         << "before_epi_cluster,after_epi_cluster,average_before_epi_cluster,average_after_epi_cluster,recall_epi_cluster,avg_recall_epi_cluster,"
-         << "recall_ncc_threshold, avg_recall_ncc_threshold\n";
-
-    int total_avg_before_max_disp = 0;
-    int total_avg_after_max_disp = 0;
-    double total_avg_recall_max_disp = 0;
-
-    int total_avg_before_epi = 0;
-    int total_avg_after_epi = 0;
-    double total_avg_recall_epi_distance = 0;
-
-    int total_before_epi_shift = 0;
-    int total_after_epi_shift = 0;
-    double total_recall_epi_shift = 0;
-
-    int total_before_epi_cluster = 0;
-    int total_after_epi_cluster = 0;
-    double total_recall_epi_cluster = 0;
-
-    double total_recall_ncc_threshold = 0;
-
-    size_t num_rows = per_image_avg_before_max_disp.size();
-
-    for (size_t i = 0; i < num_rows; ++i) {
-        total_avg_before_max_disp += per_image_avg_before_max_disp[i];
-        total_avg_after_max_disp += per_image_avg_after_max_disp[i];
-        total_avg_recall_max_disp += per_image_avg_recall_max_disp[i];
-
-        total_avg_before_epi += per_image_avg_before_epi[i];
-        total_avg_after_epi += per_image_avg_after_epi[i];
-        total_avg_recall_epi_distance += per_image_avg_recall_epi[i];
-
-        total_before_epi_shift += per_image_avg_before_epi_shift[i];
-        total_after_epi_shift += per_image_avg_after_epi_shift[i];
-        total_recall_epi_shift += per_image_avg_recall_epi_shift[i];
-
-        total_before_epi_cluster += per_image_avg_before_epi_cluster[i];
-        total_after_epi_cluster += per_image_avg_after_epi_cluster[i];
-        total_recall_epi_cluster += per_image_avg_recall_epi_cluster[i];
-
-        total_recall_ncc_threshold += per_image_avg_recall_ncc_threshold[i];
-
-        csv_file 
-            << per_image_avg_before_epi[i] << ","        
-            << per_image_avg_after_epi[i] << ","        
-            << ","                                      
-            << ","                                   
-            << per_image_avg_recall_epi[i] << ","        
-            << ","
-            << per_image_avg_before_max_disp[i] << ","    
-            << per_image_avg_after_max_disp[i] << ","  
-            << ","                                   
-            << ","
-            << per_image_avg_recall_max_disp[i] << ","        
-            << ","                                                                               
-            << per_image_avg_before_epi_shift[i] << "," 
-            << per_image_avg_after_epi_shift[i] << ","   
-            << ","                                        
-            << ","                                    
-            << per_image_avg_recall_epi_shift[i] << "," 
-            << ","                                       
-            << per_image_avg_before_epi_cluster[i] << ","
-            << per_image_avg_after_epi_cluster[i] << ","  
-            << ","                                       
-            << ","                                    
-            << per_image_avg_recall_epi_cluster[i] << ","
-            << ","
-            << per_image_avg_recall_ncc_threshold[i] << ","
-            << "\n";                                     
+    for (size_t i = 0; i < all_recall_metrics.size(); i++) {
+        const auto& m = all_recall_metrics[i];
+        csv_file << i << ","
+                << std::fixed << std::setprecision(4) << m.epi_distance_recall * 100 << ","
+                << std::fixed << std::setprecision(4) << m.max_disparity_recall * 100 << ","
+                << std::fixed << std::setprecision(4) << m.epi_shift_recall * 100 << "\n";
     }
 
-    int avg_of_avgs_before_max_disp = 0;
-    int avg_of_avgs_after_max_disp = 0;
-    double avg_of_avgs_recall_max_disp = 0;
+    csv_file << "Average,"
+            << std::fixed << std::setprecision(4) << avg_epi_recall * 100 << ","
+            << std::fixed << std::setprecision(4) << avg_disp_recall * 100 << ","
+            << std::fixed << std::setprecision(4) << avg_shift_recall * 100 << "\n";
 
-    int avg_of_avgs_before_epi = 0;
-    int avg_of_avgs_after_epi = 0;
-    double avg_of_avgs_recall_epi = 0;
-
-    int avg_before_epi_shift = 0;
-    int avg_after_epi_shift = 0; 
-    double avg_recall_epi_shift = 0; 
-
-
-    int avg_before_epi_cluster = 0;
-    int avg_after_epi_cluster = 0; 
-    double avg_recall_epi_cluster = 0; 
-
-    double avg_recall_ncc_threshold = 0;
-
-    if (num_rows > 0) {
-        avg_of_avgs_before_max_disp = total_avg_before_max_disp / num_rows;
-        avg_of_avgs_after_max_disp = total_avg_after_max_disp / num_rows;
-        avg_of_avgs_recall_max_disp = total_avg_recall_max_disp / num_rows;
-
-        avg_of_avgs_before_epi = total_avg_before_epi / num_rows;
-        avg_of_avgs_after_epi = total_avg_after_epi / num_rows;
-        avg_of_avgs_recall_epi = total_avg_recall_epi_distance / num_rows;
-
-        avg_before_epi_shift = total_before_epi_shift / num_rows;
-        avg_after_epi_shift = total_after_epi_shift / num_rows;
-        avg_recall_epi_shift = total_recall_epi_shift / num_rows;
-
-        avg_before_epi_cluster = total_before_epi_cluster / num_rows;
-        avg_after_epi_cluster = total_after_epi_cluster / num_rows;
-        avg_recall_epi_cluster = total_recall_epi_cluster / num_rows;
-
-        avg_recall_ncc_threshold = total_recall_ncc_threshold / num_rows;
-    }
-
-    csv_file 
-        << ","                                   
-        << ","                                                                     
-        << avg_of_avgs_before_epi << ","       
-        << avg_of_avgs_after_epi << ","         
-        << ","                                     
-        << avg_of_avgs_recall_epi << ","              
-        << ","                                     
-        << ","
-        << avg_of_avgs_before_max_disp << ","   
-        << avg_of_avgs_after_max_disp << ","
-        << ","                                     
-        << avg_of_avgs_recall_max_disp << ","        
-        << ","                                    
-        << ","                                          
-        << avg_before_epi_shift << ","              
-        << avg_after_epi_shift << ","               
-        << ","                                 
-        << avg_recall_epi_shift << ","              
-        << ","                                     
-        << ","                                      
-        << avg_before_epi_cluster << ","            
-        << avg_after_epi_cluster << ","            
-        << ","                                     
-        << avg_recall_epi_cluster << ","
-        << ","
-        << avg_recall_ncc_threshold << "\n";          
-       
-    csv_file.close();
-    std::cout << "Finished writing to edge_data.csv file!\n";
-    auto end_time = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-
-    std::cout << "Edge-matching pipeline + storing results took: "<< duration.count() / 1000.0 << " seconds." << std::endl;
 }
 
-void Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, const cv::Mat& left_binary_map, const cv::Mat& right_binary_map, std::vector<cv::Point2d> right_edge_coords, std::vector<double> right_edge_orientations) {
-   cv::Mat left_visualization, right_visualization;
-   cv::cvtColor(left_binary_map, left_visualization, cv::COLOR_GRAY2BGR);
-   cv::cvtColor(right_binary_map, right_visualization, cv::COLOR_GRAY2BGR);
+RecallMetrics Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, const cv::Mat& left_binary_map, const cv::Mat& right_binary_map, std::vector<cv::Point2d> right_edge_coords, std::vector<double> right_edge_orientations) {
+    cv::Mat left_visualization, right_visualization;
+    cv::cvtColor(left_binary_map, left_visualization, cv::COLOR_GRAY2BGR);
+    cv::cvtColor(right_binary_map, right_visualization, cv::COLOR_GRAY2BGR);
 
     std::vector<cv::Point2d> left_edge_coords;
     std::vector<cv::Point2d> ground_truth_right_edges;
@@ -494,16 +288,9 @@ void Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_ima
     std::vector<double> selected_left_orientations;
     std::vector<cv::Point2d> selected_ground_truth_right_edges;
 
-    // std::tie(selected_left_edges, selected_left_orientations, selected_ground_truth_right_edges) = PickRandomEdges(20, left_edge_coords, ground_truth_right_edges, 
-    //     left_edge_orientations, 10, left_res[0], left_res[1]);
-
     selected_left_edges = left_edge_coords;
     selected_left_orientations = left_edge_orientations;
     selected_ground_truth_right_edges = ground_truth_right_edges;
-
-    //    for (const auto& point : selected_left_edges) {
-    //        cv::circle(left_visualization, point, 5, cv::Scalar(0, 0, 255), cv::FILLED);
-    //    }
 
     double shift_magnitude = 3.0;
     int patch_size = 7;
@@ -530,62 +317,48 @@ void Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_ima
         left_patch_set_two
     );
 
-   Eigen::Matrix3d fundamental_matrix_21 = ConvertToEigenMatrix(fund_mat_21);
-   Eigen::Matrix3d fundamental_matrix_12 = ConvertToEigenMatrix(fund_mat_12);
-   std::vector<Eigen::Vector3d> epipolar_lines_right = CalculateEpipolarLine(fundamental_matrix_21, filtered_left_edges);
+    Eigen::Matrix3d fundamental_matrix_21 = ConvertToEigenMatrix(fund_mat_21);
+    Eigen::Matrix3d fundamental_matrix_12 = ConvertToEigenMatrix(fund_mat_12);
+    std::vector<Eigen::Vector3d> epipolar_lines_right = CalculateEpipolarLine(fundamental_matrix_21, filtered_left_edges);
 
-   CalculateMatches(filtered_left_edges, filtered_gt_right_edges, filtered_left_orientations, left_edge_coords, left_edge_orientations, right_edge_coords, 
+    RecallMetrics recall_metrics = CalculateMatches(filtered_left_edges, filtered_gt_right_edges, filtered_left_orientations, left_edge_coords, left_edge_orientations, right_edge_coords, 
     right_edge_orientations, left_patch_set_one, left_patch_set_two, epipolar_lines_right, left_image, right_image, fundamental_matrix_12, right_visualization);
 
-//    cv::hconcat(left_visualization, right_visualization, merged_visualization_global);
-//    cv::namedWindow("Edge Matching Using NCC & Bidirectional Consistency");
-//    cv::setMouseCallback("Edge Matching Using NCC & Bidirectional Consistency", Dataset::onMouse);
-//    cv::imshow("Edge Matching Using NCC & Bidirectional Consistency", merged_visualization_global);
-//    cv::waitKey(0);
+    return recall_metrics;
 }
 
-void Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_left_edges, const std::vector<cv::Point2d>& selected_ground_truth_right_edges,
+RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_left_edges, const std::vector<cv::Point2d>& selected_ground_truth_right_edges,
    const std::vector<double>& selected_left_orientations, const std::vector<cv::Point2d>& left_edge_coords, const std::vector<double>& left_edge_orientations,
    const std::vector<cv::Point2d>& right_edge_coords, const std::vector<double>& right_edge_orientations, const std::vector<cv::Mat>& left_patch_set_one, const std::vector<cv::Mat>& left_patch_set_two,
    const std::vector<Eigen::Vector3d>& epipolar_lines_right, const cv::Mat& left_image, const cv::Mat& right_image, const Eigen::Matrix3d& fundamental_matrix_12,
    cv::Mat& right_visualization) {
 
-    int true_positive = 0;
-    int false_negative = 0;
-    int true_negative = 0;
+    int epi_true_positive = 0;
+    int epi_false_negative = 0;
+    int epi_true_negative = 0;
 
-    int disparity_true_positive = 0;
-    int disparity_false_negative = 0;
-    int disparity_true_negative = 0;
+    int disp_true_positive = 0;
+    int disp_false_negative = 0;
 
     int shift_true_positive = 0;
     int shift_false_negative = 0;
-    int shift_true_negative = 0;
 
-    int cluster_true_positive = 0;
-    int cluster_true_negative = 0;
-    int cluster_false_negative = 0;
+    double selected_max_disparity = 23.0063;
 
-    int NCC_true_positive = 0;
-    int NCC_true_negative = 0;
-    int NCC_false_negative = 0;
-
-    double selected_max_disparity = 19.0063;
-    
     int skip = 100;
-  for (size_t i = 0; i < selected_left_edges.size(); i += skip) {
-      const auto& left_edge = selected_left_edges[i];
-      const auto& left_orientation = selected_left_orientations[i];
-      const auto& ground_truth_right_edge = selected_ground_truth_right_edges[i];
-      const auto& epipolar_line = epipolar_lines_right[i];
-      const auto& left_patch_one = left_patch_set_one[i];
-      const auto& left_patch_two = left_patch_set_two[i];
+    for (size_t i = 0; i < selected_left_edges.size(); i += skip) {
+        const auto& left_edge = selected_left_edges[i];
+        const auto& left_orientation = selected_left_orientations[i];
+        const auto& ground_truth_right_edge = selected_ground_truth_right_edges[i];
+        const auto& epipolar_line = epipolar_lines_right[i];
+        const auto& left_patch_one = left_patch_set_one[i];
+        const auto& left_patch_two = left_patch_set_two[i];
 
-      double a = epipolar_line(0);
-      double b = epipolar_line(1);
-      double c = epipolar_line(2);
+        double a = epipolar_line(0);
+        double b = epipolar_line(1);
+        double c = epipolar_line(2);
 
-      if (std::abs(b) < 1e-6) continue;
+        if (std::abs(b) < 1e-6) continue;
 
         double a1_line = -a / b;
         double b1_line = -1;
@@ -597,65 +370,52 @@ void Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_left_edg
             angle_diff_deg -= 180;
         }
 
-        bool pass_tangency_check = (abs(angle_diff_deg - 0) > 8 && abs(angle_diff_deg - 180) > 8) ? (true) : (false);
-        if (!pass_tangency_check) {
+        bool left_passes_tangency = (abs(angle_diff_deg - 0) > 7 && abs(angle_diff_deg - 180) > 7) ? (true) : (false);
+        if (!left_passes_tangency) {
             continue;
         }
 
-    //   if (b != 0) {
-    //       cv::Point2d pt1(0, -c / b);
-    //       cv::Point2d pt2(right_visualization.cols, -(c + a * right_visualization.cols) / b);
-    //       cv::line(right_visualization, pt1, pt2, cv::Scalar(255, 200, 100), 1);
-    //   }
+        ///////////////////////////////EPIPOLAR DISTANCE THRESHOLD///////////////////////////////
+        std::pair<std::vector<cv::Point2d>, std::vector<double>> right_candidates_data = ExtractEpipolarEdges(epipolar_line, right_edge_coords, right_edge_orientations, 0.5);
+        std::vector<cv::Point2d> right_candidate_edges = right_candidates_data.first;
+        std::vector<double> right_candidate_orientations = right_candidates_data.second;
 
-       std::pair<std::vector<cv::Point2d>, std::vector<double>> right_candidates_data = ExtractEpipolarEdges(epipolar_line, right_edge_coords, right_edge_orientations, 0.5);
-       std::vector<cv::Point2d> right_candidate_edges = right_candidates_data.first;
-       std::vector<double> right_candidate_orientations = right_candidates_data.second;
+        std::pair<std::vector<cv::Point2d>, std::vector<double>> test_right_candidates_data = ExtractEpipolarEdges(epipolar_line, right_edge_coords, right_edge_orientations, 3);
+        std::vector<cv::Point2d> test_right_candidate_edges = test_right_candidates_data.first;
+        ///////////////////////////////EPIPOLAR DISTANCE THRESHOLD RECALL//////////////////////////
+        bool match_found = false;
 
-       before_epi_distance_thresholding.push_back(right_edge_coords.size());
-       after_epi_distance_thresholding.push_back(right_candidate_edges.size());
-
-       std::pair<std::vector<cv::Point2d>, std::vector<double>> test_right_candidates_data = ExtractEpipolarEdges(epipolar_line, right_edge_coords, right_edge_orientations, 3);
-       std::vector<cv::Point2d> test_right_candidate_edges = test_right_candidates_data.first;
-       ///////////////////////////////EPIPOLAR DISTANCE THRESHOLD RECALL//////////////////////////
-       bool match_found = false;
-
-       for (const auto& candidate : right_candidate_edges) {
-           if (cv::norm(candidate - ground_truth_right_edge) <= 0.5) {
-               match_found = true;
-               break;
-           }
-       }
-
-       if (match_found) {
-           true_positive++;
-       } else {
-               bool gt_right_edge_exists = false;
-               for (const auto& test_candidate : test_right_candidate_edges) {
-                   if (cv::norm(test_candidate - ground_truth_right_edge) <= 0.5) {
-                       gt_right_edge_exists = true;
-                       break;
-                   }
-               }
-
-               if (!gt_right_edge_exists) {
-                   true_negative++;
-               } else {
-                   false_negative++;
-               }
+        for (const auto& candidate : right_candidate_edges) {
+            if (cv::norm(candidate - ground_truth_right_edge) <= 0.5) {
+                match_found = true;
+                break;
+            }
         }
 
-       double epi_distance_recall = 0.0;
-       if ((true_positive + false_negative) > 0) {
-           epi_distance_recall = static_cast<double>(true_positive) / (true_positive + false_negative);
-       }
+        if (match_found) {
+            epi_true_positive++;
+        } 
+        else {
+            bool gt_match_found = false;
+            for (const auto& test_candidate : test_right_candidate_edges) {
+                if (cv::norm(test_candidate - ground_truth_right_edge) <= 0.5) {
+                    gt_match_found = true;
+                    break;
+                }
+            }
 
-       recall_rates_epi_distance.push_back(epi_distance_recall * 100.0);       
-        /////////////////////////////// REDUCING CANDIDATE POOL W/ MAX DISPARITY/////////////////////////////
+            if (!gt_match_found) {
+                epi_true_negative++;
+                continue;
+            } else {
+                epi_false_negative++;
+            }
+        }
+        ///////////////////////////////MAXIMUM DISPARITY THRESHOLD//////////////////////////
         std::vector<cv::Point2d> filtered_right_edge_coords;
         std::vector<double> filtered_right_edge_orientations;
 
-        for (size_t j = 0; j < right_candidate_edges.size(); ++j) {
+        for (size_t j = 0; j < right_candidate_edges.size(); j++) {
             const cv::Point2d& right_edge = right_candidate_edges[j];
 
             double disparity = left_edge.x - right_edge.x;
@@ -669,242 +429,87 @@ void Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_left_edg
             }
         }
 
-        before_max_disparity_thresholding.push_back(right_candidate_edges.size());
-        after_max_disparity_thresholding.push_back(filtered_right_edge_coords.size());
+        ///////////////////////////////MAXIMUM DISPARITY THRESHOLD RECALL//////////////////////////
+        bool disp_match_found = false;
 
-        ///////////////////////////////MAX DISPARITY THRESHOLD RECALL//////////////////////////
-        bool disparity_match_found = false;
-
-        for(const auto& candidate : filtered_right_edge_coords){
-            if (cv::norm(candidate - ground_truth_right_edge) <= 0.5){
-                disparity_match_found = true;
+        for(const auto& filtered_candidate : filtered_right_edge_coords){
+            if (cv::norm(filtered_candidate - ground_truth_right_edge) <= 0.5){
+                disp_match_found = true;
                 break;
             }
         }
 
-        if (disparity_match_found){
-            disparity_true_positive++;
-        } else {
-            bool disparity_gt_right_edge_exists = false;
-            for (const auto& test_candidate : test_right_candidate_edges){
-                if (cv::norm(test_candidate - ground_truth_right_edge) <= 0.5){
-                    disparity_gt_right_edge_exists = true;
-                    break;
-                }
-            }
-
-            if (!disparity_gt_right_edge_exists){
-                disparity_true_negative++;
-            }
-            else {
-                disparity_false_negative++;
-            }
+        if (disp_match_found){
+            disp_true_positive++;
+        } 
+        else {
+            disp_false_negative++;
         }
-
-        double disparity_recall = 0.0;
-        if ((disparity_true_positive + disparity_false_negative) > 0){
-            disparity_recall = static_cast<double>(disparity_true_positive) / (disparity_true_positive + disparity_false_negative);
-        }
-
-        recall_rates_max_disp.push_back(disparity_recall * 100.0);
-
-       ///////////////////////////////EPIPOLAR SHIFT ON CANDIDATE EDGES//////////////////////////
-        std::vector<cv::Point2d> valid_shifted_edges;
-        std::vector<double> valid_shifted_orientations;
+        ///////////////////////////////EPIPOLAR SHIFT THRESHOLD//////////////////////////
+        std::vector<cv::Point2d> shifted_right_edge_coords;
+        std::vector<double> shifted_right_edge_orientations;
         std::vector<double> epipolar_coefficients = {a, b, c};
 
-        before_epi_shift.push_back(filtered_right_edge_coords.size());
+        for (size_t j = 0; j < filtered_right_edge_coords.size(); j++) {
+            bool right_passes_tangency = false;
 
-        for (size_t i = 0; i < filtered_right_edge_coords.size(); ++i) {
-            bool passes_tangency_check = false;
-
-            cv::Point2d corrected_edge = Epipolar_Shift(filtered_right_edge_coords[i], filtered_right_edge_orientations[i], epipolar_coefficients, passes_tangency_check);
-            if (passes_tangency_check){
-                valid_shifted_edges.push_back(corrected_edge);
-                valid_shifted_orientations.push_back(filtered_right_edge_orientations[i]);
+            cv::Point2d shifted_edge = PerformEpipolarShift(filtered_right_edge_coords[j], filtered_right_edge_orientations[j], epipolar_coefficients, right_passes_tangency);
+            if (right_passes_tangency){
+                shifted_right_edge_coords.push_back(shifted_edge);
+                shifted_right_edge_orientations.push_back(filtered_right_edge_orientations[j]);
             }
         }
-        after_epi_shift.push_back(valid_shifted_edges.size());
+        ///////////////////////////////EPIPOLAR SHIFT THRESHOLD RECALL//////////////////////////
+        bool shift_match_found = false;
 
-        ///////////////////////////////SHIFTED EDGES THRESHOLD RECALL//////////////////////////
-       bool shift_match_found = false;
-       for (const auto& corrected_edge : valid_shifted_edges) {
-           if (cv::norm(corrected_edge - ground_truth_right_edge) <= 3.0) {
-               shift_match_found = true;
-               break;
-           }
-       }
-
-       if (shift_match_found) {
-           shift_true_positive++;
-       } 
-       else {
-        shift_false_negative++;
-       }
-    //    else {
-    //            bool shift_gt_right_edge_exists = false;
-    //            for (const auto& test_candidate : test_right_candidate_edges) {
-    //                if (cv::norm(test_candidate - ground_truth_right_edge) <= 0.5) {
-    //                    shift_gt_right_edge_exists = true;
-    //                    break;
-    //                }
-    //            }
-
-    //            if (!shift_gt_right_edge_exists) {
-    //                shift_true_negative++;
-    //            } else {
-    //                shift_false_negative++;
-    //            }
-    //     }
-
-       double shift_recall = 0.0;
-       if ((shift_true_positive + shift_false_negative) > 0) {
-           shift_recall = static_cast<double>(shift_true_positive) / (shift_true_positive + shift_false_negative);
-       }
-
-       recall_rates_epi_shift.push_back(shift_recall * 100.0);
-
-    before_epi_cluster.push_back(valid_shifted_edges.size());
-    std::vector<std::pair<std::vector<cv::Point2d>, std::vector<double>>> clusters = ClusterEpipolarShiftedEdges(valid_shifted_edges, valid_shifted_orientations);
-
-    std::vector<cv::Point2d> cluster_center_edges;
-    std::vector<double> cluster_orientation_edges;
-    std::vector<std::vector<double>> all_cluster_distances;
-
-    for (size_t i = 0; i < clusters.size(); ++i) {
-        const auto& cluster_edges = clusters[i].first;
-        const auto& cluster_orientations = clusters[i].second;
-
-        if (cluster_edges.empty()) continue;
-
-        cv::Point2d sum_point(0.0, 0.0);
-        double sum_orientation = 0.0;
-        
-        for (size_t j = 0; j < cluster_edges.size(); ++j) {
-            sum_point += cluster_edges[j];
+        for(const auto& shifted_candidate : shifted_right_edge_coords){
+            if (cv::norm(shifted_candidate - ground_truth_right_edge) <= 3.0){
+                shift_match_found = true;
+                break;
+            }
         }
 
-        for (size_t j = 0; j < cluster_orientations.size(); ++j) {
-            sum_orientation += cluster_orientations[j];
-        }
-
-        cv::Point2d avg_point = sum_point * (1.0 / cluster_edges.size());
-        double avg_orientation = sum_orientation / cluster_orientations.size();
-
-        cluster_center_edges.push_back(avg_point);
-        cluster_orientation_edges.push_back(avg_orientation);
-
-    }
-
-    after_epi_cluster.push_back(cluster_center_edges.size());
-    // ///////////////////////////////CLUSTER CENTER EDGES THRESHOLD RECALL//////////////////////////
-       bool cluster_match_found = false;
-
-       for (const auto& cluster_center : cluster_center_edges) {
-           if (cv::norm(cluster_center - ground_truth_right_edge) <= 3.0) {
-               cluster_match_found = true;
-               break;
-           }
-       }
-
-       if (cluster_match_found) {
-           cluster_true_positive++;
-       } else {
-               bool cluster_gt_right_edge_exists = false;
-               for (const auto& test_candidate : test_right_candidate_edges) {
-                   if (cv::norm(test_candidate - ground_truth_right_edge) <= 0.5) {
-                       cluster_gt_right_edge_exists = true;
-                       break;
-                   }
-               }
-
-               if (!cluster_gt_right_edge_exists) {
-                   cluster_true_negative++;
-               } else {
-                   cluster_false_negative++;
-               }
-        }
-
-        double cluster_recall = 0.0;
-        if ((cluster_true_positive + cluster_false_negative) > 0) {
-        cluster_recall = static_cast<double>(cluster_true_positive) / (cluster_true_positive + cluster_false_negative);
-        }
-        recall_rates_epi_cluster.push_back(cluster_recall * 100.0);
-
-        double orthogonal_shift_magnitude = 3.0;
-        int patch_size = 7;
-
-        auto [shifted_points_one, shifted_points_two] = CalculateOrthogonalShifts(
-            cluster_center_edges,
-            cluster_orientation_edges,
-            orthogonal_shift_magnitude
-        );
-
-        std::vector<cv::Point2d> filtered_right_edges;
-        std::vector<double> filtered_right_orientations;
-        std::vector<cv::Mat> right_patch_set_one;
-        std::vector<cv::Mat> right_patch_set_two;
-
-        //Used to simply bypass ExtractPatches requirement of passing in ground truth right edge vector
-            //Find a better way to deal with this
-        std::vector<cv::Point2d> ground_truth_right_edges;
-
-        for (const auto& data : gt_edge_data) {
-            ground_truth_right_edges.push_back(std::get<1>(data)); 
-        }
-
-        ExtractPatches(
-            patch_size,
-            right_image,
-            cluster_center_edges,
-            cluster_orientation_edges,
-            ground_truth_right_edges,
-            shifted_points_one,
-            shifted_points_two,
-            filtered_right_edges,
-            filtered_right_orientations,
-            ground_truth_right_edges,
-            right_patch_set_one,
-            right_patch_set_two
-        );
-
-        double ncc_threshold = -1;
-
-        if (!left_patch_one.empty() && !left_patch_two.empty() && !right_patch_set_one.empty() && !right_patch_set_two.empty()){
-            int best_right_match_index = ComputeNCCScores(left_patch_one, left_patch_two, right_patch_set_one, right_patch_set_two, ncc_threshold);
-
-            if (best_right_match_index != -1) {
-                cv::Point2d best_cluster_center = filtered_right_edges[best_right_match_index];
-                double best_cluster_orientation = filtered_right_orientations[best_right_match_index];
-                }
+        if (shift_match_found){
+            shift_true_positive++;
         } 
+        else {
+            shift_false_negative++;
+        }
     }
-    
-    std::cout << "Epipolar Distance:\n";
-    std::cout << "  True Positive: " << true_positive << "\n";
-    std::cout << "  False Negative: " << false_negative << "\n";
-    std::cout << "  True Negative: " << true_negative << "\n\n";
 
-    std::cout << "Disparity:\n";
-    std::cout << "  True Positive: " << disparity_true_positive << "\n";
-    std::cout << "  False Negative: " << disparity_false_negative << "\n";
-    std::cout << "  True Negative: " << disparity_true_negative << "\n\n";
+    double epi_distance_recall = 0.0;
+    if ((epi_true_positive + epi_false_negative) > 0) {
+        epi_distance_recall = static_cast<double>(epi_true_positive) / (epi_true_positive + epi_false_negative);
+    }
 
-    std::cout << "Shift:\n";
-    std::cout << "  True Positive: " << shift_true_positive << "\n";
-    std::cout << "  False Negative: " << shift_false_negative << "\n";
-    std::cout << "  True Negative: " << shift_true_negative << "\n\n";
+    double max_disparity_recall = 0.0;
+    if ((disp_true_positive + disp_false_negative) > 0) {
+        max_disparity_recall = static_cast<double>(disp_true_positive) / (disp_true_positive + disp_false_negative);
+    }
 
-    std::cout << "Cluster:\n";
-    std::cout << "  True Positive: " << cluster_true_positive << "\n";
-    std::cout << "  False Negative: " << cluster_false_negative << "\n";
-    std::cout << "  True Negative: " << cluster_true_negative << "\n\n";
+     double epi_shift_recall = 0.0;
+    if ((shift_true_positive + shift_false_negative) > 0) {
+        epi_shift_recall = static_cast<double>(shift_true_positive) / (shift_true_positive + shift_false_negative);
+    }
 
-    std::cout << "NCC:\n";
-    std::cout << "  True Positive: " << NCC_true_positive << "\n";
-    std::cout << "  False Negative: " << NCC_false_negative << "\n";
-    std::cout << "  True Negative: " << NCC_true_negative << "\n";
-}
+    std::cout << "Epipolar Distance Recall: " 
+            << std::fixed << std::setprecision(2) 
+            << epi_distance_recall * 100 << "%" << std::endl;
+
+    std::cout << "Max Disparity Threshold Recall: "
+          << std::fixed << std::setprecision(2)
+          << max_disparity_recall * 100 << "%" << std::endl;
+
+    std::cout << "Epipolar Shift Threshold Recall: "
+          << std::fixed << std::setprecision(2)
+          << epi_shift_recall * 100 << "%" << std::endl;
+
+    return RecallMetrics {
+        epi_distance_recall,
+        max_disparity_recall,
+        epi_shift_recall
+    };
+}  
 
 int Dataset::ComputeNCCScores(const cv::Mat& left_patch_one, const cv::Mat& left_patch_two, const std::vector<cv::Mat>& right_patch_set_one, const std::vector<cv::Mat>& right_patch_set_two, double ncc_threshold){
     double best_ncc = -1.0;
@@ -1429,7 +1034,7 @@ void Dataset::CalculateGTRightEdge(const std::vector<cv::Point2d> &left_third_or
     csv_file.flush();
 }
 
-cv::Point2d Dataset::Epipolar_Shift( 
+cv::Point2d Dataset::PerformEpipolarShift( 
     cv::Point2d original_edge_location, double edge_orientation,
     std::vector<double> epipolar_line_coeffs, bool& b_pass_epipolar_tengency_check )
 {
@@ -1451,7 +1056,7 @@ cv::Point2d Dataset::Epipolar_Shift(
     corrected_edge.x = (b1_line * c_edgeH2 - b_edgeH2 * c1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line);
     corrected_edge.y = (c1_line * a_edgeH2 - c_edgeH2 * a1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line);
     
-    //> Find (i) the displacement between the original edge and the corrected edge, and \
+    //> Find (i) the displacement between the original edge and the corrected edge, and
     //       (ii) the intersection angle between the epipolar line and the line passing through the original edge along its direction vector
     double epipolar_shift_displacement = cv::norm(corrected_edge - original_edge_location);
     double m_epipolar = -a1_line / b1_line; //> Slope of epipolar line
@@ -1462,10 +1067,11 @@ cv::Point2d Dataset::Epipolar_Shift(
     }
 
     //> check if the corrected edge passes the epoplar tengency test (intersection angle < 4 degrees and displacement < 6 pixels)
-    b_pass_epipolar_tengency_check = (epipolar_shift_displacement < 2 && abs(angle_diff_deg - 0) > 8 && abs(angle_diff_deg - 180) > 8) ? (true) : (false);
+    b_pass_epipolar_tengency_check = (epipolar_shift_displacement < 2 && abs(angle_diff_deg - 0) > 7 && abs(angle_diff_deg - 180) > 7) ? (true) : (false);
     
     return corrected_edge;
 }
+
 std::vector<double> Dataset::LoadMaximumDisparityValues(const std::string& stereo_pairs_path, int num_pairs) {
     std::vector<double> max_disparities;
     std::string csv_filename = stereo_pairs_path + "/maximum_disparity_values.csv";

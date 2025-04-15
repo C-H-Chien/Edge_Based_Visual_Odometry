@@ -27,6 +27,12 @@
 //> Chiang-Heng Chien (chiang-heng_chien@brown.edu), Saul Lopez Lucas (saul_lopez_lucas@brown.edu)
 // =======================================================================================================
 
+struct RecallMetrics {
+    double epi_distance_recall;
+    double max_disparity_recall;
+    double epi_shift_recall;
+};
+
 extern cv::Mat merged_visualization_global;
 class Dataset {
 public:
@@ -95,29 +101,9 @@ private:
    std::vector<double> matched_right_orientations;
    std::vector<double> left_edge_depths;
 
-   std::vector<int> before_max_disparity_thresholding;
-   std::vector<int> after_max_disparity_thresholding;
-
-   std::vector<double> recall_rates_max_disp;
-
-   std::vector<int> before_epi_distance_thresholding;
-   std::vector<int> after_epi_distance_thresholding;
-
-   std::vector<double> recall_rates_epi_distance;
-
-   std::vector<int> before_epi_shift;      
-   std::vector<int> after_epi_shift;     
-   std::vector<double> recall_rates_epi_shift;  
-
-   std::vector<int> before_epi_cluster;      
-   std::vector<int> after_epi_cluster;     
-   std::vector<double> recall_rates_epi_cluster;  
-
-   std::vector<double> recall_rates_ncc_threshold; 
-
    void PrintDatasetInfo();
-   void DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, const cv::Mat& left_binary_map, const cv::Mat& right_binary_map, std::vector<cv::Point2d> right_edge_coords, std::vector<double> right_edge_orientations);
-   void CalculateMatches(const std::vector<cv::Point2d>& selected_left_edges, const std::vector<cv::Point2d>& selected_ground_truth_right_edges, 
+   RecallMetrics DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, const cv::Mat& left_binary_map, const cv::Mat& right_binary_map, std::vector<cv::Point2d> right_edge_coords, std::vector<double> right_edge_orientations);
+   RecallMetrics CalculateMatches(const std::vector<cv::Point2d>& selected_left_edges, const std::vector<cv::Point2d>& selected_ground_truth_right_edges, 
       const std::vector<double>& selected_left_orientations, const std::vector<cv::Point2d>& left_edge_coords, const std::vector<double>& left_edge_orientations, 
       const std::vector<cv::Point2d>& right_edge_coords, const std::vector<double>& right_edge_orientations, const std::vector<cv::Mat>& left_patch_set_one, const std::vector<cv::Mat>& left_patch_set_two,
       const std::vector<Eigen::Vector3d>& epipolar_lines_right, const cv::Mat& left_image, const cv::Mat& right_image, const Eigen::Matrix3d& fundamental_matrix_12, 
@@ -166,7 +152,7 @@ private:
                      std::vector<double>& orientations);
    void VisualizeGTRightEdge(const cv::Mat &left_image, const cv::Mat &right_image, const std::vector<std::pair<cv::Point2d, cv::Point2d>> &edge_pairs);
    void CalculateGTRightEdge(const std::vector<cv::Point2d> &left_third_order_edges_locations, const std::vector<double> &left_third_order_edges_orientation, const cv::Mat &disparity_map, const cv::Mat &left_image, const cv::Mat &right_image);
-   cv::Point2d Epipolar_Shift( cv::Point2d original_edge_location, double edge_orientation, std::vector<double> epipolar_line_coeffs, bool& b_pass_epipolar_tengency_check);
+   cv::Point2d PerformEpipolarShift( cv::Point2d original_edge_location, double edge_orientation, std::vector<double> epipolar_line_coeffs, bool& b_pass_epipolar_tengency_check);
    void Load_GT_Poses( std::string GT_Poses_File_Path );
    std::vector<double> GT_time_stamps;
    std::vector<double> Img_time_stamps;
