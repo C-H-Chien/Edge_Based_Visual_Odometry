@@ -171,8 +171,8 @@ void Dataset::PerformEdgeBasedVO() {
 
     auto start_time = std::chrono::high_resolution_clock::now();
 
-    // for (size_t i = 0; i < image_pairs.size(); i++) {
-    for (size_t i = 96; i < 97; i++) {
+    for (size_t i = 0; i < image_pairs.size(); i++) {
+    // for (size_t i = 96; i < 97; i++) {
         const cv::Mat& left_img = image_pairs[i].first;
         const cv::Mat& right_img = image_pairs[i].second;
         const cv::Mat& disparity_map = disparity_maps[i]; 
@@ -370,7 +370,7 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
             angle_diff_deg -= 180;
         }
 
-        bool left_passes_tangency = (abs(angle_diff_deg - 0) > 7 && abs(angle_diff_deg - 180) > 7) ? (true) : (false);
+        bool left_passes_tangency = (abs(angle_diff_deg - 0) > 6 && abs(angle_diff_deg - 180) > 6) ? (true) : (false);
         if (!left_passes_tangency) {
             continue;
         }
@@ -1067,7 +1067,7 @@ cv::Point2d Dataset::PerformEpipolarShift(
     }
 
     //> check if the corrected edge passes the epoplar tengency test (intersection angle < 4 degrees and displacement < 6 pixels)
-    b_pass_epipolar_tengency_check = (epipolar_shift_displacement < 2 && abs(angle_diff_deg - 0) > 7 && abs(angle_diff_deg - 180) > 7) ? (true) : (false);
+    b_pass_epipolar_tengency_check = (epipolar_shift_displacement < 5 && abs(angle_diff_deg - 0) > 6 && abs(angle_diff_deg - 180) > 6) ? (true) : (false);
     
     return corrected_edge;
 }
