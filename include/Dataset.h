@@ -34,6 +34,7 @@ struct RecallMetrics {
     double epi_cluster_recall;
     double patch_recall;
     double ncc_recall;
+    double lrt_recall;
 };
 
 extern cv::Mat merged_visualization_global;
