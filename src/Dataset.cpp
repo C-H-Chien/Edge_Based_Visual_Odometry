@@ -235,11 +235,15 @@ void Dataset::PerformEdgeBasedVO() {
     double total_epi_recall = 0.0;
     double total_disp_recall = 0.0;
     double total_shift_recall = 0.0;
+    double total_cluster_recall = 0.0;
+    double total_patch_recall = 0.0;
 
     for (const RecallMetrics& m : all_recall_metrics) {
         total_epi_recall += m.epi_distance_recall;
         total_disp_recall += m.max_disparity_recall;
         total_shift_recall += m.epi_shift_recall;
+        total_cluster_recall += m.epi_cluster_recall;
+        total_patch_recall += m.patch_recall;
     }
 
     int total_images = static_cast<int>(all_recall_metrics.size());
@@ -247,26 +251,30 @@ void Dataset::PerformEdgeBasedVO() {
     double avg_epi_recall   = (total_images > 0) ? total_epi_recall / total_images : 0.0;
     double avg_disp_recall  = (total_images > 0) ? total_disp_recall / total_images : 0.0;
     double avg_shift_recall = (total_images > 0) ? total_shift_recall / total_images : 0.0;
-
+    double avg_cluster_recall = (total_images > 0) ? total_cluster_recall / total_images : 0.0;
+    double avg_patch_recall = (total_images > 0) ? total_patch_recall / total_images : 0.0;
 
     std::string edge_stat_dir = output_path + "/edge stats";
     std::filesystem::create_directories(edge_stat_dir);
     std::ofstream csv_file(edge_stat_dir + "/recall_metrics.csv");
-    csv_file << "ImageIndex,EpiDistanceRecall,MaxDisparityRecall,EpiShiftRecall\n";
+    csv_file << "ImageIndex,EpiDistanceRecall,MaxDisparityRecall,EpiShiftRecall,EpiClusterRecall,PatchRecall\n";
 
     for (size_t i = 0; i < all_recall_metrics.size(); i++) {
         const auto& m = all_recall_metrics[i];
         csv_file << i << ","
                 << std::fixed << std::setprecision(4) << m.epi_distance_recall * 100 << ","
                 << std::fixed << std::setprecision(4) << m.max_disparity_recall * 100 << ","
-                << std::fixed << std::setprecision(4) << m.epi_shift_recall * 100 << "\n";
+                << std::fixed << std::setprecision(4) << m.epi_shift_recall * 100 << ","
+                << std::fixed << std::setprecision(4) << m.epi_cluster_recall * 100 << ","
+                << std::fixed << std::setprecision(4) << m.patch_recall * 100 << "\n";
     }
 
     csv_file << "Average,"
             << std::fixed << std::setprecision(4) << avg_epi_recall * 100 << ","
             << std::fixed << std::setprecision(4) << avg_disp_recall * 100 << ","
-            << std::fixed << std::setprecision(4) << avg_shift_recall * 100 << "\n";
-
+            << std::fixed << std::setprecision(4) << avg_shift_recall * 100 << ","
+            << std::fixed << std::setprecision(4) << avg_cluster_recall * 100 << ","
+            << std::fixed << std::setprecision(4) << avg_patch_recall * 100 << "\n";
 }
 
 RecallMetrics Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, const cv::Mat& left_binary_map, const cv::Mat& right_binary_map, std::vector<cv::Point2d> right_edge_coords, std::vector<double> right_edge_orientations) {
@@ -292,13 +300,14 @@ RecallMetrics Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& 
     selected_left_orientations = left_edge_orientations;
     selected_ground_truth_right_edges = ground_truth_right_edges;
 
-    double shift_magnitude = 3.0;
+    double orthogonal_shifted_mag = 3.0;
     int patch_size = 7;
-    auto [left_shifted_one, left_shifted_two] = CalculateOrthogonalShifts(selected_left_edges, selected_left_orientations, shift_magnitude);
+    auto [left_orthogonal_one, left_orthogonal_two] = CalculateOrthogonalShifts(selected_left_edges, selected_left_orientations, orthogonal_shifted_mag);
 
     std::vector<cv::Point2d> filtered_left_edges;
     std::vector<double> filtered_left_orientations;
-    std::vector<cv::Point2d> filtered_gt_right_edges;
+    std::vector<cv::Point2d> filtered_ground_truth_right_edges;
+
     std::vector<cv::Mat> left_patch_set_one;
     std::vector<cv::Mat> left_patch_set_two;
 
@@ -307,12 +316,12 @@ RecallMetrics Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& 
         left_image,
         selected_left_edges,
         selected_left_orientations,
-        selected_ground_truth_right_edges,
-        left_shifted_one,
-        left_shifted_two,
+        &selected_ground_truth_right_edges,
+        left_orthogonal_one,
+        left_orthogonal_two,
         filtered_left_edges,
         filtered_left_orientations,
-        filtered_gt_right_edges,
+        &filtered_ground_truth_right_edges,
         left_patch_set_one,
         left_patch_set_two
     );
@@ -321,7 +330,7 @@ RecallMetrics Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& 
     Eigen::Matrix3d fundamental_matrix_12 = ConvertToEigenMatrix(fund_mat_12);
     std::vector<Eigen::Vector3d> epipolar_lines_right = CalculateEpipolarLine(fundamental_matrix_21, filtered_left_edges);
 
-    RecallMetrics recall_metrics = CalculateMatches(filtered_left_edges, filtered_gt_right_edges, filtered_left_orientations, left_edge_coords, left_edge_orientations, right_edge_coords, 
+    RecallMetrics recall_metrics = CalculateMatches(filtered_left_edges, filtered_ground_truth_right_edges, filtered_left_orientations, left_edge_coords, left_edge_orientations, right_edge_coords, 
     right_edge_orientations, left_patch_set_one, left_patch_set_two, epipolar_lines_right, left_image, right_image, fundamental_matrix_12, right_visualization);
 
     return recall_metrics;
@@ -342,6 +351,12 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
 
     int shift_true_positive = 0;
     int shift_false_negative = 0;
+
+    int cluster_true_positive = 0;
+    int cluster_false_negative = 0;
+
+    int patch_true_positive = 0;
+    int patch_false_negative = 0;
 
     double selected_max_disparity = 23.0063;
 
@@ -475,6 +490,95 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
         else {
             shift_false_negative++;
         }
+        ///////////////////////////////EPIPOLAR CLUSTER THRESHOLD//////////////////////////
+        std::vector<std::pair<std::vector<cv::Point2d>, std::vector<double>>> clusters = ClusterEpipolarShiftedEdges(shifted_right_edge_coords, shifted_right_edge_orientations);
+        std::vector<cv::Point2d> cluster_center_edge_coords;
+        std::vector<double> cluster_center_edge_orientations;
+
+        for (size_t j = 0; j < clusters.size(); j++) {
+            const auto& cluster_edges = clusters[j].first;
+            const auto& cluster_orientations = clusters[j].second;
+
+            if (cluster_edges.empty()) continue;
+
+            cv::Point2d sum_point(0.0, 0.0);
+            double sum_orientation = 0.0;
+
+            for (size_t j = 0; j < cluster_edges.size(); ++j) {
+                sum_point += cluster_edges[j];
+            }
+
+            for (size_t j = 0; j < cluster_orientations.size(); ++j) {
+                sum_orientation += cluster_orientations[j];
+            }
+
+            cv::Point2d avg_point = sum_point * (1.0 / cluster_edges.size());
+            double avg_orientation = sum_orientation * (1.0 / cluster_orientations.size());
+
+            cluster_center_edge_coords.push_back(avg_point);
+            cluster_center_edge_orientations.push_back(avg_orientation);
+        }
+        ///////////////////////////////EPIPOLAR CLUSTER THRESHOLD RECALL//////////////////////////
+        bool cluster_match_found = false;
+
+        for (const auto& cluster_candidate : cluster_center_edge_coords) {
+            if (cv::norm(cluster_candidate - ground_truth_right_edge) <= 3.0) {
+                cluster_match_found = true;
+                break;
+            }
+        }
+
+        if (cluster_match_found) {
+            cluster_true_positive++;
+        }
+        else {
+            cluster_false_negative++;
+        }
+        ///////////////////////////////EXTRACT PATCHES THRESHOLD////////////////////////////////////////////
+        double orthogonal_shifted_mag = 3.0;
+        int patch_size = 7;
+
+        auto [right_orthogonal_one, right_orthogonal_two] = CalculateOrthogonalShifts(
+            cluster_center_edge_coords,
+            cluster_center_edge_orientations,
+            orthogonal_shifted_mag
+        );
+
+        std::vector<cv::Point2d> patch_right_edge_coords;
+        std::vector<double> patch_right_edge_orientations;
+        std::vector<cv::Mat> right_patch_set_one;
+        std::vector<cv::Mat> right_patch_set_two;
+
+        ExtractPatches(
+            patch_size,
+            right_image,
+            cluster_center_edge_coords,
+            cluster_center_edge_orientations,
+            nullptr,
+            right_orthogonal_one,
+            right_orthogonal_two,
+            patch_right_edge_coords,
+            patch_right_edge_orientations,
+            nullptr,
+            right_patch_set_one,
+            right_patch_set_two
+        );
+        ///////////////////////////////EXTRACT PATCHES RECALL////////////////////////////////////////////
+        bool patch_match_found = false;
+
+        for (const auto& patch_candidate : patch_right_edge_coords) {
+            if (cv::norm(patch_candidate - ground_truth_right_edge) <= 3.0) {
+                patch_match_found = true;
+                break;
+            }
+        }
+
+        if (patch_match_found) {
+            patch_true_positive++;
+        }
+        else {
+            patch_false_negative++;
+        }
     }
 
     double epi_distance_recall = 0.0;
@@ -487,9 +591,19 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
         max_disparity_recall = static_cast<double>(disp_true_positive) / (disp_true_positive + disp_false_negative);
     }
 
-     double epi_shift_recall = 0.0;
+    double epi_shift_recall = 0.0;
     if ((shift_true_positive + shift_false_negative) > 0) {
         epi_shift_recall = static_cast<double>(shift_true_positive) / (shift_true_positive + shift_false_negative);
+    }
+
+    double epi_cluster_recall = 0.0;
+    if ((cluster_true_positive + cluster_false_negative) > 0) {
+        epi_cluster_recall = static_cast<double>(cluster_true_positive) / (cluster_true_positive + cluster_false_negative);
+    }
+
+    double patch_recall = 0.0;
+    if ((patch_true_positive + patch_false_negative) > 0) {
+        patch_recall = static_cast<double>(patch_true_positive) / (patch_true_positive + patch_false_negative);
     }
 
     std::cout << "Epipolar Distance Recall: " 
@@ -504,10 +618,20 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
           << std::fixed << std::setprecision(2)
           << epi_shift_recall * 100 << "%" << std::endl;
 
+    std::cout << "Epipolar Cluster Threshold Recall: "
+          << std::fixed << std::setprecision(2)
+          << epi_cluster_recall * 100 << "%" << std::endl;
+
+    std::cout << "Patch Threshold Recall: "
+          << std::fixed << std::setprecision(2)
+          << patch_recall * 100 << "%" << std::endl;
+
     return RecallMetrics {
         epi_distance_recall,
         max_disparity_recall,
-        epi_shift_recall
+        epi_shift_recall,
+        epi_cluster_recall,
+        patch_recall
     };
 }  
 
@@ -595,18 +719,19 @@ void Dataset::ExtractPatches(
     const cv::Mat& image,
     const std::vector<cv::Point2d>& edges,
     const std::vector<double>& orientations,
-    const std::vector<cv::Point2d>& right_edges,
+    const std::vector<cv::Point2d>* right_edges, 
     const std::vector<cv::Point2d>& shifted_one,
     const std::vector<cv::Point2d>& shifted_two,
     std::vector<cv::Point2d>& filtered_edges_out,
     std::vector<double>& filtered_orientations_out,
-    std::vector<cv::Point2d>& filtered_right_edges_out,
+    std::vector<cv::Point2d>* filtered_right_edges_out,
     std::vector<cv::Mat>& patch_set_one_out,
     std::vector<cv::Mat>& patch_set_two_out
-){
+)
+{
     int half_patch = patch_size / 2;
 
-    for (int i = 0; i < shifted_one.size(); ++i) {
+    for (int i = 0; i < shifted_one.size(); i++) {
         double x1 = shifted_one[i].x;
         double y1 = shifted_one[i].y;
         double x2 = shifted_two[i].x;
@@ -635,11 +760,12 @@ void Dataset::ExtractPatches(
 
             filtered_edges_out.push_back(edges[i]);
             filtered_orientations_out.push_back(orientations[i]);
-            filtered_right_edges_out.push_back(right_edges[i]);
             patch_set_one_out.push_back(patch1);
             patch_set_two_out.push_back(patch2);
-        } else {
-            // std::cerr << "WARNING: Skipped pair due to boundary constraints! "<< "Point #1: (" << x1 << ", " << y1 << "), "<< "Point #2: (" << x2 << ", " << y2 << ")\n";
+
+            if (right_edges && filtered_right_edges_out) {
+                filtered_right_edges_out->push_back((*right_edges)[i]);
+            }
         }
     }
 }

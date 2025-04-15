@@ -31,6 +31,8 @@ struct RecallMetrics {
     double epi_distance_recall;
     double max_disparity_recall;
     double epi_shift_recall;
+    double epi_cluster_recall;
+    double patch_recall;
 };
 
 extern cv::Mat merged_visualization_global;
@@ -120,12 +122,12 @@ private:
     const cv::Mat& image,
     const std::vector<cv::Point2d>& edges,
     const std::vector<double>& orientations,
-    const std::vector<cv::Point2d>& right_edges,
+    const std::vector<cv::Point2d>* right_edges, 
     const std::vector<cv::Point2d>& shifted_one,
     const std::vector<cv::Point2d>& shifted_two,
     std::vector<cv::Point2d>& filtered_edges_out,
     std::vector<double>& filtered_orientations_out,
-    std::vector<cv::Point2d>& filtered_right_edges_out,
+    std::vector<cv::Point2d>* filtered_right_edges_out,
     std::vector<cv::Mat>& patch_set_one_out,
     std::vector<cv::Mat>& patch_set_two_out);
    std::pair<std::vector<cv::Point2d>, std::vector<double>> ExtractEpipolarEdges(const Eigen::Vector3d& epipolar_line, const std::vector<cv::Point2d>& edge_locations, const std::vector<double>& edge_orientations, double distance_threshold); 
