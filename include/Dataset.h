@@ -87,7 +87,6 @@ private:
    std::vector<std::vector<double>> fund_mat_12;
    double focal_length;
    double baseline;
-   double epipolar_distance_threshold;
    double max_disparity;
 
    std::vector<cv::Point2d> matched_left_edges;
