@@ -5,8 +5,12 @@
 #define NUM_OF_CPU_CORES                (6)
 
 //> Define output file folder
-#define OUTPUT_WRITE_PATH               std::string("Output_Results/")
+#define OUTPUT_WRITE_PATH               std::string("../output_files/")
 #define OUTPUT_DATA_TYPE                std::string("TUM")  //> Either TUM or KITTI
+
+//> For quick processing
+#define WRITE_TOED_EDGES                (true)
+#define READ_TOED_EDGES_FROM_FILES      (false)
 
 //> Use for the TUM type dataset
 #define ASSOCIATION_FILE_NAME           std::string("associate.txt")
@@ -21,6 +25,9 @@
 
 //> DEBUGGING PURPOSE
 #define SHOW_YAML_FILE_DATA             (false)
+#define DEBUG_FALSE_NEGATIVES           (false)
+#define DEBUG_COLLECT_NCC_AND_ERR       (true)
+//> ----------------------------------------------
 #define WRITE_FEATURES_TO_FILE          (false)
 #define WRITE_CORRESPONDENCES_TO_FILE   (false)
 #define OPENCV_DISPLAY_FEATURES         (false)

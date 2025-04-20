@@ -61,6 +61,9 @@ public:
    std::vector<Eigen::Vector3d> aligned_GT_Transl;
    std::vector<std::tuple<cv::Point2d, cv::Point2d, double>> gt_edge_data;
 
+   std::vector<std::pair<double, double>> ncc_one_vs_err;
+   std::vector<std::pair<double, double>> ncc_two_vs_err;
+
 private:
    YAML::Node config_file;
 
@@ -104,6 +107,8 @@ private:
    std::vector<double> matched_left_orientations;
    std::vector<double> matched_right_orientations;
    std::vector<double> left_edge_depths;
+
+   void write_ncc_vals_to_files( int img_index );
 
    void PrintDatasetInfo();
    RecallMetrics DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, const cv::Mat& left_binary_map, const cv::Mat& right_binary_map, std::vector<cv::Point2d> right_edge_coords, std::vector<double> right_edge_orientations);

@@ -144,6 +144,16 @@ Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(confi
    Total_Num_Of_Imgs = 0;
 }
 
+void Dataset::write_ncc_vals_to_files( int img_index ) {
+    std::string file_path = OUTPUT_WRITE_PATH + "ncc_vs_err/img_" + std::to_string(img_index) + ".txt";
+    std::ofstream ncc_vs_err_file_out(file_path);
+    for (unsigned i = 0; i < ncc_one_vs_err.size(); i++) {
+        ncc_vs_err_file_out << ncc_one_vs_err[i].first << "\t" << ncc_one_vs_err[i].second << "\t" \
+                            << ncc_two_vs_err[i].first << "\t" << ncc_two_vs_err[i].second << "\n";
+    }
+    ncc_vs_err_file_out.close();
+}
+
 void Dataset::PerformEdgeBasedVO() {
     int num_pairs = 247;
     std::vector<std::pair<cv::Mat, cv::Mat>> image_pairs;
@@ -171,8 +181,14 @@ void Dataset::PerformEdgeBasedVO() {
 
     auto start_time = std::chrono::high_resolution_clock::now();
 
+    LOG_INFO("Start looping over all image pairs");
+
     for (size_t i = 0; i < image_pairs.size(); i++) {
-    // for (size_t i = 209; i < 210; i++) {
+    // for (size_t i = 0; i < 2; i++) {
+
+        ncc_one_vs_err.clear();
+        ncc_two_vs_err.clear();
+
         const cv::Mat& left_img = image_pairs[i].first;
         const cv::Mat& right_img = image_pairs[i].second;
         const cv::Mat& disparity_map = disparity_maps[i]; 
@@ -228,9 +244,12 @@ void Dataset::PerformEdgeBasedVO() {
         RecallMetrics metrics = DisplayMatches(left_undistorted, right_undistorted, left_edge_map, right_edge_map, right_third_order_edges_locations, right_third_order_edges_orientation);
         
         all_recall_metrics.push_back(metrics);
-        }                                  
+        }                                
+        
+        //> write to the files
+        write_ncc_vals_to_files( i );
     
-    }
+    } //> end of looping over all stereo images
 
     double total_epi_recall = 0.0;
     double total_disp_recall = 0.0;
@@ -368,7 +387,7 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
 
     double selected_max_disparity = 23.0063;
 
-    int skip = 100;
+    int skip = 10;
     for (size_t i = 0; i < selected_left_edges.size(); i += skip) {
         const auto& left_edge = selected_left_edges[i];
         const auto& left_orientation = selected_left_orientations[i];
@@ -588,7 +607,7 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
             patch_false_negative++;
         }
         ///////////////////////////////NCC THRESHOLD/////////////////////////////////////////////////////
-        double ncc_threshold = 0.65;
+        double ncc_threshold = 0.3;
         bool ncc_match_found = false;
 
         if (!left_patch_one.empty() && !left_patch_two.empty() &&
@@ -597,6 +616,18 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
             for (size_t i = 0; i < patch_right_edge_coords.size(); ++i) {
                 double ncc_one = ComputeNCC(left_patch_one, right_patch_set_one[i]);
                 double ncc_two = ComputeNCC(left_patch_two, right_patch_set_two[i]);
+
+#if DEBUG_COLLECT_NCC_AND_ERR
+                double err_to_gt = cv::norm(patch_right_edge_coords[i] - ground_truth_right_edge);
+                std::pair<double, double> pair_ncc_one_err(err_to_gt, ncc_one);
+                std::pair<double, double> pair_ncc_two_err(err_to_gt, ncc_two);
+                ncc_one_vs_err.push_back(pair_ncc_one_err);
+                ncc_two_vs_err.push_back(pair_ncc_two_err);
+#endif
+
+                if (cv::norm(patch_right_edge_coords[i] - ground_truth_right_edge) < 3.0) {
+
+                }
  
                 if (ncc_one >= ncc_threshold && ncc_two >= ncc_threshold) {
                     if (cv::norm(patch_right_edge_coords[i] - ground_truth_right_edge) <= 3.0) {
@@ -610,6 +641,29 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
                 ncc_true_positive++;
             } else {
                 ncc_false_negative++;
+
+#if DEBUG_FALSE_NEGATIVES
+                //> [DEBUG]
+                if (ncc_false_negative == 2) {
+                    std::cout << "Left edge: (" << left_edge.x << ", " << left_edge.y << ")" << std::endl;
+                    std::cout << "GT edge: (" << ground_truth_right_edge.x << ", " << ground_truth_right_edge.y << ")" << std::endl;
+                    std::cout << "patch_right_edge_coords.size() = " << patch_right_edge_coords.size() << ", right_patch_set_one.size() = " << right_patch_set_one.size() << std::endl;
+                    std::cout << "Left patch #1:" << left_patch_one << std::endl;
+                    std::cout << "Left patch #2:" << left_patch_two << std::endl;
+                    std::cout << "Right edges:" << std::endl;
+                    for (size_t i = 0; i < patch_right_edge_coords.size(); ++i) {
+                        std::cout << "Right patch #1:" << right_patch_set_one[i] << std::endl;
+                        std::cout << "Right patch #2:" << right_patch_set_two[i] << std::endl;
+                        double ncc_one = ComputeNCC(left_patch_one, right_patch_set_one[i]);
+                        double ncc_two = ComputeNCC(left_patch_two, right_patch_set_two[i]);
+                        std::cout << "(" << patch_right_edge_coords[i].x << ", " << patch_right_edge_coords[i].y << "), ncc_one = " << ncc_one << ", ncc_two = " << ncc_two << std::endl;
+                    }
+                    std::cout << "Evaluation:" << std::endl;
+                    for (size_t i = 0; i < patch_right_edge_coords.size(); ++i) {
+                        std::cout << cv::norm(patch_right_edge_coords[i] - ground_truth_right_edge) << std::endl;
+                    }
+                }
+#endif
             }
         }
     }
@@ -666,6 +720,7 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
     std::cout << "NCC Threshold Recall: "
           << std::fixed << std::setprecision(2)
           << ncc_recall * 100 << "%" << std::endl;
+    std::cout << "Number of NCC Threshold false negatives: " << ncc_false_negative << std::endl;
 
     return RecallMetrics {
         epi_distance_recall,
@@ -677,20 +732,31 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
     };
 }  
 
+// double Dataset::ComputeNCC(const cv::Mat& patch_one, const cv::Mat& patch_two){
+//     cv::Scalar mean_one, stddev_one, mean_two, stddev_two;
+//     cv::meanStdDev(patch_one, mean_one, stddev_one);
+//     cv::meanStdDev(patch_two, mean_two, stddev_two);
+
+//     if (stddev_one[0] == 0 || stddev_two[0] == 0) {
+//         return 0.0;
+//     }
+
+//     cv::Mat norm_one = (patch_one - mean_one[0]) / stddev_one[0];
+//     cv::Mat norm_two = (patch_two - mean_two[0]) / stddev_two[0];
+
+//     double ncc = (norm_one.dot(norm_two)) / static_cast<double>(patch_one.total());
+//     return ncc;
+// }
+
 double Dataset::ComputeNCC(const cv::Mat& patch_one, const cv::Mat& patch_two){
-    cv::Scalar mean_one, stddev_one, mean_two, stddev_two;
-    cv::meanStdDev(patch_one, mean_one, stddev_one);
-    cv::meanStdDev(patch_two, mean_two, stddev_two);
+    double mean_one = (cv::mean(patch_one))[0];
+    double mean_two = (cv::mean(patch_two))[0];
+    double sum_of_squared_one  = (cv::sum((patch_one - mean_one).mul(patch_one - mean_one))).val[0];
+    double sum_of_squared_two  = (cv::sum((patch_two - mean_two).mul(patch_two - mean_two))).val[0];
 
-    if (stddev_one[0] == 0 || stddev_two[0] == 0) {
-        return 0.0;
-    }
-
-    cv::Mat norm_one = (patch_one - mean_one[0]) / stddev_one[0];
-    cv::Mat norm_two = (patch_two - mean_two[0]) / stddev_two[0];
-
-    double ncc = (norm_one.dot(norm_two)) / static_cast<double>(patch_one.total());
-    return ncc;
+    cv::Mat norm_one = (patch_one - mean_one) / sqrt(sum_of_squared_one);
+    cv::Mat norm_two = (patch_two - mean_two) / sqrt(sum_of_squared_two);
+    return norm_one.dot(norm_two);
 }
 
 std::pair<std::vector<cv::Point2d>, std::vector<cv::Point2d>> Dataset::CalculateOrthogonalShifts(const std::vector<cv::Point2d>& edge_points, const std::vector<double>& orientations, double shift_magnitude){
