@@ -184,7 +184,7 @@ void Dataset::PerformEdgeBasedVO() {
     LOG_INFO("Start looping over all image pairs");
 
     for (size_t i = 0; i < image_pairs.size(); i++) {
-    // for (size_t i = 0; i < 2; i++) {
+    // for (size_t i = 0; i < 3; i++) {
 
         ncc_one_vs_err.clear();
         ncc_two_vs_err.clear();
@@ -247,7 +247,7 @@ void Dataset::PerformEdgeBasedVO() {
         }                                
         
         //> write to the files
-        write_ncc_vals_to_files( i );
+        // write_ncc_vals_to_files( i );
     
     } //> end of looping over all stereo images
 
@@ -378,6 +378,7 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
 
     int cluster_true_positive = 0;
     int cluster_false_negative = 0;
+    int cluster_true_negative = 0;
 
     int patch_true_positive = 0;
     int patch_false_negative = 0;
@@ -412,7 +413,7 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
             angle_diff_deg -= 180;
         }
 
-        bool left_passes_tangency = (abs(angle_diff_deg - 0) > 6 && abs(angle_diff_deg - 180) > 6) ? (true) : (false);
+        bool left_passes_tangency = (abs(angle_diff_deg - 0) > EPIP_TENGENCY_ORIENT_THRESH && abs(angle_diff_deg - 180) > EPIP_TENGENCY_ORIENT_THRESH) ? (true) : (false);
         if (!left_passes_tangency) {
             continue;
         }
@@ -607,7 +608,10 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
             patch_false_negative++;
         }
         ///////////////////////////////NCC THRESHOLD/////////////////////////////////////////////////////
-        double ncc_threshold = 0.3;
+        double ncc_threshold_strong_both_sides = 0.5;
+        double ncc_threshold_weak_both_sides = 0.25;
+        double ncc_threshold_strong_one_side = 0.65;
+
         bool ncc_match_found = false;
 
         if (!left_patch_one.empty() && !left_patch_two.empty() &&
@@ -623,13 +627,20 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
                 std::pair<double, double> pair_ncc_two_err(err_to_gt, ncc_two);
                 ncc_one_vs_err.push_back(pair_ncc_one_err);
                 ncc_two_vs_err.push_back(pair_ncc_two_err);
-#endif
-
-                if (cv::norm(patch_right_edge_coords[i] - ground_truth_right_edge) < 3.0) {
-
+#endif 
+                if (ncc_one >= ncc_threshold_strong_both_sides && ncc_two >= ncc_threshold_strong_both_sides) {
+                    if (cv::norm(patch_right_edge_coords[i] - ground_truth_right_edge) <= 3.0) {
+                        ncc_match_found = true;
+                        break;
+                    }
                 }
- 
-                if (ncc_one >= ncc_threshold && ncc_two >= ncc_threshold) {
+                else if (ncc_one >= ncc_threshold_strong_one_side || ncc_two >= ncc_threshold_strong_one_side) {
+                    if (cv::norm(patch_right_edge_coords[i] - ground_truth_right_edge) <= 3.0) {
+                        ncc_match_found = true;
+                        break;
+                    }
+                }
+                else if (ncc_one >= ncc_threshold_weak_both_sides && ncc_two >= ncc_threshold_weak_both_sides && patch_right_edge_coords.size() == 1) {
                     if (cv::norm(patch_right_edge_coords[i] - ground_truth_right_edge) <= 3.0) {
                         ncc_match_found = true;
                         break;
@@ -846,7 +857,6 @@ void Dataset::ExtractPatches(
 }
 
 std::vector<std::pair<std::vector<cv::Point2d>, std::vector<double>>> Dataset::ClusterEpipolarShiftedEdges(std::vector<cv::Point2d>& valid_shifted_edges, std::vector<double>& valid_shifted_orientations) {
-    double cluster_threshold = 0.5;
     std::vector<std::pair<std::vector<cv::Point2d>, std::vector<double>>> clusters;
     
     if (valid_shifted_edges.empty() || valid_shifted_orientations.empty()) {
@@ -879,7 +889,7 @@ std::vector<std::pair<std::vector<cv::Point2d>, std::vector<double>>> Dataset::C
         double distance = cv::norm(valid_shifted_edges[i] - valid_shifted_edges[i - 1]); 
         double orientation_difference = std::abs(valid_shifted_orientations[i] - valid_shifted_orientations[i - 1]);
 
-        if (distance <= cluster_threshold && orientation_difference < 5.0) {
+        if (distance <= EDGE_CLUSTER_THRESH && orientation_difference < 5.0) {
             current_cluster_edges.push_back(valid_shifted_edges[i]);
             current_cluster_orientations.push_back(valid_shifted_orientations[i]);
         } else {
@@ -1268,7 +1278,7 @@ cv::Point2d Dataset::PerformEpipolarShift(
     }
 
     //> check if the corrected edge passes the epoplar tengency test (intersection angle < 4 degrees and displacement < 6 pixels)
-    b_pass_epipolar_tengency_check = (epipolar_shift_displacement < 5 && abs(angle_diff_deg - 0) > 6 && abs(angle_diff_deg - 180) > 6) ? (true) : (false);
+    b_pass_epipolar_tengency_check = (epipolar_shift_displacement < EPIP_TENGENCY_PROXIM_THRESH && abs(angle_diff_deg - 0) > EPIP_TENGENCY_ORIENT_THRESH && abs(angle_diff_deg - 180) > EPIP_TENGENCY_ORIENT_THRESH) ? (true) : (false);
     
     return corrected_edge;
 }
