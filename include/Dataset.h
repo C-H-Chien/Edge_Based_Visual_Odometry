@@ -28,14 +28,27 @@
 // =======================================================================================================
 
 struct RecallMetrics {
-    double epi_distance_recall;
-    double max_disparity_recall;
-    double epi_shift_recall;
-    double epi_cluster_recall;
-    double patch_recall;
-    double ncc_recall;
-    double lrt_recall;
+  double epi_distance_recall;
+  double max_disparity_recall;
+  double epi_shift_recall;
+  double epi_cluster_recall;
+  double patch_recall;
+  double ncc_recall;
+  double lowe_recall;
+
+
+  std::vector<int> epi_input_counts;
+  std::vector<int> epi_output_counts;
+  std::vector<int> disp_input_counts;
+  std::vector<int> disp_output_counts;
+  std::vector<int> shift_input_counts;
+  std::vector<int> shift_output_counts;
+  std::vector<int> clust_input_counts;
+  std::vector<int> clust_output_counts;
+  std::vector<int> ncc_input_counts;
+  std::vector<int> ncc_output_counts;
 };
+
 
 extern cv::Mat merged_visualization_global;
 class Dataset {
