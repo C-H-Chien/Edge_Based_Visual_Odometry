@@ -45,6 +45,8 @@ struct RecallMetrics {
   std::vector<int> shift_output_counts;
   std::vector<int> clust_input_counts;
   std::vector<int> clust_output_counts;
+  std::vector<int> patch_input_counts;
+  std::vector<int> patch_output_counts;
   std::vector<int> ncc_input_counts;
   std::vector<int> ncc_output_counts;
 };

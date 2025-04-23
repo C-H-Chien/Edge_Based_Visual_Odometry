@@ -5,6 +5,9 @@
 #define EPIP_TENGENCY_PROXIM_THRESH     (4)     //> in pixels
 #define EDGE_CLUSTER_THRESH             (0.3)   //> in pixels
 
+#define ORTHOGONAL_SHIFT_MAG            (5)     //> in pixels
+#define PATCH_SIZE                      (7)     //> in pixels
+
 //> Number of CPU cores to process
 #define NUM_OF_CPU_CORES                (6)
 
