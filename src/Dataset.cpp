@@ -642,11 +642,20 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
     int lowe_true_positive = 0;
     int lowe_false_negative = 0;
 
+    double per_edge_epi_precision = 0.0;
+    double per_edge_disp_precision = 0.0;
+    double per_edge_shift_precision = 0.0;
+    double per_edge_clust_precision = 0.0;
+
+    int epi_edges_evaluated = 0;
+    int disp_edges_evaluated = 0;
+    int shift_edges_evaluated = 0;
+    int clust_edges_evaluated = 0;
+
     double selected_max_disparity = 23.0063;
 
     int skip = 100;
     for (size_t i = 0; i < selected_left_edges.size(); i += skip) {
-        std::cout << "Edge #: " << i << std::endl;
         const auto& left_edge = selected_left_edges[i];
         const auto& left_orientation = selected_left_orientations[i];
         const auto& ground_truth_right_edge = selected_ground_truth_right_edges[i];
@@ -685,15 +694,13 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
 
         epi_input_counts.push_back(right_edge_coords.size());
         ///////////////////////////////EPIPOLAR DISTANCE THRESHOLD RECALL//////////////////////////
+        int epi_precision_numerator = 0;
         bool match_found = false;
 
         for (const auto& candidate : right_candidate_edges) {
             if (cv::norm(candidate - ground_truth_right_edge) <= 0.5) {
+                epi_precision_numerator++;
                 match_found = true;
-                ///count the number of right edges that go inside this if-statement --> this is your numerator
-                ///right_candidate_edges' size is the denominator 
-                //numerator/denominator = precision
-                break; ///REMOVE THIS BREAK --> LOOP OVER THE ENTIRE RIGHT_CANDIDATE_EDGES TO GET AN ACCURATE NUMBER FOR PRECISION
             }
         }
 
@@ -711,11 +718,14 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
 
             if (!gt_match_found) {
                 epi_true_negative++;
-                std::cout << "SKIPPED" << std::endl;
                 continue;
             } else {
                 epi_false_negative++;
             }
+        }
+        if (!right_candidate_edges.empty()) {
+            per_edge_epi_precision += static_cast<double>(epi_precision_numerator) / right_candidate_edges.size();
+            epi_edges_evaluated++; 
         }
         ///////////////////////////////MAXIMUM DISPARITY THRESHOLD//////////////////////////
         epi_output_counts.push_back(right_candidate_edges.size());
@@ -739,12 +749,13 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
 
         disp_input_counts.push_back(right_candidate_edges.size());
         ///////////////////////////////MAXIMUM DISPARITY THRESHOLD RECALL//////////////////////////
+        int disp_precision_numerator = 0;
         bool disp_match_found = false;
 
         for(const auto& filtered_candidate : filtered_right_edge_coords){
             if (cv::norm(filtered_candidate - ground_truth_right_edge) <= 0.5){
+                disp_precision_numerator++;
                 disp_match_found = true;
-                break;
             }
         }
 
@@ -753,6 +764,9 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
         } 
         else {
             disp_false_negative++;
+        }
+        if (!filtered_right_edge_coords.empty()) {
+            per_edge_disp_precision += static_cast<double>(disp_precision_numerator) / filtered_right_edge_coords.size();
         }
         ///////////////////////////////EPIPOLAR SHIFT THRESHOLD//////////////////////////
         disp_output_counts.push_back(filtered_right_edge_coords.size());
@@ -773,12 +787,13 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
 
         shift_input_counts.push_back(filtered_right_edge_coords.size());
         ///////////////////////////////EPIPOLAR SHIFT THRESHOLD RECALL//////////////////////////
+        int shift_precision_numerator = 0;
         bool shift_match_found = false;
 
         for(const auto& shifted_candidate : shifted_right_edge_coords){
             if (cv::norm(shifted_candidate - ground_truth_right_edge) <= 3.0){
+                shift_precision_numerator++;
                 shift_match_found = true;
-                break;
             }
         }
 
@@ -787,6 +802,9 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
         } 
         else {
             shift_false_negative++;
+        }
+        if (!shifted_right_edge_coords.empty()) {
+            per_edge_shift_precision += static_cast<double>(shift_precision_numerator) / shifted_right_edge_coords.size();
         }
         ///////////////////////////////EPIPOLAR CLUSTER THRESHOLD//////////////////////////
         shift_output_counts.push_back(shifted_right_edge_coords.size());
@@ -821,12 +839,13 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
 
         clust_input_counts.push_back(shifted_right_edge_coords.size());
         ///////////////////////////////EPIPOLAR CLUSTER THRESHOLD RECALL//////////////////////////
+        int clust_precision_numerator = 0;
         bool cluster_match_found = false;
 
         for (const auto& cluster_candidate : cluster_center_edge_coords) {
             if (cv::norm(cluster_candidate - ground_truth_right_edge) <= 3.0) {
+                clust_precision_numerator++;
                 cluster_match_found = true;
-                break;
             }
         }
 
@@ -835,6 +854,14 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
         }
         else {
             cluster_false_negative++;
+        }
+        if (!cluster_center_edge_coords.empty()) {
+            per_edge_clust_precision += static_cast<double>(clust_precision_numerator) / cluster_center_edge_coords.size();
+            std::cout << "Total Clusters: " << cluster_center_edge_coords.size() 
+                << ", Matches Found: " << clust_precision_numerator 
+                << ", Precision: " 
+                << (cluster_center_edge_coords.empty() ? 0 : (double(clust_precision_numerator) / cluster_center_edge_coords.size()) * 100)
+                << "%" << std::endl;
         }
         ///////////////////////////////EXTRACT PATCHES THRESHOLD////////////////////////////////////////////
         clust_output_counts.push_back(cluster_center_edge_coords.size());
@@ -977,7 +1004,6 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
         ncc_output_counts.push_back(passed_ncc_matches.size());
         ///////////////////////////////LOWES RATIO TEST//////////////////////////////////////////////
         lowe_input_counts.push_back(passed_ncc_matches.size());
-        std::cout << "Size of Passed NCC Matches: " << passed_ncc_matches.size() << std::endl;
 
         PatchMatch best_match;
         double best_score_A = -1.0;
@@ -1004,16 +1030,8 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
                 }
             }
 
-            std::cout << "Best Score A: " << best_score_A << std::endl;
-            std::cout << "Best Score B: " << best_score_B << std::endl;
-            std::cout << "Second Best Score A: " << second_best_score_A << std::endl;
-            std::cout << "Second Best Score B: " << second_best_score_B << std::endl;
-
             double lowe_ratio_A = second_best_score_A / best_score_A;
             double lowe_ratio_B = second_best_score_B / best_score_B;
-            std::cout << "Lowe's ratio A: " << lowe_ratio_A << std::endl;
-            std::cout << "Lowe's ratio B: " << lowe_ratio_B << std::endl;
-            std::cout <<"---------------------------------" << std::endl;
 
             if (lowe_ratio_A < 1.0 && lowe_ratio_B < 1.0) {
                 if (cv::norm(best_match.coord - ground_truth_right_edge) <= 3.0) {
@@ -1027,7 +1045,6 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
             best_match = passed_ncc_matches[0];
         }
         lowe_output_counts.push_back(1);
-        std::cout << "==================================" << std::endl;
     }
 
     double epi_distance_recall = 0.0;
@@ -1065,33 +1082,60 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
         lowe_recall = static_cast<double>(lowe_true_positive) / (lowe_true_positive + lowe_false_negative);
     }
 
-    std::cout << "Epipolar Distance Recall: " 
-            << std::fixed << std::setprecision(2) 
-            << epi_distance_recall * 100 << "%" << std::endl;
+    double per_image_epi_precision = (epi_edges_evaluated > 0)
+    ? (per_edge_epi_precision / epi_edges_evaluated)
+    : 0.0;
+    double per_image_disp_precision = (epi_edges_evaluated > 0)
+    ? (per_edge_disp_precision / epi_edges_evaluated)
+    : 0.0;
+    double per_image_shift_precision = (epi_edges_evaluated > 0)
+    ? (per_edge_shift_precision / epi_edges_evaluated)
+    : 0.0;
+    double per_image_clust_precision = (epi_edges_evaluated > 0)
+    ? (per_edge_clust_precision / epi_edges_evaluated)
+    : 0.0;
 
-    std::cout << "Max Disparity Threshold Recall: "
-          << std::fixed << std::setprecision(2)
-          << max_disparity_recall * 100 << "%" << std::endl;
+    // std::cout << "Epipolar Distance Recall: " 
+    //         << std::fixed << std::setprecision(2) 
+    //         << epi_distance_recall * 100 << "%" << std::endl;
 
-    std::cout << "Epipolar Shift Threshold Recall: "
-          << std::fixed << std::setprecision(2)
-          << epi_shift_recall * 100 << "%" << std::endl;
+    // std::cout << "Max Disparity Threshold Recall: "
+    //       << std::fixed << std::setprecision(2)
+    //       << max_disparity_recall * 100 << "%" << std::endl;
 
-    std::cout << "Epipolar Cluster Threshold Recall: "
-          << std::fixed << std::setprecision(2)
-          << epi_cluster_recall * 100 << "%" << std::endl;
+    // std::cout << "Epipolar Shift Threshold Recall: "
+    //       << std::fixed << std::setprecision(2)
+    //       << epi_shift_recall * 100 << "%" << std::endl;
 
-    std::cout << "Patch Threshold Recall: "
-          << std::fixed << std::setprecision(2)
-          << patch_recall * 100 << "%" << std::endl;
+    // std::cout << "Epipolar Cluster Threshold Recall: "
+    //       << std::fixed << std::setprecision(2)
+    //       << epi_cluster_recall * 100 << "%" << std::endl;
 
-    std::cout << "NCC Threshold Recall: "
-          << std::fixed << std::setprecision(2)
-          << ncc_recall * 100 << "%" << std::endl;
+    // std::cout << "Patch Threshold Recall: "
+    //       << std::fixed << std::setprecision(2)
+    //       << patch_recall * 100 << "%" << std::endl;
 
-    std::cout << "LRT Threshold Recall: "
-          << std::fixed << std::setprecision(2)
-          << lowe_recall * 100 << "%" << std::endl;
+    // std::cout << "NCC Threshold Recall: "
+    //       << std::fixed << std::setprecision(2)
+    //       << ncc_recall * 100 << "%" << std::endl;
+
+    // std::cout << "LRT Threshold Recall: "
+    //       << std::fixed << std::setprecision(2)
+    //       << lowe_recall * 100 << "%" << std::endl;
+
+
+    std::cout << "Epipolar Distance Precision: " 
+        << std::fixed << std::setprecision(2) 
+        << per_image_epi_precision * 100 << "%" << std::endl;
+    std::cout << "Maximum Disparity Precision: " 
+        << std::fixed << std::setprecision(2) 
+        << per_image_disp_precision * 100 << "%" << std::endl;
+    std::cout << "Epipolar Shift Precision: " 
+        << std::fixed << std::setprecision(2) 
+        << per_image_shift_precision * 100 << "%" << std::endl;
+    std::cout << "Epipolar Cluster Precision: " 
+        << std::fixed << std::setprecision(2) 
+        << per_image_clust_precision * 100 << "%" << std::endl;
 
    return RecallMetrics {
        epi_distance_recall,
@@ -1114,7 +1158,11 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
        ncc_input_counts,
        ncc_output_counts,
        lowe_input_counts,
-       lowe_output_counts
+       lowe_output_counts,
+       per_image_epi_precision,
+       per_image_disp_precision,
+       per_image_shift_precision,
+       per_image_clust_precision
    };
 }  
 
