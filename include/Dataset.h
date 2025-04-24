@@ -49,8 +49,16 @@ struct RecallMetrics {
   std::vector<int> patch_output_counts;
   std::vector<int> ncc_input_counts;
   std::vector<int> ncc_output_counts;
+  std::vector<int> lowe_input_counts;
+  std::vector<int> lowe_output_counts;
 };
 
+struct PatchMatch{
+    cv::Point2d coord;
+    double orientation;
+    double ncc_one;
+    double ncc_two;
+};
 
 extern cv::Mat merged_visualization_global;
 class Dataset {
