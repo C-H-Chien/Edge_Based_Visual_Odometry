@@ -61,8 +61,7 @@ struct RecallMetrics {
 struct PatchMatch{
     cv::Point2d coord;
     double orientation;
-    double ncc_one;
-    double ncc_two;
+    double final_score;
 };
 
 extern cv::Mat merged_visualization_global;
