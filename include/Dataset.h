@@ -32,7 +32,6 @@ struct RecallMetrics {
   double max_disparity_recall;
   double epi_shift_recall;
   double epi_cluster_recall;
-  double patch_recall;
   double ncc_recall;
   double lowe_recall;
 

@@ -325,7 +325,6 @@ void Dataset::PerformEdgeBasedVO() {
     double total_disp_recall = 0.0;
     double total_shift_recall = 0.0;
     double total_cluster_recall = 0.0;
-    double total_patch_recall = 0.0;
     double total_ncc_recall = 0.0;
     double total_lowe_recall = 0.0;
 
@@ -334,7 +333,6 @@ void Dataset::PerformEdgeBasedVO() {
         total_disp_recall += m.max_disparity_recall;
         total_shift_recall += m.epi_shift_recall;
         total_cluster_recall += m.epi_cluster_recall;
-        total_patch_recall += m.patch_recall;
         total_ncc_recall += m.ncc_recall;
         total_lowe_recall += m.lowe_recall;
     }
@@ -345,14 +343,13 @@ void Dataset::PerformEdgeBasedVO() {
     double avg_disp_recall  = (total_images > 0) ? total_disp_recall / total_images : 0.0;
     double avg_shift_recall = (total_images > 0) ? total_shift_recall / total_images : 0.0;
     double avg_cluster_recall = (total_images > 0) ? total_cluster_recall / total_images : 0.0;
-    double avg_patch_recall = (total_images > 0) ? total_patch_recall / total_images : 0.0;
     double avg_ncc_recall = (total_images > 0) ? total_ncc_recall / total_images : 0.0;
     double avg_lowe_recall = (total_images > 0) ? total_lowe_recall / total_images: 0.0;
 
     std::string edge_stat_dir = output_path + "/edge stats";
     std::filesystem::create_directories(edge_stat_dir);
     std::ofstream recall_csv(edge_stat_dir + "/recall_metrics.csv");
-    recall_csv << "ImageIndex,EpiDistanceRecall,MaxDisparityRecall,EpiShiftRecall,EpiClusterRecall,PatchRecall,NCCRecall,LoweRecall\n";
+    recall_csv << "ImageIndex,EpiDistanceRecall,MaxDisparityRecall,EpiShiftRecall,EpiClusterRecall,NCCRecall,LoweRecall\n";
 
     for (size_t i = 0; i < all_recall_metrics.size(); i++) {
         const auto& m = all_recall_metrics[i];
@@ -361,7 +358,6 @@ void Dataset::PerformEdgeBasedVO() {
                 << std::fixed << std::setprecision(4) << m.max_disparity_recall * 100 << ","
                 << std::fixed << std::setprecision(4) << m.epi_shift_recall * 100 << ","
                 << std::fixed << std::setprecision(4) << m.epi_cluster_recall * 100 << ","
-                << std::fixed << std::setprecision(4) << m.patch_recall * 100 << ","
                 << std::fixed << std::setprecision(4) << m.ncc_recall * 100 << ","
                 << std::fixed << std::setprecision(4) << m.lowe_recall * 100 << "\n";
     }
@@ -371,7 +367,6 @@ void Dataset::PerformEdgeBasedVO() {
             << std::fixed << std::setprecision(4) << avg_disp_recall * 100 << ","
             << std::fixed << std::setprecision(4) << avg_shift_recall * 100 << ","
             << std::fixed << std::setprecision(4) << avg_cluster_recall * 100 << ","
-            << std::fixed << std::setprecision(4) << avg_patch_recall * 100 << ","
             << std::fixed << std::setprecision(4) << avg_ncc_recall * 100 << ","
             << std::fixed << std::setprecision(4) << avg_lowe_recall * 100 << "\n";
     
@@ -633,9 +628,6 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
     int cluster_false_negative = 0;
     int cluster_true_negative = 0;
 
-    int patch_true_positive = 0;
-    int patch_false_negative = 0;
-
     int ncc_true_positive = 0;
     int ncc_false_negative = 0;
 
@@ -646,14 +638,12 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
     double per_edge_disp_precision = 0.0;
     double per_edge_shift_precision = 0.0;
     double per_edge_clust_precision = 0.0;
-    double per_edge_patch_precision = 0.0;
     double per_edge_ncc_precision = 0.0;
     double per_edge_lowe_precision = 0.0;
 
     double selected_max_disparity = 23.0063;
 
     int epi_edges_evaluated = 0;
-    int patch_edges_evaluated = 0;
     int ncc_edges_evaluated = 0;
     int lowe_edges_evaluated = 0;
 
@@ -801,7 +791,7 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
         }
 
         if (shift_match_found){
-            shift_true_positive++; //Have a flag for the next step if this (1 means its true positive, 0 means its not)
+            shift_true_positive++;
         } 
         else {
             shift_false_negative++;
@@ -853,12 +843,12 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
         }
 
         if (cluster_match_found) {
-            cluster_true_positive++; //have another flag for when its true positive (used if we should measure the precision rate in the next step)
+            cluster_true_positive++;
         }
         else {
             cluster_false_negative++;
         }
-        if (!cluster_center_edge_coords.empty()) { //&& flag = 1 or you can have a nested if-statement for when flag = 1
+        if (!cluster_center_edge_coords.empty()) {
             per_edge_clust_precision += static_cast<double>(clust_precision_numerator) / cluster_center_edge_coords.size();
         }
         ///////////////////////////////EXTRACT PATCHES THRESHOLD////////////////////////////////////////////
@@ -891,27 +881,6 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
         );
 
         patch_input_counts.push_back(cluster_center_edge_coords.size());
-        ///////////////////////////////EXTRACT PATCHES RECALL////////////////////////////////////////////
-        int patch_precision_numerator = 0;
-        bool patch_match_found = false;
-
-        for (const auto& patch_candidate : patch_right_edge_coords) {
-            if (cv::norm(patch_candidate - ground_truth_right_edge) <= 3.0) {
-                patch_precision_numerator++;
-                patch_match_found = true;
-            }
-        }
-
-        if (patch_match_found) {
-            patch_true_positive++;
-        }
-        else {
-            patch_false_negative++;
-        }
-        if (!patch_right_edge_coords.empty()) {
-            per_edge_patch_precision += static_cast<double>(patch_precision_numerator) / patch_right_edge_coords.size();
-            patch_edges_evaluated++;
-        }
         ///////////////////////////////NCC THRESHOLD/////////////////////////////////////////////////////
         patch_output_counts.push_back(patch_right_edge_coords.size());
         int ncc_precision_numerator = 0;
@@ -946,14 +915,14 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
                     }
                 }
             }
-            if (ncc_match_found) {  //Create another flag to be used in LRT step
+            if (ncc_match_found) {
                 ncc_true_positive++;
             } else {
                 ncc_false_negative++;
             }
         }
 
-        if (!patch_right_edge_coords.empty()) { //&& flag = 1 or nested if-statement (this flag will be the flag of the previous true positive --> you'll keep track of different flags for each step)
+        if (!patch_right_edge_coords.empty()) {
             per_edge_ncc_precision += static_cast<double>(ncc_precision_numerator) / patch_right_edge_coords.size();
             ncc_edges_evaluated++;
         }
@@ -989,23 +958,15 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
                 if (cv::norm(best_match.coord - ground_truth_right_edge) <= 3.0) {
                     lowe_precision_numerator++;
                     lowe_true_positive++;
-                } 
-            } else {
-                lowe_false_negative++;
+                } else {
+                    lowe_false_negative++;
+                }
             }
         }
         else if (passed_ncc_matches.size() == 1){
             best_match = passed_ncc_matches[0];
-            if (cv::norm(best_match.coord - ground_truth_right_edge) <= 3.0) {
-                lowe_true_positive++;
-            } else{
-                lowe_false_negative++;
-            }
         }
-        else if (passed_ncc_matches.size() == 0){
-            lowe_false_negative++;
-        }
-        if (!passed_ncc_matches.empty()) { // && flag = 1 
+        if (!passed_ncc_matches.empty()) {
             per_edge_lowe_precision += static_cast<double>(lowe_precision_numerator) / passed_ncc_matches.size();
             lowe_edges_evaluated++;
         }
@@ -1030,11 +991,6 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
     double epi_cluster_recall = 0.0;
     if ((cluster_true_positive + cluster_false_negative) > 0) {
         epi_cluster_recall = static_cast<double>(cluster_true_positive) / (cluster_true_positive + cluster_false_negative);
-    }
-
-    double patch_recall = 0.0;
-    if ((patch_true_positive + patch_false_negative) > 0) {
-        patch_recall = static_cast<double>(patch_true_positive) / (patch_true_positive + patch_false_negative);
     }
 
     double ncc_recall = 0.0;
@@ -1063,10 +1019,6 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
     //       << std::fixed << std::setprecision(2)
     //       << epi_cluster_recall * 100 << "%" << std::endl;
 
-    // std::cout << "Patch Threshold Recall: "
-    //       << std::fixed << std::setprecision(2)
-    //       << patch_recall * 100 << "%" << std::endl;
-
     // std::cout << "NCC Threshold Recall: "
     //       << std::fixed << std::setprecision(2)
     //       << ncc_recall * 100 << "%" << std::endl;
@@ -1087,9 +1039,6 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
     double per_image_clust_precision = (epi_edges_evaluated > 0)
     ? (per_edge_clust_precision / epi_edges_evaluated)
     : 0.0;
-    double per_image_patch_precision = (patch_edges_evaluated > 0)
-    ? (per_edge_patch_precision / patch_edges_evaluated)
-    : 0.0;
     double per_image_ncc_precision = (ncc_edges_evaluated > 0)
     ? (per_edge_ncc_precision / ncc_edges_evaluated)
     : 0.0;
@@ -1109,9 +1058,6 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
     std::cout << "Epipolar Cluster Precision: " 
         << std::fixed << std::setprecision(2) 
         << per_image_clust_precision * 100 << "%" << std::endl;
-    std::cout << "Patch Precision: " 
-        << std::fixed << std::setprecision(2) 
-        << per_image_patch_precision * 100 << "%" << std::endl;
     std::cout << "NCC Precision: " 
         << std::fixed << std::setprecision(2) 
         << per_image_ncc_precision * 100 << "%" << std::endl;
@@ -1124,7 +1070,6 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
        max_disparity_recall,
        epi_shift_recall,
        epi_cluster_recall,
-       patch_recall,
        ncc_recall,
        lowe_recall,
        epi_input_counts,
