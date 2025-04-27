@@ -801,7 +801,7 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
         }
 
         if (shift_match_found){
-            shift_true_positive++;
+            shift_true_positive++; //Have a flag for the next step if this (1 means its true positive, 0 means its not)
         } 
         else {
             shift_false_negative++;
@@ -853,12 +853,12 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
         }
 
         if (cluster_match_found) {
-            cluster_true_positive++;
+            cluster_true_positive++; //have another flag for when its true positive (used if we should measure the precision rate in the next step)
         }
         else {
             cluster_false_negative++;
         }
-        if (!cluster_center_edge_coords.empty()) {
+        if (!cluster_center_edge_coords.empty()) { //&& flag = 1 or you can have a nested if-statement for when flag = 1
             per_edge_clust_precision += static_cast<double>(clust_precision_numerator) / cluster_center_edge_coords.size();
         }
         ///////////////////////////////EXTRACT PATCHES THRESHOLD////////////////////////////////////////////
@@ -946,14 +946,14 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
                     }
                 }
             }
-            if (ncc_match_found) {
+            if (ncc_match_found) {  //Create another flag to be used in LRT step
                 ncc_true_positive++;
             } else {
                 ncc_false_negative++;
             }
         }
 
-        if (!patch_right_edge_coords.empty()) {
+        if (!patch_right_edge_coords.empty()) { //&& flag = 1 or nested if-statement (this flag will be the flag of the previous true positive --> you'll keep track of different flags for each step)
             per_edge_ncc_precision += static_cast<double>(ncc_precision_numerator) / patch_right_edge_coords.size();
             ncc_edges_evaluated++;
         }
@@ -989,15 +989,23 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
                 if (cv::norm(best_match.coord - ground_truth_right_edge) <= 3.0) {
                     lowe_precision_numerator++;
                     lowe_true_positive++;
-                } else {
-                    lowe_false_negative++;
-                }
+                } 
+            } else {
+                lowe_false_negative++;
             }
         }
         else if (passed_ncc_matches.size() == 1){
             best_match = passed_ncc_matches[0];
+            if (cv::norm(best_match.coord - ground_truth_right_edge) <= 3.0) {
+                lowe_true_positive++;
+            } else{
+                lowe_false_negative++;
+            }
         }
-        if (!passed_ncc_matches.empty()) {
+        else if (passed_ncc_matches.size() == 0){
+            lowe_false_negative++;
+        }
+        if (!passed_ncc_matches.empty()) { // && flag = 1 
             per_edge_lowe_precision += static_cast<double>(lowe_precision_numerator) / passed_ncc_matches.size();
             lowe_edges_evaluated++;
         }
