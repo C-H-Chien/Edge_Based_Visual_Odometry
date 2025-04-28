@@ -167,7 +167,7 @@ void Dataset::write_ncc_vals_to_files( int img_index ) {
 }
 
 void Dataset::PerformEdgeBasedVO() {
-    int num_pairs = 1;
+    int num_pairs = 247;
     std::vector<std::pair<cv::Mat, cv::Mat>> image_pairs;
     std::vector<cv::Mat> disparity_maps;
     std::vector<double> max_disparity_values;
@@ -227,7 +227,7 @@ void Dataset::PerformEdgeBasedVO() {
         const cv::Mat& disparity_map = disparity_maps[i]; 
         {
 
-        std::cout << "Image #" << i << "\n";
+        std::cout << "Image Pair #" << i << "\n";
         cv::Mat left_calib = (cv::Mat_<double>(3, 3) << left_intr[0], 0, left_intr[2], 0, left_intr[1], left_intr[3], 0, 0, 1);
         cv::Mat right_calib = (cv::Mat_<double>(3, 3) << right_intr[0], 0, right_intr[2], 0, right_intr[1], right_intr[3], 0, 0, 1);
         cv::Mat left_dist_coeff_mat(left_dist_coeffs);
@@ -328,6 +328,13 @@ void Dataset::PerformEdgeBasedVO() {
     double total_ncc_recall = 0.0;
     double total_lowe_recall = 0.0;
 
+    double total_epi_precision = 0.0;
+    double total_disp_precision = 0.0;
+    double total_shift_precision = 0.0;
+    double total_cluster_precision = 0.0;
+    double total_ncc_precision = 0.0;
+    double total_lowe_precision = 0.0;
+
     for (const RecallMetrics& m : all_recall_metrics) {
         total_epi_recall += m.epi_distance_recall;
         total_disp_recall += m.max_disparity_recall;
@@ -335,6 +342,13 @@ void Dataset::PerformEdgeBasedVO() {
         total_cluster_recall += m.epi_cluster_recall;
         total_ncc_recall += m.ncc_recall;
         total_lowe_recall += m.lowe_recall;
+
+        total_epi_precision += m.per_image_epi_precision;
+        total_disp_precision += m.per_image_disp_precision;
+        total_shift_precision += m.per_image_shift_precision;
+        total_cluster_precision += m.per_image_clust_precision;
+        total_ncc_precision += m.per_image_ncc_precision;
+        total_lowe_precision += m.per_image_lowe_precision;
     }
 
     int total_images = static_cast<int>(all_recall_metrics.size());
@@ -345,6 +359,13 @@ void Dataset::PerformEdgeBasedVO() {
     double avg_cluster_recall = (total_images > 0) ? total_cluster_recall / total_images : 0.0;
     double avg_ncc_recall = (total_images > 0) ? total_ncc_recall / total_images : 0.0;
     double avg_lowe_recall = (total_images > 0) ? total_lowe_recall / total_images: 0.0;
+
+    double avg_epi_precision   = (total_images > 0) ? total_epi_precision / total_images : 0.0;
+    double avg_disp_precision  = (total_images > 0) ? total_disp_precision / total_images : 0.0;
+    double avg_shift_precision = (total_images > 0) ? total_shift_precision / total_images : 0.0;
+    double avg_cluster_precision = (total_images > 0) ? total_cluster_precision / total_images : 0.0;
+    double avg_ncc_precision = (total_images > 0) ? total_ncc_precision / total_images : 0.0;
+    double avg_lowe_precision = (total_images > 0) ? total_lowe_precision / total_images: 0.0;
 
     std::string edge_stat_dir = output_path + "/edge stats";
     std::filesystem::create_directories(edge_stat_dir);
@@ -527,7 +548,29 @@ void Dataset::PerformEdgeBasedVO() {
         << ","
         << ","
         << avg_of_avgs_before_lowe << ","            
-        << avg_of_avgs_after_lowe << "\n";          
+        << avg_of_avgs_after_lowe << "\n";  
+    
+    std::ofstream precision_csv(edge_stat_dir + "/precision_metrics.csv");
+    precision_csv << "ImageIndex,EpiDistancePrecision,MaxDisparityPrecision,EpiShiftPrecision,EpiClusterPrecision,NCCPrecision,LowePrecision\n";
+
+    for (size_t i = 0; i < all_recall_metrics.size(); i++) {
+        const auto& m = all_recall_metrics[i];
+        precision_csv << i << ","
+                << std::fixed << std::setprecision(4) << m.per_image_epi_precision * 100 << ","
+                << std::fixed << std::setprecision(4) << m.per_image_disp_precision * 100 << ","
+                << std::fixed << std::setprecision(4) << m.per_image_shift_precision * 100 << ","
+                << std::fixed << std::setprecision(4) << m.per_image_clust_precision * 100 << ","
+                << std::fixed << std::setprecision(4) << m.per_image_ncc_precision * 100 << ","
+                << std::fixed << std::setprecision(4) << m.per_image_lowe_precision * 100 << "\n";
+    }
+
+    precision_csv << "Average,"
+        << std::fixed << std::setprecision(4) << avg_epi_precision * 100 << ","
+        << std::fixed << std::setprecision(4) << avg_disp_precision * 100 << ","
+        << std::fixed << std::setprecision(4) << avg_shift_precision * 100 << ","
+        << std::fixed << std::setprecision(4) << avg_cluster_precision * 100 << ","
+        << std::fixed << std::setprecision(4) << avg_ncc_precision * 100 << ","
+        << std::fixed << std::setprecision(4) << avg_lowe_precision * 100 << "\n";
 }
 
 RecallMetrics Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, const cv::Mat& left_binary_map, const cv::Mat& right_binary_map, std::vector<cv::Point2d> right_edge_coords, std::vector<double> right_edge_orientations) {
@@ -643,7 +686,12 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
 
     double selected_max_disparity = 23.0063;
 
-    int left_edges_evaluated = 0;
+    int epi_edges_evaluated = 0;
+    int disp_edges_evaluated = 0;
+    int shift_edges_evaluated = 0;
+    int clust_edges_evaluated = 0;
+    int ncc_edges_evaluated = 0;
+    int lowe_edges_evaluated = 0;
 
     int skip = 100;
     for (size_t i = 0; i < selected_left_edges.size(); i += skip) {
@@ -717,7 +765,7 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
         }
         if (!right_candidate_edges.empty()) {
             per_edge_epi_precision += static_cast<double>(epi_precision_numerator) / right_candidate_edges.size();
-            left_edges_evaluated++; 
+            epi_edges_evaluated++; 
         }
         ///////////////////////////////MAXIMUM DISPARITY THRESHOLD//////////////////////////
         epi_output_counts.push_back(right_candidate_edges.size());
@@ -760,6 +808,7 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
         }
         if (!filtered_right_edge_coords.empty()) {
             per_edge_disp_precision += static_cast<double>(disp_precision_numerator) / filtered_right_edge_coords.size();
+            disp_edges_evaluated++;
         }
         ///////////////////////////////EPIPOLAR SHIFT THRESHOLD//////////////////////////
         disp_output_counts.push_back(filtered_right_edge_coords.size());
@@ -799,6 +848,7 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
         }
         if (!shifted_right_edge_coords.empty()) {
             per_edge_shift_precision += static_cast<double>(shift_precision_numerator) / shifted_right_edge_coords.size();
+            shift_edges_evaluated++;
         }
         ///////////////////////////////EPIPOLAR CLUSTER THRESHOLD//////////////////////////
         shift_output_counts.push_back(shifted_right_edge_coords.size());
@@ -852,6 +902,7 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
         }
         if (!cluster_center_edge_coords.empty()) {
             per_edge_clust_precision += static_cast<double>(clust_precision_numerator) / cluster_center_edge_coords.size();
+            clust_edges_evaluated++;
         }
         ///////////////////////////////EXTRACT PATCHES THRESHOLD////////////////////////////////////////////
         clust_output_counts.push_back(cluster_center_edge_coords.size());
@@ -883,115 +934,115 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
         );
 
         patch_input_counts.push_back(cluster_center_edge_coords.size());
-        ///////////////////////////////NCC THRESHOLD/////////////////////////////////////////////////////
-        patch_output_counts.push_back(patch_right_edge_coords.size());
-        int ncc_precision_numerator = 0;
+       ///////////////////////////////NCC THRESHOLD/////////////////////////////////////////////////////
+       patch_output_counts.push_back(patch_right_edge_coords.size());
+       int ncc_precision_numerator = 0;
 
-        double ncc_threshold_strong_both_sides = 0.5;
-        double ncc_threshold_weak_both_sides = 0.25;
-        double ncc_threshold_strong_one_side = 0.65;
+       double ncc_threshold_strong_both_sides = 0.5;
+       double ncc_threshold_weak_both_sides = 0.25;
+       double ncc_threshold_strong_one_side = 0.65;
 
-        bool ncc_match_found = false;
-        std::vector<PatchMatch> passed_ncc_matches;
+       bool ncc_match_found = false;
+       std::vector<PatchMatch> passed_ncc_matches;
 
-        if (!left_patch_one.empty() && !left_patch_two.empty() &&
-            !right_patch_set_one.empty() && !right_patch_set_two.empty()) {
+       if (!left_patch_one.empty() && !left_patch_two.empty() &&
+           !right_patch_set_one.empty() && !right_patch_set_two.empty()) {
 
-            for (size_t i = 0; i < patch_right_edge_coords.size(); ++i) {
-                double ncc_one = ComputeNCC(left_patch_one, right_patch_set_one[i]);
-                double ncc_two = ComputeNCC(left_patch_two, right_patch_set_two[i]);
-                double ncc_three = ComputeNCC(left_patch_one, right_patch_set_two[i]);
-                double ncc_four = ComputeNCC(left_patch_two, right_patch_set_one[i]);
+           for (size_t i = 0; i < patch_right_edge_coords.size(); ++i) {
+               double ncc_one = ComputeNCC(left_patch_one, right_patch_set_one[i]);
+               double ncc_two = ComputeNCC(left_patch_two, right_patch_set_two[i]);
+               double ncc_three = ComputeNCC(left_patch_one, right_patch_set_two[i]);
+               double ncc_four = ComputeNCC(left_patch_two, right_patch_set_one[i]);
 
-                double score_one = std::min(ncc_one, ncc_two);
-                double score_two = std::min(ncc_three, ncc_four);
+               double score_one = std::min(ncc_one, ncc_two);
+               double score_two = std::min(ncc_three, ncc_four);
 
-                double final_score = std::max(score_one, score_two);
+               double final_score = std::max(score_one, score_two);
 
 #if DEBUG_COLLECT_NCC_AND_ERR
-                double err_to_gt = cv::norm(patch_right_edge_coords[i] - ground_truth_right_edge);
-                std::pair<double, double> pair_ncc_one_err(err_to_gt, ncc_one);
-                std::pair<double, double> pair_ncc_two_err(err_to_gt, ncc_two);
-                ncc_one_vs_err.push_back(pair_ncc_one_err);
-                ncc_two_vs_err.push_back(pair_ncc_two_err);
-#endif 
-                if (ncc_one >= ncc_threshold_strong_both_sides && ncc_two >= ncc_threshold_strong_both_sides) {
-                    PatchMatch info;
-                    info.coord = patch_right_edge_coords[i];
-                    info.orientation = patch_right_edge_orientations[i];
-                    info.final_score = final_score;
-                    passed_ncc_matches.push_back(info);
+               double err_to_gt = cv::norm(patch_right_edge_coords[i] - ground_truth_right_edge);
+               std::pair<double, double> pair_ncc_one_err(err_to_gt, ncc_one);
+               std::pair<double, double> pair_ncc_two_err(err_to_gt, ncc_two);
+               ncc_one_vs_err.push_back(pair_ncc_one_err);
+               ncc_two_vs_err.push_back(pair_ncc_two_err);
+#endif
+               if (ncc_one >= ncc_threshold_strong_both_sides && ncc_two >= ncc_threshold_strong_both_sides) {
+                   PatchMatch info;
+                   info.coord = patch_right_edge_coords[i];
+                   info.orientation = patch_right_edge_orientations[i];
+                   info.final_score = final_score;
+                   passed_ncc_matches.push_back(info);
 
-                    if (cv::norm(patch_right_edge_coords[i] - ground_truth_right_edge) <= 3.0) {
-                        ncc_match_found = true;
-                        ncc_precision_numerator++;
-                        // break;
-                    }
-                }
-                else if (ncc_one >= ncc_threshold_strong_one_side || ncc_two >= ncc_threshold_strong_one_side) {
-                    PatchMatch info;
-                    info.coord = patch_right_edge_coords[i];
-                    info.orientation = patch_right_edge_orientations[i];
-                    info.final_score = final_score;
-                    passed_ncc_matches.push_back(info);
+                   if (cv::norm(patch_right_edge_coords[i] - ground_truth_right_edge) <= 3.0) {
+                       ncc_match_found = true;
+                       ncc_precision_numerator++;
+                    //    break;
+                   }
+               }
+               else if (ncc_one >= ncc_threshold_strong_one_side || ncc_two >= ncc_threshold_strong_one_side) {
+                   PatchMatch info;
+                   info.coord = patch_right_edge_coords[i];
+                   info.orientation = patch_right_edge_orientations[i];
+                   info.final_score = final_score;
+                   passed_ncc_matches.push_back(info);
 
-                    if (cv::norm(patch_right_edge_coords[i] - ground_truth_right_edge) <= 3.0) {
-                        ncc_match_found = true;
-                        ncc_precision_numerator++;
-                        // break;
-                    }
-                }
-                else if (ncc_one >= ncc_threshold_weak_both_sides && ncc_two >= ncc_threshold_weak_both_sides && patch_right_edge_coords.size() == 1) {
-                    PatchMatch info;
-                    info.coord = patch_right_edge_coords[i];
-                    info.orientation = patch_right_edge_orientations[i];
-                    info.final_score = final_score;
-                    passed_ncc_matches.push_back(info);
+                   if (cv::norm(patch_right_edge_coords[i] - ground_truth_right_edge) <= 3.0) {
+                       ncc_match_found = true;
+                       ncc_precision_numerator++;
+                    //    break;
+                   }
+               }
+               else if (ncc_one >= ncc_threshold_weak_both_sides && ncc_two >= ncc_threshold_weak_both_sides && patch_right_edge_coords.size() == 1) {
+                   PatchMatch info;
+                   info.coord = patch_right_edge_coords[i];
+                   info.orientation = patch_right_edge_orientations[i];
+                   info.final_score = final_score;
+                   passed_ncc_matches.push_back(info);
 
-                    if (cv::norm(patch_right_edge_coords[i] - ground_truth_right_edge) <= 3.0) {
-                        ncc_match_found = true;
-                        ncc_precision_numerator++;
-                        // break;
-                    }
-                }
-            }
+                   if (cv::norm(patch_right_edge_coords[i] - ground_truth_right_edge) <= 3.0) {
+                       ncc_match_found = true;
+                       ncc_precision_numerator++;
+                    //    break;
+                   }
+               }
+           }
 
-            if (ncc_match_found) {
-                ncc_true_positive++;
-            } else {
-                ncc_false_negative++;
+           if (ncc_match_found) {
+               ncc_true_positive++;
+           } else {
+               ncc_false_negative++;
 
 #if DEBUG_FALSE_NEGATIVES
-                //> [DEBUG]
-                if (ncc_false_negative == 2) {
-                    std::cout << "Left edge: (" << left_edge.x << ", " << left_edge.y << ")" << std::endl;
-                    std::cout << "GT edge: (" << ground_truth_right_edge.x << ", " << ground_truth_right_edge.y << ")" << std::endl;
-                    std::cout << "patch_right_edge_coords.size() = " << patch_right_edge_coords.size() << ", right_patch_set_one.size() = " << right_patch_set_one.size() << std::endl;
-                    std::cout << "Left patch #1:" << left_patch_one << std::endl;
-                    std::cout << "Left patch #2:" << left_patch_two << std::endl;
-                    std::cout << "Right edges:" << std::endl;
-                    for (size_t i = 0; i < patch_right_edge_coords.size(); ++i) {
-                        std::cout << "Right patch #1:" << right_patch_set_one[i] << std::endl;
-                        std::cout << "Right patch #2:" << right_patch_set_two[i] << std::endl;
-                        double ncc_one = ComputeNCC(left_patch_one, right_patch_set_one[i]);
-                        double ncc_two = ComputeNCC(left_patch_two, right_patch_set_two[i]);
-                        std::cout << "(" << patch_right_edge_coords[i].x << ", " << patch_right_edge_coords[i].y << "), ncc_one = " << ncc_one << ", ncc_two = " << ncc_two << std::endl;
-                    }
-                    std::cout << "Evaluation:" << std::endl;
-                    for (size_t i = 0; i < patch_right_edge_coords.size(); ++i) {
-                        std::cout << cv::norm(patch_right_edge_coords[i] - ground_truth_right_edge) << std::endl;
-                    }
-                }
+               //> [DEBUG]
+               if (ncc_false_negative == 2) {
+                   std::cout << "Left edge: (" << left_edge.x << ", " << left_edge.y << ")" << std::endl;
+                   std::cout << "GT edge: (" << ground_truth_right_edge.x << ", " << ground_truth_right_edge.y << ")" << std::endl;
+                   std::cout << "patch_right_edge_coords.size() = " << patch_right_edge_coords.size() << ", right_patch_set_one.size() = " << right_patch_set_one.size() << std::endl;
+                   std::cout << "Left patch #1:" << left_patch_one << std::endl;
+                   std::cout << "Left patch #2:" << left_patch_two << std::endl;
+                   std::cout << "Right edges:" << std::endl;
+                   for (size_t i = 0; i < patch_right_edge_coords.size(); ++i) {
+                       std::cout << "Right patch #1:" << right_patch_set_one[i] << std::endl;
+                       std::cout << "Right patch #2:" << right_patch_set_two[i] << std::endl;
+                       double ncc_one = ComputeNCC(left_patch_one, right_patch_set_one[i]);
+                       double ncc_two = ComputeNCC(left_patch_two, right_patch_set_two[i]);
+                       std::cout << "(" << patch_right_edge_coords[i].x << ", " << patch_right_edge_coords[i].y << "), ncc_one = " << ncc_one << ", ncc_two = " << ncc_two << std::endl;
+                   }
+                   std::cout << "Evaluation:" << std::endl;
+                   for (size_t i = 0; i < patch_right_edge_coords.size(); ++i) {
+                       std::cout << cv::norm(patch_right_edge_coords[i] - ground_truth_right_edge) << std::endl;
+                   }
+               }
 #endif
-            }
-        }
+           }
+       }
 
-        if (!patch_right_edge_coords.empty()) {
-            per_edge_ncc_precision += static_cast<double>(ncc_precision_numerator) / patch_right_edge_coords.size();
-        }
-        ncc_input_counts.push_back(patch_right_edge_coords.size());
-        ncc_output_counts.push_back(passed_ncc_matches.size());
-
+       if (!passed_ncc_matches.empty()) {
+           per_edge_ncc_precision += static_cast<double>(ncc_precision_numerator) / passed_ncc_matches.size();
+           ncc_edges_evaluated++;
+       }
+       ncc_input_counts.push_back(patch_right_edge_coords.size());
+       ncc_output_counts.push_back(passed_ncc_matches.size());
         ///////////////////////////////LOWES RATIO TEST//////////////////////////////////////////////
         lowe_input_counts.push_back(passed_ncc_matches.size());
         int lowe_precision_numerator = 0;
@@ -1018,17 +1069,21 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
             }
             double lowe_ratio = second_best_score / best_score;
 
-            if (lowe_ratio < 1){
+            if (lowe_ratio < 1) {
                 if (cv::norm(best_match.coord - ground_truth_right_edge) <= 3.0) {
                     lowe_precision_numerator++;
                     lowe_true_positive++;
-                } else {
+                }
+                else {
                     lowe_false_negative++;
                 }
-
                 lowe_output_counts.push_back(1);
             }
-        }
+            else {
+                lowe_false_negative++;
+                lowe_output_counts.push_back(0);
+            }
+        }   
         else if (passed_ncc_matches.size() == 1){
             best_match = passed_ncc_matches[0];
 
@@ -1042,11 +1097,13 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
             lowe_output_counts.push_back(1);
         }
         else {
-            std::cout << "WARNING: Passed NCC Matches vector has no edges!" << std::endl;
+            lowe_false_negative++;
             lowe_output_counts.push_back(0); 
         }
+        per_edge_lowe_precision += (static_cast<double>(lowe_precision_numerator) > 0) ? 1.0: 0.0;
+        
         if (!passed_ncc_matches.empty()) {
-            per_edge_lowe_precision += static_cast<double>(lowe_precision_numerator) / passed_ncc_matches.size();
+            lowe_edges_evaluated++;
         }
     }   
 
@@ -1080,47 +1137,47 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
         lowe_recall = static_cast<double>(lowe_true_positive) / (lowe_true_positive + lowe_false_negative);
     }
 
-    // std::cout << "Epipolar Distance Recall: " 
-    //         << std::fixed << std::setprecision(2) 
-    //         << epi_distance_recall * 100 << "%" << std::endl;
+    std::cout << "Epipolar Distance Recall: " 
+            << std::fixed << std::setprecision(2) 
+            << epi_distance_recall * 100 << "%" << std::endl;
 
-    // std::cout << "Max Disparity Threshold Recall: "
-    //       << std::fixed << std::setprecision(2)
-    //       << max_disparity_recall * 100 << "%" << std::endl;
+    std::cout << "Max Disparity Threshold Recall: "
+          << std::fixed << std::setprecision(2)
+          << max_disparity_recall * 100 << "%" << std::endl;
 
-    // std::cout << "Epipolar Shift Threshold Recall: "
-    //       << std::fixed << std::setprecision(2)
-    //       << epi_shift_recall * 100 << "%" << std::endl;
+    std::cout << "Epipolar Shift Threshold Recall: "
+          << std::fixed << std::setprecision(2)
+          << epi_shift_recall * 100 << "%" << std::endl;
 
-    // std::cout << "Epipolar Cluster Threshold Recall: "
-    //       << std::fixed << std::setprecision(2)
-    //       << epi_cluster_recall * 100 << "%" << std::endl;
+    std::cout << "Epipolar Cluster Threshold Recall: "
+          << std::fixed << std::setprecision(2)
+          << epi_cluster_recall * 100 << "%" << std::endl;
 
-    // std::cout << "NCC Threshold Recall: "
-    //       << std::fixed << std::setprecision(2)
-    //       << ncc_recall * 100 << "%" << std::endl;
+    std::cout << "NCC Threshold Recall: "
+          << std::fixed << std::setprecision(2)
+          << ncc_recall * 100 << "%" << std::endl;
 
-    // std::cout << "LRT Threshold Recall: "
-    //       << std::fixed << std::setprecision(2)
-    //       << lowe_recall * 100 << "%" << std::endl;
+    std::cout << "LRT Threshold Recall: "
+          << std::fixed << std::setprecision(2)
+          << lowe_recall * 100 << "%" << std::endl;
 
-    double per_image_epi_precision = (left_edges_evaluated > 0)
-    ? (per_edge_epi_precision / left_edges_evaluated)
+    double per_image_epi_precision = (epi_edges_evaluated > 0)
+    ? (per_edge_epi_precision / epi_edges_evaluated)
     : 0.0;
-    double per_image_disp_precision = (left_edges_evaluated > 0)
-    ? (per_edge_disp_precision / left_edges_evaluated)
+    double per_image_disp_precision = (disp_edges_evaluated > 0)
+    ? (per_edge_disp_precision / disp_edges_evaluated)
     : 0.0;
-    double per_image_shift_precision = (left_edges_evaluated > 0)
-    ? (per_edge_shift_precision / left_edges_evaluated)
+    double per_image_shift_precision = (shift_edges_evaluated > 0)
+    ? (per_edge_shift_precision / shift_edges_evaluated)
     : 0.0;
-    double per_image_clust_precision = (left_edges_evaluated > 0)
-    ? (per_edge_clust_precision / left_edges_evaluated)
+    double per_image_clust_precision = (clust_edges_evaluated > 0)
+    ? (per_edge_clust_precision / clust_edges_evaluated)
     : 0.0;
-    double per_image_ncc_precision = (left_edges_evaluated > 0)
-    ? (per_edge_ncc_precision / left_edges_evaluated)
+    double per_image_ncc_precision = (ncc_edges_evaluated > 0)
+    ? (per_edge_ncc_precision / ncc_edges_evaluated)
     : 0.0;
-    double per_image_lowe_precision = (left_edges_evaluated > 0)
-    ? (per_edge_lowe_precision / left_edges_evaluated)
+    double per_image_lowe_precision = (lowe_edges_evaluated > 0)
+    ? (per_edge_lowe_precision / lowe_edges_evaluated)
     : 0.0;
 
     std::cout << "Epipolar Distance Precision: " 
@@ -1162,7 +1219,13 @@ RecallMetrics Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected
        ncc_input_counts,
        ncc_output_counts,
        lowe_input_counts,
-       lowe_output_counts
+       lowe_output_counts,
+       per_image_epi_precision,
+       per_image_disp_precision,
+       per_image_shift_precision,
+       per_image_clust_precision,
+       per_image_ncc_precision,
+       per_image_lowe_precision
    };
 }  
 

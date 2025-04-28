@@ -51,10 +51,12 @@ struct RecallMetrics {
   std::vector<int> lowe_input_counts;
   std::vector<int> lowe_output_counts;
 
-  double per_image_epi_precision;
-  double per_image_disp_precision;
-  double per_image_shift_precision;
-  double per_image_clust_precision;
+   double per_image_epi_precision;
+   double per_image_disp_precision;
+   double per_image_shift_precision;
+   double per_image_clust_precision;
+   double per_image_ncc_precision;
+   double per_image_lowe_precision;
 };
 
 struct PatchMatch{
