@@ -140,12 +140,11 @@ private:
 
    void PrintDatasetInfo();
    RecallMetrics DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, const cv::Mat& left_binary_map, const cv::Mat& right_binary_map, std::vector<cv::Point2d> right_edge_coords, std::vector<double> right_edge_orientations);
-   RecallMetrics CalculateMatches(const std::vector<cv::Point2d>& selected_left_edges, const std::vector<cv::Point2d>& selected_ground_truth_right_edges, 
-      const std::vector<double>& selected_left_orientations, const std::vector<cv::Point2d>& left_edge_coords, const std::vector<double>& left_edge_orientations, 
-      const std::vector<cv::Point2d>& right_edge_coords, const std::vector<double>& right_edge_orientations, const std::vector<cv::Mat>& left_patch_set_one, const std::vector<cv::Mat>& left_patch_set_two,
-      const std::vector<Eigen::Vector3d>& epipolar_lines_right, const cv::Mat& left_image, const cv::Mat& right_image, const Eigen::Matrix3d& fundamental_matrix_12, 
-      cv::Mat& right_visualization);
-   int ComputeNCCScores(const cv::Mat& left_patch_one, const cv::Mat& left_patch_two, const std::vector<cv::Mat>& right_patch_set_one, const std::vector<cv::Mat>& right_patch_set_two, double ncc_threshold);
+   RecallMetrics CalculateMatches(const std::vector<cv::Point2d>& selected_primary_edges, const std::vector<cv::Point2d>& selected_ground_truth_edges,
+   const std::vector<double>& selected_primary_orientations, const std::vector<cv::Point2d>& primary_edge_coords, const std::vector<double>& primary_edge_orientations,
+   const std::vector<cv::Point2d>& secondary_edge_coords, const std::vector<double>& secondary_edge_orientations, const std::vector<cv::Mat>& primary_patch_set_one, 
+   const std::vector<cv::Mat>& primary_patch_set_two, const std::vector<Eigen::Vector3d>& epipolar_lines_secondary, const cv::Mat& primary_image, const cv::Mat& secondary_image, 
+   cv::Mat& secondary_visualization, bool left_to_right = true);
    double ComputeNCC(const cv::Mat& patch_one, const cv::Mat& patch_two);
    std::pair<std::vector<cv::Point2d>, std::vector<cv::Point2d>> CalculateOrthogonalShifts(const std::vector<cv::Point2d>& edge_points, const std::vector<double>& orientations, double shift_magnitude);
    std::vector<std::pair<std::vector<cv::Point2d>, std::vector<double>>> ClusterEpipolarShiftedEdges(std::vector<cv::Point2d>& valid_corrected_edges, std::vector<double>& valid_corrected_orientations); 
