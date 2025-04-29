@@ -579,25 +579,18 @@ MatchResult Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& ri
     cv::cvtColor(left_binary_map, left_visualization, cv::COLOR_GRAY2BGR);
     cv::cvtColor(right_binary_map, right_visualization, cv::COLOR_GRAY2BGR);
 
+    ///////////////////////////////FORWARD DIRECTION///////////////////////////////
     std::vector<cv::Point2d> left_edge_coords;
     std::vector<cv::Point2d> ground_truth_right_edges;
     std::vector<double> left_edge_orientations;
 
-    for (const auto& data : gt_edge_data) {
+    for (const auto& data : forward_gt_data) {
         left_edge_coords.push_back(std::get<0>(data)); 
         ground_truth_right_edges.push_back(std::get<1>(data)); 
         left_edge_orientations.push_back(std::get<2>(data)); 
     }
 
-    std::vector<cv::Point2d> selected_left_edges;
-    std::vector<double> selected_left_orientations;
-    std::vector<cv::Point2d> selected_ground_truth_right_edges;
-
-    selected_left_edges = left_edge_coords;
-    selected_left_orientations = left_edge_orientations;
-    selected_ground_truth_right_edges = ground_truth_right_edges;
-
-    auto [left_orthogonal_one, left_orthogonal_two] = CalculateOrthogonalShifts(selected_left_edges, selected_left_orientations, ORTHOGONAL_SHIFT_MAG);
+    auto [left_orthogonal_one, left_orthogonal_two] = CalculateOrthogonalShifts(left_edge_coords, left_edge_orientations, ORTHOGONAL_SHIFT_MAG);
 
     std::vector<cv::Point2d> filtered_left_edges;
     std::vector<double> filtered_left_orientations;
@@ -609,9 +602,9 @@ MatchResult Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& ri
     ExtractPatches(
         PATCH_SIZE,
         left_image,
-        selected_left_edges,
-        selected_left_orientations,
-        &selected_ground_truth_right_edges,
+        left_edge_coords,
+        left_edge_orientations,
+        &ground_truth_right_edges,
         left_orthogonal_one,
         left_orthogonal_two,
         filtered_left_edges,
@@ -621,11 +614,9 @@ MatchResult Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& ri
         left_patch_set_two
     );
 
-    Eigen::Matrix3d fundamental_matrix_21 = ConvertToEigenMatrix(fund_mat_21);
-    Eigen::Matrix3d fundamental_matrix_12 = ConvertToEigenMatrix(fund_mat_12);
     std::vector<Eigen::Vector3d> epipolar_lines_right = CalculateEpipolarLine(fundamental_matrix_21, filtered_left_edges);
 
-    MatchResult match_result = CalculateMatches(
+    MatchResult forward_match = CalculateMatches(
     filtered_left_edges,
     filtered_ground_truth_right_edges,
     filtered_left_orientations,
@@ -642,7 +633,18 @@ MatchResult Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& ri
     true
     );
 
-    return match_result;
+    ///////////////////////////////REVERSE DIRECTION///////////////////////////////
+    std::vector<cv::Point2d> right_edge_coords;
+    std::vector<cv::Point2d> ground_truth_left_edges;
+    std::vector<double> right_edge_orientations;
+
+    for (const auto& data : reverse_gt_data) {
+        right_edge_coords.push_back(std::get<0>(data)); 
+        ground_truth_left_edges.push_back(std::get<1>(data)); 
+        right_edge_orientations.push_back(std::get<2>(data)); 
+    }
+
+    return forward_match;
 }
 
 MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_primary_edges, const std::vector<cv::Point2d>& selected_ground_truth_edges,
