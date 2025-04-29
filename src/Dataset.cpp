@@ -169,7 +169,8 @@ void Dataset::write_ncc_vals_to_files( int img_index ) {
 void Dataset::PerformEdgeBasedVO() {
     int num_pairs = 247;
     std::vector<std::pair<cv::Mat, cv::Mat>> image_pairs;
-    std::vector<cv::Mat> disparity_maps;
+    std::vector<cv::Mat> left_ref_disparity_maps;
+    std::vector<cv::Mat> right_ref_disparity_maps;
     std::vector<double> max_disparity_values;
 
     std::vector<double> per_image_avg_before_epi;
@@ -209,7 +210,8 @@ void Dataset::PerformEdgeBasedVO() {
     else if (dataset_type == "ETH3D"){
         std::string stereo_pairs_path = dataset_path + "/" + sequence_name + "/stereo_pairs";
         image_pairs = LoadETH3DImages(stereo_pairs_path, num_pairs);
-        disparity_maps = LoadETH3DMaps(stereo_pairs_path, num_pairs);
+        left_ref_disparity_maps = LoadETH3DLeftReferenceMaps(stereo_pairs_path, num_pairs);
+        right_ref_disparity_maps = LoadETH3DRightReferenceMaps(stereo_pairs_path, num_pairs);
     }
 
     auto start_time = std::chrono::high_resolution_clock::now();
@@ -224,7 +226,8 @@ void Dataset::PerformEdgeBasedVO() {
 
         const cv::Mat& left_img = image_pairs[i].first;
         const cv::Mat& right_img = image_pairs[i].second;
-        const cv::Mat& disparity_map = disparity_maps[i]; 
+        const cv::Mat& left_ref_map = left_ref_disparity_maps[i]; 
+        const cv::Mat& right_ref_map = right_ref_disparity_maps[i];
         {
 
         std::cout << "Image Pair #" << i << "\n";
@@ -273,7 +276,8 @@ void Dataset::PerformEdgeBasedVO() {
             }
         }
 
-        CalculateGTRightEdge(left_third_order_edges_locations, left_third_order_edges_orientation, disparity_map, left_edge_map, right_edge_map);
+        CalculateGTRightEdge(left_third_order_edges_locations, left_third_order_edges_orientation, left_ref_map, left_edge_map, right_edge_map);
+        CalculateGTLeftEdge(right_third_order_edges_locations, right_third_order_edges_orientation, right_ref_map, left_edge_map, right_edge_map);
         MatchResult match_result = DisplayMatches(left_undistorted, right_undistorted, left_edge_map, right_edge_map, right_third_order_edges_locations, right_third_order_edges_orientation);
         const RecallMetrics& metrics = match_result.recall_metrics;
         all_recall_metrics.push_back(metrics);
@@ -614,6 +618,9 @@ MatchResult Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& ri
         left_patch_set_two
     );
 
+    Eigen::Matrix3d fundamental_matrix_21 = ConvertToEigenMatrix(fund_mat_21);
+    Eigen::Matrix3d fundamental_matrix_12 = ConvertToEigenMatrix(fund_mat_12);
+
     std::vector<Eigen::Vector3d> epipolar_lines_right = CalculateEpipolarLine(fundamental_matrix_21, filtered_left_edges);
 
     MatchResult forward_match = CalculateMatches(
@@ -634,15 +641,59 @@ MatchResult Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& ri
     );
 
     ///////////////////////////////REVERSE DIRECTION///////////////////////////////
-    std::vector<cv::Point2d> right_edge_coords;
-    std::vector<cv::Point2d> ground_truth_left_edges;
-    std::vector<double> right_edge_orientations;
+    std::vector<cv::Point2d> reverse_primary_edges;
+    std::vector<cv::Point2d> reverse_ground_truth_edges;
+    std::vector<double> reverse_primary_orientations;
 
     for (const auto& data : reverse_gt_data) {
-        right_edge_coords.push_back(std::get<0>(data)); 
-        ground_truth_left_edges.push_back(std::get<1>(data)); 
-        right_edge_orientations.push_back(std::get<2>(data)); 
+        reverse_primary_edges.push_back(std::get<0>(data));
+        reverse_ground_truth_edges.push_back(std::get<1>(data));  
+        reverse_primary_orientations.push_back(std::get<2>(data));
     }
+
+    auto [right_orthogonal_one, right_orthogonal_two] =
+        CalculateOrthogonalShifts(reverse_primary_edges, reverse_primary_orientations, ORTHOGONAL_SHIFT_MAG);
+
+    std::vector<cv::Point2d> filtered_right_edges;
+    std::vector<double> filtered_right_orientations;
+    std::vector<cv::Point2d> filtered_ground_truth_left_edges;
+
+    std::vector<cv::Mat> right_patch_set_one;
+    std::vector<cv::Mat> right_patch_set_two;
+
+    ExtractPatches(
+        PATCH_SIZE,
+        right_image,
+        reverse_primary_edges,
+        reverse_primary_orientations,
+        &reverse_ground_truth_edges,
+        right_orthogonal_one,
+        right_orthogonal_two,
+        filtered_right_edges,
+        filtered_right_orientations,
+        &filtered_ground_truth_left_edges,
+        right_patch_set_one,
+        right_patch_set_two
+    );
+
+    std::vector<Eigen::Vector3d> epipolar_lines_left = CalculateEpipolarLine(fundamental_matrix_12, filtered_right_edges);
+
+    MatchResult reverse_match = CalculateMatches(
+        filtered_right_edges,
+        filtered_ground_truth_left_edges,
+        filtered_right_orientations,
+        right_edge_coords,
+        right_edge_orientations,
+        left_edge_coords,
+        left_edge_orientations,
+        right_patch_set_one,
+        right_patch_set_two,
+        epipolar_lines_left,
+        right_image,
+        left_image,
+        left_visualization,
+        false
+    );
 
     return forward_match;
 }
@@ -1736,10 +1787,8 @@ double Bilinear_Interpolation(const cv::Mat &meshGrid, cv::Point2d P) {
     return ((Q12.y - P.y) / (Q12.y - Q11.y)) * f_x_y1 + ((P.y - Q11.y) / (Q12.y - Q11.y)) * f_x_y2;
 }
 
-// Note: You could try to break this into a function that just reads the files, and a function that creates the files once and then never again!
-// Note: Create the valid disparities CSV inside the outputs folder! Keep everything in one place!
 void Dataset::CalculateGTRightEdge(const std::vector<cv::Point2d> &left_third_order_edges_locations, const std::vector<double> &left_third_order_edges_orientation, const cv::Mat &disparity_map, const cv::Mat &left_image, const cv::Mat &right_image) {
-    gt_edge_data.clear();
+    forward_gt_data.clear();
 
     static size_t total_rows_written = 0;
     static int file_index = 1;
@@ -1762,13 +1811,55 @@ void Dataset::CalculateGTRightEdge(const std::vector<cv::Point2d> &left_third_or
         }
 
         cv::Point2d right_edge(left_edge.x - disparity, left_edge.y);
-        gt_edge_data.emplace_back(left_edge, right_edge, orientation);
+        forward_gt_data.emplace_back(left_edge, right_edge, orientation);
 
         if (total_rows_written >= max_rows_per_file) {
             csv_file.close();
             ++file_index;
             total_rows_written = 0;
             std::string next_filename = "valid_disparities_part_" + std::to_string(file_index) + ".csv";
+            csv_file.open(next_filename, std::ios::out);
+        }
+
+        csv_file << disparity << "\n";
+        ++total_rows_written;
+    }
+
+    csv_file.flush();
+}
+
+void Dataset::CalculateGTLeftEdge(const std::vector<cv::Point2d>& right_third_order_edges_locations,const std::vector<double>& right_third_order_edges_orientation,const cv::Mat& disparity_map_right_reference,const cv::Mat& left_image,const cv::Mat& right_image) {
+    reverse_gt_data.clear();
+
+    static size_t total_rows_written = 0;
+    static int file_index = 1;
+    static std::ofstream csv_file;
+    static const size_t max_rows_per_file = 1'000'000;
+
+    if (!csv_file.is_open()) {
+        std::string filename = "valid_reverse_disparities_part_" + std::to_string(file_index) + ".csv";
+        csv_file.open(filename, std::ios::out);
+    }
+
+    for (size_t i = 0; i < right_third_order_edges_locations.size(); i++) {
+        const cv::Point2d& right_edge = right_third_order_edges_locations[i];
+        double orientation = right_third_order_edges_orientation[i];
+
+        double disparity = Bilinear_Interpolation(disparity_map_right_reference, right_edge);
+
+        if (std::isnan(disparity) || std::isinf(disparity) || disparity < 0) {
+            continue;
+        }
+
+        cv::Point2d left_edge(right_edge.x + disparity, right_edge.y);
+
+        reverse_gt_data.emplace_back(right_edge, left_edge, orientation);
+
+        if (total_rows_written >= max_rows_per_file) {
+            csv_file.close();
+            ++file_index;
+            total_rows_written = 0;
+            std::string next_filename = "valid_reverse_disparities_part_" + std::to_string(file_index) + ".csv";
             csv_file.open(next_filename, std::ios::out);
         }
 
@@ -1911,7 +2002,7 @@ std::vector<std::pair<cv::Mat, cv::Mat>> Dataset::LoadETH3DImages(const std::str
     return image_pairs;
 }
 
-std::vector<cv::Mat> Dataset::LoadETH3DMaps(const std::string &stereo_pairs_path, int num_maps) {
+std::vector<cv::Mat> Dataset::LoadETH3DLeftReferenceMaps(const std::string &stereo_pairs_path, int num_maps) {
     std::vector<cv::Mat> disparity_maps;
     std::vector<std::string> stereo_folders;
 
@@ -1939,6 +2030,42 @@ std::vector<cv::Mat> Dataset::LoadETH3DMaps(const std::string &stereo_pairs_path
             if (!disparity_map.empty()) {
                 WriteDisparityToBinary(disparity_bin_path, disparity_map);
                 // std::cout << "Saved disparity data to: " << disparity_bin_path << std::endl;
+            }
+        }
+
+        if (!disparity_map.empty()) {
+            disparity_maps.push_back(disparity_map);
+        }
+    }
+
+    return disparity_maps;
+}
+
+std::vector<cv::Mat> Dataset::LoadETH3DRightReferenceMaps(const std::string &stereo_pairs_path, int num_maps) {
+    std::vector<cv::Mat> disparity_maps;
+    std::vector<std::string> stereo_folders;
+
+    for (const auto &entry : std::filesystem::directory_iterator(stereo_pairs_path)) {
+        if (entry.is_directory()) {
+            stereo_folders.push_back(entry.path().string());
+        }
+    }
+
+    std::sort(stereo_folders.begin(), stereo_folders.end());
+
+    for (int i = 0; i < std::min(num_maps, static_cast<int>(stereo_folders.size())); i++) {
+        std::string folder_path = stereo_folders[i];
+        std::string disparity_csv_path = folder_path + "/disparity_map_right.csv";
+        std::string disparity_bin_path = folder_path + "/disparity_map_right.bin";
+
+        cv::Mat disparity_map;
+
+        if (std::filesystem::exists(disparity_bin_path)) {
+            disparity_map = ReadDisparityFromBinary(disparity_bin_path);
+        } else {
+            disparity_map = LoadDisparityFromCSV(disparity_csv_path);
+            if (!disparity_map.empty()) {
+                WriteDisparityToBinary(disparity_bin_path, disparity_map);
             }
         }
 
