@@ -42,6 +42,16 @@ double ComputeAverage(const std::vector<int>& values) {
     return sum / values.size();
 }
 
+cv::Scalar PickUniqueColor(int index, int total) {
+    int hue = (index * 180) / total;
+    cv::Mat hsv(1, 1, CV_8UC3, cv::Scalar(hue, 255, 255));
+    cv::Mat bgr;
+    cv::cvtColor(hsv, bgr, cv::COLOR_HSV2BGR);
+
+    cv::Vec3b color = bgr.at<cv::Vec3b>(0, 0);
+    return cv::Scalar(color[0], color[1], color[2]); 
+}
+
 Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(config_map), compute_grad_depth(use_GCC_filter) {
    dataset_path = config_file["dataset_dir"].as<std::string>();
    output_path = config_file["output_dir"].as<std::string>();
@@ -167,7 +177,7 @@ void Dataset::write_ncc_vals_to_files( int img_index ) {
 }
 
 void Dataset::PerformEdgeBasedVO() {
-    int num_pairs = 247;
+    int num_pairs = 2;
     std::vector<std::pair<cv::Mat, cv::Mat>> image_pairs;
     std::vector<cv::Mat> left_ref_disparity_maps;
     std::vector<cv::Mat> right_ref_disparity_maps;
@@ -305,12 +315,34 @@ void Dataset::PerformEdgeBasedVO() {
         BidirectionalMatchResult match_result = DisplayMatches(
             left_undistorted,
             right_undistorted,
-            left_edge_map,
-            right_edge_map,
             right_third_order_edges_locations,
             right_third_order_edges_orientation
         );
-        
+
+        cv::Mat left_visualization, right_visualization;
+        cv::cvtColor(left_edge_map, left_visualization, cv::COLOR_GRAY2BGR);
+        cv::cvtColor(right_edge_map, right_visualization, cv::COLOR_GRAY2BGR);
+
+        cv::Mat merged_visualization;
+        cv::hconcat(left_visualization, right_visualization, merged_visualization);
+
+        int total_matches = static_cast<int>(match_result.confirmed_matches.size());
+        int index = 0;
+
+        for (const auto& [left_edge, right_edge] : match_result.confirmed_matches) {
+            cv::Scalar color = PickUniqueColor(index, total_matches);
+
+            cv::circle(merged_visualization, left_edge, 4, color, cv::FILLED);
+            cv::Point2d right_shifted(right_edge.x + left_visualization.cols, right_edge.y);
+            cv::circle(merged_visualization, right_shifted, 4, color, cv::FILLED);
+            cv::line(merged_visualization, left_edge, right_shifted, color, 1);
+
+            ++index;
+        }
+
+        std::string save_path = output_path + "/edge_matches_image" + std::to_string(i) + ".png";
+        cv::imwrite(save_path, merged_visualization);
+
         const RecallMetrics& forward_metrics = match_result.forward_match.recall_metrics;
         all_forward_recall_metrics.push_back(forward_metrics);
 
@@ -914,11 +946,7 @@ void Dataset::PerformEdgeBasedVO() {
         << std::fixed << std::setprecision(4) << rev_avg_lowe_precision * 100 << "\n";
 }
 
-BidirectionalMatchResult Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, const cv::Mat& left_binary_map, const cv::Mat& right_binary_map, std::vector<cv::Point2d> right_edge_coords, std::vector<double> right_edge_orientations) {
-    cv::Mat left_visualization, right_visualization;
-    cv::cvtColor(left_binary_map, left_visualization, cv::COLOR_GRAY2BGR);
-    cv::cvtColor(right_binary_map, right_visualization, cv::COLOR_GRAY2BGR);
-
+BidirectionalMatchResult Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, std::vector<cv::Point2d> right_edge_coords, std::vector<double> right_edge_orientations) {
     ///////////////////////////////FORWARD DIRECTION///////////////////////////////
     std::vector<cv::Point2d> left_edge_coords;
     std::vector<cv::Point2d> ground_truth_right_edges;
@@ -960,20 +988,19 @@ BidirectionalMatchResult Dataset::DisplayMatches(const cv::Mat& left_image, cons
     std::vector<Eigen::Vector3d> epipolar_lines_right = CalculateEpipolarLine(fundamental_matrix_21, filtered_left_edges);
 
     MatchResult forward_match = CalculateMatches(
-    filtered_left_edges,
-    filtered_ground_truth_right_edges,
-    filtered_left_orientations,
-    left_edge_coords,
-    left_edge_orientations,
-    right_edge_coords,
-    right_edge_orientations,
-    left_patch_set_one,
-    left_patch_set_two,
-    epipolar_lines_right,
-    left_image,
-    right_image,
-    right_visualization,
-    true
+        filtered_left_edges,
+        filtered_ground_truth_right_edges,
+        filtered_left_orientations,
+        left_edge_coords,
+        left_edge_orientations,
+        right_edge_coords,
+        right_edge_orientations,
+        left_patch_set_one,
+        left_patch_set_two,
+        epipolar_lines_right,
+        left_image,
+        right_image,
+        true
     );
 
     ///////////////////////////////REVERSE DIRECTION///////////////////////////////
@@ -987,8 +1014,7 @@ BidirectionalMatchResult Dataset::DisplayMatches(const cv::Mat& left_image, cons
         reverse_primary_orientations.push_back(std::get<2>(data));
     }
 
-    auto [right_orthogonal_one, right_orthogonal_two] =
-        CalculateOrthogonalShifts(reverse_primary_edges, reverse_primary_orientations, ORTHOGONAL_SHIFT_MAG);
+    auto [right_orthogonal_one, right_orthogonal_two] = CalculateOrthogonalShifts(reverse_primary_edges, reverse_primary_orientations, ORTHOGONAL_SHIFT_MAG);
 
     std::vector<cv::Point2d> filtered_right_edges;
     std::vector<double> filtered_right_orientations;
@@ -1027,18 +1053,45 @@ BidirectionalMatchResult Dataset::DisplayMatches(const cv::Mat& left_image, cons
         epipolar_lines_left,
         right_image,
         left_image,
-        left_visualization,
         false
     );
 
-    return BidirectionalMatchResult{forward_match, reverse_match};
+    std::vector<std::pair<cv::Point2d, cv::Point2d>> confirmed_matches;
+
+    const double match_tolerance = 3;
+
+    std::cout << "Forward match count: " << forward_match.matches.size() << std::endl;
+    std::cout << "Reverse match count: " << reverse_match.matches.size() << std::endl;
+
+    for (const auto& [left_edge, patch_match_forward] : forward_match.matches) {
+        const auto& right_contributing_edges = patch_match_forward.contributing_edges;
+        for (const auto& right_edge : right_contributing_edges) {
+
+            for (const auto& [rev_right_edge, patch_match_rev] : reverse_match.matches) {
+                if (cv::norm(rev_right_edge - right_edge) < match_tolerance) {
+
+                    for (const auto& rev_contributing_left : patch_match_rev.contributing_edges) {
+                        if (cv::norm(rev_contributing_left - left_edge) < match_tolerance) {
+
+                            confirmed_matches.emplace_back(left_edge, right_edge);
+                            goto next_left_edge;
+                        }
+                    }
+                }
+            }
+        }
+        next_left_edge:;
+    }
+
+    std::cout << "Bidirectional consistent matches: " << confirmed_matches.size() << std::endl;
+
+    return BidirectionalMatchResult{forward_match, reverse_match, confirmed_matches};
 }
 
 MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_primary_edges, const std::vector<cv::Point2d>& selected_ground_truth_edges,
    const std::vector<double>& selected_primary_orientations, const std::vector<cv::Point2d>& primary_edge_coords, const std::vector<double>& primary_edge_orientations,
    const std::vector<cv::Point2d>& secondary_edge_coords, const std::vector<double>& secondary_edge_orientations, const std::vector<cv::Mat>& primary_patch_set_one, 
-   const std::vector<cv::Mat>& primary_patch_set_two, const std::vector<Eigen::Vector3d>& epipolar_lines_secondary, const cv::Mat& primary_image, const cv::Mat& secondary_image, 
-   cv::Mat& secondary_visualization, bool left_to_right) {
+   const std::vector<cv::Mat>& primary_patch_set_two, const std::vector<Eigen::Vector3d>& epipolar_lines_secondary, const cv::Mat& primary_image, const cv::Mat& secondary_image, bool left_to_right) {
 
     std::vector<int> epi_input_counts;
     std::vector<int> epi_output_counts;
