@@ -194,7 +194,30 @@ void Dataset::PerformEdgeBasedVO() {
     std::vector<double> per_image_avg_before_lowe;
     std::vector<double> per_image_avg_after_lowe;
 
-    std::vector<RecallMetrics> all_recall_metrics;
+
+    std::vector<double> rev_per_image_avg_before_epi;
+    std::vector<double> rev_per_image_avg_after_epi;
+
+    std::vector<double> rev_per_image_avg_before_disp;
+    std::vector<double> rev_per_image_avg_after_disp;
+
+    std::vector<double> rev_per_image_avg_before_shift;
+    std::vector<double> rev_per_image_avg_after_shift;
+
+    std::vector<double> rev_per_image_avg_before_clust;
+    std::vector<double> rev_per_image_avg_after_clust;
+
+    std::vector<double> rev_per_image_avg_before_patch;
+    std::vector<double> rev_per_image_avg_after_patch;
+
+    std::vector<double> rev_per_image_avg_before_ncc;
+    std::vector<double> rev_per_image_avg_after_ncc;
+
+    std::vector<double> rev_per_image_avg_before_lowe;
+    std::vector<double> rev_per_image_avg_after_lowe;
+
+    std::vector<RecallMetrics> all_forward_recall_metrics;
+    std::vector<RecallMetrics> all_reverse_recall_metrics;
 
     if (dataset_type == "EuRoC"){
         std::string left_path = dataset_path + "/" + sequence_name + "/mav0/cam0/data/";
@@ -278,30 +301,64 @@ void Dataset::PerformEdgeBasedVO() {
 
         CalculateGTRightEdge(left_third_order_edges_locations, left_third_order_edges_orientation, left_ref_map, left_edge_map, right_edge_map);
         CalculateGTLeftEdge(right_third_order_edges_locations, right_third_order_edges_orientation, right_ref_map, left_edge_map, right_edge_map);
-        MatchResult match_result = DisplayMatches(left_undistorted, right_undistorted, left_edge_map, right_edge_map, right_third_order_edges_locations, right_third_order_edges_orientation);
-        const RecallMetrics& metrics = match_result.recall_metrics;
-        all_recall_metrics.push_back(metrics);
 
-        double avg_before_epi = ComputeAverage(metrics.epi_input_counts);
-        double avg_after_epi = ComputeAverage(metrics.epi_output_counts);
+        BidirectionalMatchResult match_result = DisplayMatches(
+            left_undistorted,
+            right_undistorted,
+            left_edge_map,
+            right_edge_map,
+            right_third_order_edges_locations,
+            right_third_order_edges_orientation
+        );
+        
+        const RecallMetrics& forward_metrics = match_result.forward_match.recall_metrics;
+        all_forward_recall_metrics.push_back(forward_metrics);
 
-        double avg_before_disp = ComputeAverage(metrics.disp_input_counts);
-        double avg_after_disp = ComputeAverage(metrics.disp_output_counts);
+        const RecallMetrics& reverse_metrics = match_result.reverse_match.recall_metrics;
+        all_reverse_recall_metrics.push_back(reverse_metrics);
 
-        double avg_before_shift = ComputeAverage(metrics.shift_input_counts);
-        double avg_after_shift = ComputeAverage(metrics.shift_output_counts);
+        double avg_before_epi = ComputeAverage(forward_metrics.epi_input_counts);
+        double avg_after_epi = ComputeAverage(forward_metrics.epi_output_counts);
 
-        double avg_before_clust = ComputeAverage(metrics.clust_input_counts);
-        double avg_after_clust = ComputeAverage(metrics.clust_output_counts);
+        double avg_before_disp = ComputeAverage(forward_metrics.disp_input_counts);
+        double avg_after_disp = ComputeAverage(forward_metrics.disp_output_counts);
 
-        double avg_before_patch = ComputeAverage(metrics.patch_input_counts);
-        double avg_after_patch = ComputeAverage(metrics.patch_output_counts);
+        double avg_before_shift = ComputeAverage(forward_metrics.shift_input_counts);
+        double avg_after_shift = ComputeAverage(forward_metrics.shift_output_counts);
 
-        double avg_before_ncc = ComputeAverage(metrics.ncc_input_counts);
-        double avg_after_ncc = ComputeAverage(metrics.ncc_output_counts);
+        double avg_before_clust = ComputeAverage(forward_metrics.clust_input_counts);
+        double avg_after_clust = ComputeAverage(forward_metrics.clust_output_counts);
 
-        double avg_before_lowe = ComputeAverage(metrics.lowe_input_counts);
-        double avg_after_lowe = ComputeAverage(metrics.lowe_output_counts);
+        double avg_before_patch = ComputeAverage(forward_metrics.patch_input_counts);
+        double avg_after_patch = ComputeAverage(forward_metrics.patch_output_counts);
+
+        double avg_before_ncc = ComputeAverage(forward_metrics.ncc_input_counts);
+        double avg_after_ncc = ComputeAverage(forward_metrics.ncc_output_counts);
+
+        double avg_before_lowe = ComputeAverage(forward_metrics.lowe_input_counts);
+        double avg_after_lowe = ComputeAverage(forward_metrics.lowe_output_counts);
+
+
+        double rev_avg_before_epi = ComputeAverage(reverse_metrics.epi_input_counts);
+        double rev_avg_after_epi = ComputeAverage(reverse_metrics.epi_output_counts);
+
+        double rev_avg_before_disp = ComputeAverage(reverse_metrics.disp_input_counts);
+        double rev_avg_after_disp = ComputeAverage(reverse_metrics.disp_output_counts);
+
+        double rev_avg_before_shift = ComputeAverage(reverse_metrics.shift_input_counts);
+        double rev_avg_after_shift = ComputeAverage(reverse_metrics.shift_output_counts);
+
+        double rev_avg_before_clust = ComputeAverage(reverse_metrics.clust_input_counts);
+        double rev_avg_after_clust = ComputeAverage(reverse_metrics.clust_output_counts);
+
+        double rev_avg_before_patch = ComputeAverage(reverse_metrics.patch_input_counts);
+        double rev_avg_after_patch = ComputeAverage(reverse_metrics.patch_output_counts);
+
+        double rev_avg_before_ncc = ComputeAverage(reverse_metrics.ncc_input_counts);
+        double rev_avg_after_ncc = ComputeAverage(reverse_metrics.ncc_output_counts);
+
+        double rev_avg_before_lowe = ComputeAverage(reverse_metrics.lowe_input_counts);
+        double rev_avg_after_lowe = ComputeAverage(reverse_metrics.lowe_output_counts);
 
         per_image_avg_before_epi.push_back(avg_before_epi);
         per_image_avg_after_epi.push_back(avg_after_epi);
@@ -323,6 +380,28 @@ void Dataset::PerformEdgeBasedVO() {
 
         per_image_avg_before_lowe.push_back(avg_before_lowe);
         per_image_avg_after_lowe.push_back(avg_after_lowe);
+
+
+        rev_per_image_avg_before_epi.push_back(rev_avg_before_epi);
+        rev_per_image_avg_after_epi.push_back(rev_avg_after_epi);
+
+        rev_per_image_avg_before_disp.push_back(rev_avg_before_disp);
+        rev_per_image_avg_after_disp.push_back(rev_avg_after_disp);
+
+        rev_per_image_avg_before_shift.push_back(rev_avg_before_shift);
+        rev_per_image_avg_after_shift.push_back(rev_avg_after_shift);
+
+        rev_per_image_avg_before_clust.push_back(rev_avg_before_clust);
+        rev_per_image_avg_after_clust.push_back(rev_avg_after_clust);
+
+        rev_per_image_avg_before_patch.push_back(rev_avg_before_patch);
+        rev_per_image_avg_after_patch.push_back(rev_avg_after_patch);
+
+        rev_per_image_avg_before_ncc.push_back(rev_avg_before_ncc);
+        rev_per_image_avg_after_ncc.push_back(rev_avg_after_ncc);
+
+        rev_per_image_avg_before_lowe.push_back(rev_avg_before_lowe);
+        rev_per_image_avg_after_lowe.push_back(rev_avg_after_lowe);
         }                                
     }
 
@@ -340,7 +419,22 @@ void Dataset::PerformEdgeBasedVO() {
     double total_ncc_precision = 0.0;
     double total_lowe_precision = 0.0;
 
-    for (const RecallMetrics& m : all_recall_metrics) {
+
+    double rev_total_epi_recall = 0.0;
+    double rev_total_disp_recall = 0.0;
+    double rev_total_shift_recall = 0.0;
+    double rev_total_cluster_recall = 0.0;
+    double rev_total_ncc_recall = 0.0;
+    double rev_total_lowe_recall = 0.0;
+
+    double rev_total_epi_precision = 0.0;
+    double rev_total_disp_precision = 0.0;
+    double rev_total_shift_precision = 0.0;
+    double rev_total_cluster_precision = 0.0;
+    double rev_total_ncc_precision = 0.0;
+    double rev_total_lowe_precision = 0.0;
+
+    for (const RecallMetrics& m : all_forward_recall_metrics) {
         total_epi_recall += m.epi_distance_recall;
         total_disp_recall += m.max_disparity_recall;
         total_shift_recall += m.epi_shift_recall;
@@ -356,7 +450,25 @@ void Dataset::PerformEdgeBasedVO() {
         total_lowe_precision += m.per_image_lowe_precision;
     }
 
-    int total_images = static_cast<int>(all_recall_metrics.size());
+
+    for (const RecallMetrics& m : all_reverse_recall_metrics) {
+        rev_total_epi_recall += m.epi_distance_recall;
+        rev_total_disp_recall += m.max_disparity_recall;
+        rev_total_shift_recall += m.epi_shift_recall;
+        rev_total_cluster_recall += m.epi_cluster_recall;
+        rev_total_ncc_recall += m.ncc_recall;
+        rev_total_lowe_recall += m.lowe_recall;
+
+        rev_total_epi_precision += m.per_image_epi_precision;
+        rev_total_disp_precision += m.per_image_disp_precision;
+        rev_total_shift_precision += m.per_image_shift_precision;
+        rev_total_cluster_precision += m.per_image_clust_precision;
+        rev_total_ncc_precision += m.per_image_ncc_precision;
+        rev_total_lowe_precision += m.per_image_lowe_precision;
+    }
+
+    int total_images = static_cast<int>(all_forward_recall_metrics.size());
+    int rev_total_images = static_cast<int>(all_reverse_recall_metrics.size());
 
     double avg_epi_recall   = (total_images > 0) ? total_epi_recall / total_images : 0.0;
     double avg_disp_recall  = (total_images > 0) ? total_disp_recall / total_images : 0.0;
@@ -372,13 +484,32 @@ void Dataset::PerformEdgeBasedVO() {
     double avg_ncc_precision = (total_images > 0) ? total_ncc_precision / total_images : 0.0;
     double avg_lowe_precision = (total_images > 0) ? total_lowe_precision / total_images: 0.0;
 
+
+    double rev_avg_epi_recall   = (rev_total_images > 0) ? rev_total_epi_recall / rev_total_images : 0.0;
+    double rev_avg_disp_recall  = (rev_total_images > 0) ? rev_total_disp_recall / rev_total_images : 0.0;
+    double rev_avg_shift_recall = (rev_total_images > 0) ? rev_total_shift_recall / rev_total_images : 0.0;
+    double rev_avg_cluster_recall = (rev_total_images > 0) ? rev_total_cluster_recall / rev_total_images : 0.0;
+    double rev_avg_ncc_recall = (rev_total_images > 0) ? rev_total_ncc_recall / rev_total_images : 0.0;
+    double rev_avg_lowe_recall = (rev_total_images > 0) ? rev_total_lowe_recall / rev_total_images: 0.0;
+
+    double rev_avg_epi_precision   = (rev_total_images > 0) ? rev_total_epi_precision / rev_total_images : 0.0;
+    double rev_avg_disp_precision  = (rev_total_images > 0) ? rev_total_disp_precision / rev_total_images : 0.0;
+    double rev_avg_shift_precision = (rev_total_images > 0) ? rev_total_shift_precision / rev_total_images : 0.0;
+    double rev_avg_cluster_precision = (rev_total_images > 0) ? rev_total_cluster_precision / rev_total_images : 0.0;
+    double rev_avg_ncc_precision = (rev_total_images > 0) ? rev_total_ncc_precision / rev_total_images : 0.0;
+    double rev_avg_lowe_precision = (rev_total_images > 0) ? rev_total_lowe_precision / rev_total_images: 0.0;
+
     std::string edge_stat_dir = output_path + "/edge stats";
     std::filesystem::create_directories(edge_stat_dir);
+
     std::ofstream recall_csv(edge_stat_dir + "/recall_metrics.csv");
     recall_csv << "ImageIndex,EpiDistanceRecall,MaxDisparityRecall,EpiShiftRecall,EpiClusterRecall,NCCRecall,LoweRecall\n";
 
-    for (size_t i = 0; i < all_recall_metrics.size(); i++) {
-        const auto& m = all_recall_metrics[i];
+    std::ofstream reverse_recall_csv(edge_stat_dir + "/reverse_recall_metrics.csv");
+    reverse_recall_csv << "ImageIndex,EpiDistanceRecall,MaxDisparityRecall,EpiShiftRecall,EpiClusterRecall,NCCRecall,LoweRecall\n";
+
+    for (size_t i = 0; i < all_forward_recall_metrics.size(); i++) {
+        const auto& m = all_forward_recall_metrics[i];
         recall_csv << i << ","
                 << std::fixed << std::setprecision(4) << m.epi_distance_recall * 100 << ","
                 << std::fixed << std::setprecision(4) << m.max_disparity_recall * 100 << ","
@@ -395,6 +526,26 @@ void Dataset::PerformEdgeBasedVO() {
             << std::fixed << std::setprecision(4) << avg_cluster_recall * 100 << ","
             << std::fixed << std::setprecision(4) << avg_ncc_recall * 100 << ","
             << std::fixed << std::setprecision(4) << avg_lowe_recall * 100 << "\n";
+
+
+    for (size_t i = 0; i < all_reverse_recall_metrics.size(); i++) {
+        const auto& m = all_reverse_recall_metrics[i];
+        reverse_recall_csv << i << ","
+                << std::fixed << std::setprecision(4) << m.epi_distance_recall * 100 << ","
+                << std::fixed << std::setprecision(4) << m.max_disparity_recall * 100 << ","
+                << std::fixed << std::setprecision(4) << m.epi_shift_recall * 100 << ","
+                << std::fixed << std::setprecision(4) << m.epi_cluster_recall * 100 << ","
+                << std::fixed << std::setprecision(4) << m.ncc_recall * 100 << ","
+                << std::fixed << std::setprecision(4) << m.lowe_recall * 100 << "\n";
+    }
+
+    reverse_recall_csv << "Average,"
+            << std::fixed << std::setprecision(4) << rev_avg_epi_recall * 100 << ","
+            << std::fixed << std::setprecision(4) << rev_avg_disp_recall * 100 << ","
+            << std::fixed << std::setprecision(4) << rev_avg_shift_recall * 100 << ","
+            << std::fixed << std::setprecision(4) << rev_avg_cluster_recall * 100 << ","
+            << std::fixed << std::setprecision(4) << rev_avg_ncc_recall * 100 << ","
+            << std::fixed << std::setprecision(4) << rev_avg_lowe_recall * 100 << "\n";
     
     std::ofstream count_csv(edge_stat_dir + "/count_metrics.csv");
     count_csv 
@@ -405,6 +556,17 @@ void Dataset::PerformEdgeBasedVO() {
         << "before_patch, after_patch, average_before_patch, average_after_patch,"
         << "before_ncc,after_ncc,average_before_ncc,average_after_ncc,"
         << "before_lowe,after_lowe,average_before_lowe,after_after_lowe\n";
+
+
+    std::ofstream reverse_count_csv(edge_stat_dir + "/reverse_count_metrics.csv");
+        reverse_count_csv 
+            << "before_epi_distance,after_epi_distance,average_before_epi_distance,average_after_epi_distance,"
+            << "before_max_disp,after_max_disp,average_before_max_disp,average_after_max_disp,"
+            << "before_epi_shift,after_epi_shift,average_before_epi_shift,average_after_epi_shift,"
+            << "before_epi_cluster,after_epi_cluster,average_before_epi_cluster,average_after_epi_cluster,"
+            << "before_patch, after_patch, average_before_patch, average_after_patch,"
+            << "before_ncc,after_ncc,average_before_ncc,average_after_ncc,"
+            << "before_lowe,after_lowe,average_before_lowe,after_after_lowe\n";
 
     double total_avg_before_epi = 0.0;
     double total_avg_after_epi = 0.0;
@@ -427,7 +589,30 @@ void Dataset::PerformEdgeBasedVO() {
     double total_avg_before_lowe = 0.0;
     double total_avg_after_lowe = 0.0;
 
+
+    double rev_total_avg_before_epi = 0.0;
+    double rev_total_avg_after_epi = 0.0;
+
+    double rev_total_avg_before_disp = 0.0;
+    double rev_total_avg_after_disp = 0.0;
+
+    double rev_total_avg_before_shift = 0.0;
+    double rev_total_avg_after_shift = 0.0;
+
+    double rev_total_avg_before_clust = 0.0;
+    double rev_total_avg_after_clust = 0.0;
+
+    double rev_total_avg_before_patch = 0.0;
+    double rev_total_avg_after_patch = 0.0;
+
+    double rev_total_avg_before_ncc = 0.0;
+    double rev_total_avg_after_ncc = 0.0;
+
+    double rev_total_avg_before_lowe = 0.0;
+    double rev_total_avg_after_lowe = 0.0;
+
     size_t num_rows = per_image_avg_before_epi.size();
+    size_t rev_num_rows = rev_per_image_avg_before_epi.size();
 
     for (size_t i = 0; i < num_rows; ++i) {
         total_avg_before_epi += per_image_avg_before_epi[i];
@@ -481,6 +666,58 @@ void Dataset::PerformEdgeBasedVO() {
             <<"\n";
     }
 
+
+    for (size_t i = 0; i < rev_num_rows; ++i) {
+        rev_total_avg_before_epi += rev_per_image_avg_before_epi[i];
+        rev_total_avg_after_epi += rev_per_image_avg_after_epi[i];
+
+        rev_total_avg_before_disp += rev_per_image_avg_before_disp[i];
+        rev_total_avg_after_disp += rev_per_image_avg_after_disp[i];
+
+        rev_total_avg_before_shift += rev_per_image_avg_before_shift[i];
+        rev_total_avg_after_shift += rev_per_image_avg_after_shift[i];
+
+        rev_total_avg_before_clust += rev_per_image_avg_before_clust[i];
+        rev_total_avg_after_clust += rev_per_image_avg_after_clust[i];
+
+        rev_total_avg_before_patch += rev_per_image_avg_before_patch[i];
+        rev_total_avg_after_patch += rev_per_image_avg_after_patch[i];
+
+        rev_total_avg_before_ncc += rev_per_image_avg_before_ncc[i];
+        rev_total_avg_after_ncc += rev_per_image_avg_after_ncc[i];
+
+        rev_total_avg_before_lowe += rev_per_image_avg_before_lowe[i];
+        rev_total_avg_after_lowe += rev_per_image_avg_after_lowe[i];
+
+        reverse_count_csv
+            << static_cast<int>(std::ceil(rev_per_image_avg_before_epi[i])) << ","
+            << static_cast<int>(std::ceil(rev_per_image_avg_after_epi[i])) << ","
+            << ","
+            << ","
+            << static_cast<int>(std::ceil(rev_per_image_avg_before_disp[i])) << ","
+            << static_cast<int>(std::ceil(rev_per_image_avg_after_disp[i])) << ","
+            << ","
+            << ","
+            << static_cast<int>(std::ceil(rev_per_image_avg_before_shift[i])) << ","
+            << static_cast<int>(std::ceil(rev_per_image_avg_after_shift[i])) << ","
+            << ","
+            << ","
+            << static_cast<int>(std::ceil(rev_per_image_avg_before_clust[i])) << ","
+            << static_cast<int>(std::ceil(rev_per_image_avg_after_clust[i])) << ","
+            << ","
+            << ","
+            << static_cast<int>(std::ceil(rev_per_image_avg_before_patch[i])) << ","
+            << static_cast<int>(std::ceil(rev_per_image_avg_after_patch[i])) << ","
+            << ","
+            << ","
+            << static_cast<int>(std::ceil(rev_per_image_avg_before_ncc[i])) << ","
+            << static_cast<int>(std::ceil(rev_per_image_avg_after_ncc[i])) << ","
+            << ","
+            << ","
+            << static_cast<int>(std::ceil(rev_per_image_avg_before_lowe[i])) << ","
+            << static_cast<int>(std::ceil(rev_per_image_avg_after_lowe[i])) << ","
+            <<"\n";
+    }
     int avg_of_avgs_before_epi = 0;
     int avg_of_avgs_after_epi = 0;
 
@@ -501,6 +738,28 @@ void Dataset::PerformEdgeBasedVO() {
 
     int avg_of_avgs_before_lowe = 0;
     int avg_of_avgs_after_lowe = 0;
+
+
+    int rev_avg_of_avgs_before_epi = 0;
+    int rev_avg_of_avgs_after_epi = 0;
+
+    int rev_avg_of_avgs_before_disp = 0;
+    int rev_avg_of_avgs_after_disp = 0;
+
+    int rev_avg_of_avgs_before_shift = 0;
+    int rev_avg_of_avgs_after_shift = 0;
+
+    int rev_avg_of_avgs_before_clust = 0;
+    int rev_avg_of_avgs_after_clust = 0;
+
+    int rev_avg_of_avgs_before_patch = 0;
+    int rev_avg_of_avgs_after_patch = 0;
+    
+    int rev_avg_of_avgs_before_ncc = 0;
+    int rev_avg_of_avgs_after_ncc = 0;
+
+    int rev_avg_of_avgs_before_lowe = 0;
+    int rev_avg_of_avgs_after_lowe = 0;
 
     if (num_rows > 0) {
         avg_of_avgs_before_epi = std::ceil(total_avg_before_epi / num_rows);
@@ -523,6 +782,30 @@ void Dataset::PerformEdgeBasedVO() {
 
         avg_of_avgs_before_lowe = std::ceil(total_avg_before_lowe / num_rows);
         avg_of_avgs_after_lowe = std::ceil(total_avg_after_lowe / num_rows);
+    }
+
+
+    if (rev_num_rows > 0) {
+        rev_avg_of_avgs_before_epi = std::ceil(rev_total_avg_before_epi / rev_num_rows);
+        rev_avg_of_avgs_after_epi = std::ceil(rev_total_avg_after_epi / rev_num_rows);
+
+        rev_avg_of_avgs_before_disp = std::ceil(rev_total_avg_before_disp / rev_num_rows);
+        rev_avg_of_avgs_after_disp = std::ceil(rev_total_avg_after_disp / rev_num_rows);
+
+        rev_avg_of_avgs_before_shift = std::ceil(rev_total_avg_before_shift / rev_num_rows);
+        rev_avg_of_avgs_after_shift = std::ceil(rev_total_avg_after_shift / rev_num_rows);
+
+        rev_avg_of_avgs_before_clust = std::ceil(rev_total_avg_before_clust / rev_num_rows);
+        rev_avg_of_avgs_after_clust = std::ceil(rev_total_avg_after_clust / rev_num_rows);
+
+        rev_avg_of_avgs_before_patch = std::ceil(rev_total_avg_before_patch / rev_num_rows);
+        rev_avg_of_avgs_after_patch = std::ceil(rev_total_avg_after_patch / rev_num_rows);
+
+        rev_avg_of_avgs_before_ncc = std::ceil(rev_total_avg_before_ncc / rev_num_rows);
+        rev_avg_of_avgs_after_ncc = std::ceil(rev_total_avg_after_ncc / rev_num_rows);
+
+        rev_avg_of_avgs_before_lowe = std::ceil(rev_total_avg_before_lowe / rev_num_rows);
+        rev_avg_of_avgs_after_lowe = std::ceil(rev_total_avg_after_lowe / rev_num_rows);
     }
 
     count_csv 
@@ -554,12 +837,42 @@ void Dataset::PerformEdgeBasedVO() {
         << ","
         << avg_of_avgs_before_lowe << ","            
         << avg_of_avgs_after_lowe << "\n";  
+
+    reverse_count_csv 
+        << ","                                   
+        << ","                                                                     
+        << rev_avg_of_avgs_before_epi << ","       
+        << rev_avg_of_avgs_after_epi << ","   
+        << "," 
+        << ","     
+        << rev_avg_of_avgs_before_disp << ","   
+        << rev_avg_of_avgs_after_disp << ","
+        << ","      
+        << ","                              
+        << rev_avg_of_avgs_before_shift << ","              
+        << rev_avg_of_avgs_after_shift << ","    
+        << ","   
+        << ","                                            
+        << rev_avg_of_avgs_before_clust << ","            
+        << rev_avg_of_avgs_after_clust << ","
+        << ","
+        << ","
+        << rev_avg_of_avgs_before_patch << ","            
+        << rev_avg_of_avgs_after_patch << ","
+        << ","
+        << ","
+        << rev_avg_of_avgs_before_ncc << ","            
+        << rev_avg_of_avgs_after_ncc << ","
+        << ","
+        << ","
+        << rev_avg_of_avgs_before_lowe << ","            
+        << rev_avg_of_avgs_after_lowe << "\n";  
     
     std::ofstream precision_csv(edge_stat_dir + "/precision_metrics.csv");
     precision_csv << "ImageIndex,EpiDistancePrecision,MaxDisparityPrecision,EpiShiftPrecision,EpiClusterPrecision,NCCPrecision,LowePrecision\n";
 
-    for (size_t i = 0; i < all_recall_metrics.size(); i++) {
-        const auto& m = all_recall_metrics[i];
+    for (size_t i = 0; i < all_forward_recall_metrics.size(); i++) {
+        const auto& m = all_forward_recall_metrics[i];
         precision_csv << i << ","
                 << std::fixed << std::setprecision(4) << m.per_image_epi_precision * 100 << ","
                 << std::fixed << std::setprecision(4) << m.per_image_disp_precision * 100 << ","
@@ -576,9 +889,32 @@ void Dataset::PerformEdgeBasedVO() {
         << std::fixed << std::setprecision(4) << avg_cluster_precision * 100 << ","
         << std::fixed << std::setprecision(4) << avg_ncc_precision * 100 << ","
         << std::fixed << std::setprecision(4) << avg_lowe_precision * 100 << "\n";
+
+
+    std::ofstream reverse_precision_csv(edge_stat_dir + "/reverse_precision_metrics.csv");
+    reverse_precision_csv << "ImageIndex,EpiDistancePrecision,MaxDisparityPrecision,EpiShiftPrecision,EpiClusterPrecision,NCCPrecision,LowePrecision\n";
+
+    for (size_t i = 0; i < all_reverse_recall_metrics.size(); i++) {
+        const auto& m = all_reverse_recall_metrics[i];
+        reverse_precision_csv << i << ","
+                << std::fixed << std::setprecision(4) << m.per_image_epi_precision * 100 << ","
+                << std::fixed << std::setprecision(4) << m.per_image_disp_precision * 100 << ","
+                << std::fixed << std::setprecision(4) << m.per_image_shift_precision * 100 << ","
+                << std::fixed << std::setprecision(4) << m.per_image_clust_precision * 100 << ","
+                << std::fixed << std::setprecision(4) << m.per_image_ncc_precision * 100 << ","
+                << std::fixed << std::setprecision(4) << m.per_image_lowe_precision * 100 << "\n";
+    }
+
+    reverse_precision_csv << "Average,"
+        << std::fixed << std::setprecision(4) << rev_avg_epi_precision * 100 << ","
+        << std::fixed << std::setprecision(4) << rev_avg_disp_precision * 100 << ","
+        << std::fixed << std::setprecision(4) << rev_avg_shift_precision * 100 << ","
+        << std::fixed << std::setprecision(4) << rev_avg_cluster_precision * 100 << ","
+        << std::fixed << std::setprecision(4) << rev_avg_ncc_precision * 100 << ","
+        << std::fixed << std::setprecision(4) << rev_avg_lowe_precision * 100 << "\n";
 }
 
-MatchResult Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, const cv::Mat& left_binary_map, const cv::Mat& right_binary_map, std::vector<cv::Point2d> right_edge_coords, std::vector<double> right_edge_orientations) {
+BidirectionalMatchResult Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, const cv::Mat& left_binary_map, const cv::Mat& right_binary_map, std::vector<cv::Point2d> right_edge_coords, std::vector<double> right_edge_orientations) {
     cv::Mat left_visualization, right_visualization;
     cv::cvtColor(left_binary_map, left_visualization, cv::COLOR_GRAY2BGR);
     cv::cvtColor(right_binary_map, right_visualization, cv::COLOR_GRAY2BGR);
@@ -695,7 +1031,7 @@ MatchResult Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& ri
         false
     );
 
-    return forward_match;
+    return BidirectionalMatchResult{forward_match, reverse_match};
 }
 
 MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_primary_edges, const std::vector<cv::Point2d>& selected_ground_truth_edges,

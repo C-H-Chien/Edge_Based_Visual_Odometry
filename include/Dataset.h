@@ -77,6 +77,11 @@ struct MatchResult {
     std::vector<std::pair<cv::Point2d, PatchMatch>> matches; 
 };
 
+struct BidirectionalMatchResult {
+    MatchResult forward_match;
+    MatchResult reverse_match;
+};
+
 extern cv::Mat merged_visualization_global;
 class Dataset {
 public:
@@ -152,7 +157,7 @@ private:
    void write_ncc_vals_to_files( int img_index );
 
    void PrintDatasetInfo();
-   MatchResult DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, const cv::Mat& left_binary_map, const cv::Mat& right_binary_map, std::vector<cv::Point2d> right_edge_coords, std::vector<double> right_edge_orientations);
+   BidirectionalMatchResult DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, const cv::Mat& left_binary_map, const cv::Mat& right_binary_map, std::vector<cv::Point2d> right_edge_coords, std::vector<double> right_edge_orientations);
    MatchResult CalculateMatches(const std::vector<cv::Point2d>& selected_primary_edges, const std::vector<cv::Point2d>& selected_ground_truth_edges,
    const std::vector<double>& selected_primary_orientations, const std::vector<cv::Point2d>& primary_edge_coords, const std::vector<double>& primary_edge_orientations,
    const std::vector<cv::Point2d>& secondary_edge_coords, const std::vector<double>& secondary_edge_orientations, const std::vector<cv::Mat>& primary_patch_set_one, 
