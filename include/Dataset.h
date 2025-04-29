@@ -27,6 +27,19 @@
 //> Chiang-Heng Chien (chiang-heng_chien@brown.edu), Saul Lopez Lucas (saul_lopez_lucas@brown.edu)
 // =======================================================================================================
 
+struct ClusterCenter {
+    cv::Point2d center_coord;                  
+    double center_orientation;                 
+    std::vector<cv::Point2d> contributing_edges;
+};
+
+struct PatchMatch{
+    cv::Point2d coord;
+    double orientation;
+    double final_score;
+    std::vector<cv::Point2d> contributing_edges;
+};
+
 struct RecallMetrics {
   double epi_distance_recall;
   double max_disparity_recall;
@@ -59,10 +72,9 @@ struct RecallMetrics {
    double per_image_lowe_precision;
 };
 
-struct PatchMatch{
-    cv::Point2d coord;
-    double orientation;
-    double final_score;
+struct MatchResult {
+    RecallMetrics recall_metrics;
+    std::vector<std::pair<cv::Point2d, PatchMatch>> matches; 
 };
 
 extern cv::Mat merged_visualization_global;
@@ -139,8 +151,8 @@ private:
    void write_ncc_vals_to_files( int img_index );
 
    void PrintDatasetInfo();
-   RecallMetrics DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, const cv::Mat& left_binary_map, const cv::Mat& right_binary_map, std::vector<cv::Point2d> right_edge_coords, std::vector<double> right_edge_orientations);
-   RecallMetrics CalculateMatches(const std::vector<cv::Point2d>& selected_primary_edges, const std::vector<cv::Point2d>& selected_ground_truth_edges,
+   MatchResult DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, const cv::Mat& left_binary_map, const cv::Mat& right_binary_map, std::vector<cv::Point2d> right_edge_coords, std::vector<double> right_edge_orientations);
+   MatchResult CalculateMatches(const std::vector<cv::Point2d>& selected_primary_edges, const std::vector<cv::Point2d>& selected_ground_truth_edges,
    const std::vector<double>& selected_primary_orientations, const std::vector<cv::Point2d>& primary_edge_coords, const std::vector<double>& primary_edge_orientations,
    const std::vector<cv::Point2d>& secondary_edge_coords, const std::vector<double>& secondary_edge_orientations, const std::vector<cv::Mat>& primary_patch_set_one, 
    const std::vector<cv::Mat>& primary_patch_set_two, const std::vector<Eigen::Vector3d>& epipolar_lines_secondary, const cv::Mat& primary_image, const cv::Mat& secondary_image, 
@@ -151,6 +163,18 @@ private:
    std::vector<Eigen::Vector3d> ReprojectOrientations(const std::vector<Eigen::Vector3d>& tangent_vectors, std::vector<Eigen::Matrix3d> rot_mat_list);
    std::vector<Eigen::Vector3d> ReconstructOrientations();
    void CalculateDepths();
+   void ExtractClusterPatches(
+      int patch_size,
+      const cv::Mat& image,
+      const std::vector<ClusterCenter>& cluster_centers,
+      const std::vector<cv::Point2d>* right_edges, 
+      const std::vector<cv::Point2d>& shifted_one,
+      const std::vector<cv::Point2d>& shifted_two,
+      std::vector<ClusterCenter>& cluster_centers_out,
+      std::vector<cv::Point2d>* filtered_right_edges_out,
+      std::vector<cv::Mat>& patch_set_one_out,
+      std::vector<cv::Mat>& patch_set_two_out
+   );
    void ExtractPatches(
     int patch_size,
     const cv::Mat& image,
@@ -163,7 +187,8 @@ private:
     std::vector<double>& filtered_orientations_out,
     std::vector<cv::Point2d>* filtered_right_edges_out,
     std::vector<cv::Mat>& patch_set_one_out,
-    std::vector<cv::Mat>& patch_set_two_out);
+    std::vector<cv::Mat>& patch_set_two_out
+   );
    std::pair<std::vector<cv::Point2d>, std::vector<double>> ExtractEpipolarEdges(const Eigen::Vector3d& epipolar_line, const std::vector<cv::Point2d>& edge_locations, const std::vector<double>& edge_orientations, double distance_threshold); 
    std::vector<Eigen::Vector3d> CalculateEpipolarLine(const Eigen::Matrix3d& fund_mat, const std::vector<cv::Point2d>& edges);
    std::tuple<std::vector<cv::Point2d>, std::vector<double>, std::vector<cv::Point2d>> PickRandomEdges(int patch_size, const std::vector<cv::Point2d>& edges, const std::vector<cv::Point2d>& ground_truth_right_edges, const std::vector<double>& orientations, size_t num_points, int img_width, int img_height);
