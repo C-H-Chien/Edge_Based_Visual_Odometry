@@ -31,6 +31,7 @@ struct ClusterCenter {
     cv::Point2d center_coord;                  
     double center_orientation;                 
     std::vector<cv::Point2d> contributing_edges;
+    std::vector<double> contributing_orientations;
 };
 
 struct PatchMatch{
@@ -38,6 +39,7 @@ struct PatchMatch{
     double orientation;
     double final_score;
     std::vector<cv::Point2d> contributing_edges;
+    std::vector<double> contributing_orientations;
 };
 
 struct RecallMetrics {
@@ -70,6 +72,18 @@ struct RecallMetrics {
    double per_image_clust_precision;
    double per_image_ncc_precision;
    double per_image_lowe_precision;
+
+   int lowe_true_positive;
+   int lowe_false_negative;
+
+    double per_image_epi_time;
+    double per_image_disp_time;
+    double per_image_shift_time;
+    double per_image_clust_time;
+    double per_image_patch_time;
+    double per_image_ncc_time;
+    double per_image_lowe_time;
+    double per_image_total_time;
 };
 
 struct MatchResult {
@@ -77,10 +91,19 @@ struct MatchResult {
     std::vector<std::pair<cv::Point2d, PatchMatch>> matches; 
 };
 
+struct BCTMetrics{
+    int matches_before_bct;
+    int matches_after_bct;
+    double per_image_bct_recall;
+    double per_image_bct_precision;
+    double per_image_bct_time;
+};
+
 struct BidirectionalMatchResult {
     MatchResult forward_match;
     MatchResult reverse_match;
     std::vector<std::pair<cv::Point2d, cv::Point2d>> confirmed_matches;
+    BCTMetrics bct_metrics;
 };
 
 extern cv::Mat merged_visualization_global;

@@ -177,7 +177,7 @@ void Dataset::write_ncc_vals_to_files( int img_index ) {
 }
 
 void Dataset::PerformEdgeBasedVO() {
-    int num_pairs = 2;
+    int num_pairs = 247;
     std::vector<std::pair<cv::Mat, cv::Mat>> image_pairs;
     std::vector<cv::Mat> left_ref_disparity_maps;
     std::vector<cv::Mat> right_ref_disparity_maps;
@@ -203,7 +203,9 @@ void Dataset::PerformEdgeBasedVO() {
 
     std::vector<double> per_image_avg_before_lowe;
     std::vector<double> per_image_avg_after_lowe;
-
+    
+    std::vector<double> per_image_avg_before_bct;
+    std::vector<double> per_image_avg_after_bct;
 
     std::vector<double> rev_per_image_avg_before_epi;
     std::vector<double> rev_per_image_avg_after_epi;
@@ -228,6 +230,7 @@ void Dataset::PerformEdgeBasedVO() {
 
     std::vector<RecallMetrics> all_forward_recall_metrics;
     std::vector<RecallMetrics> all_reverse_recall_metrics;
+    std::vector<BCTMetrics> all_bct_metrics;
 
     if (dataset_type == "EuRoC"){
         std::string left_path = dataset_path + "/" + sequence_name + "/mav0/cam0/data/";
@@ -349,6 +352,9 @@ void Dataset::PerformEdgeBasedVO() {
         const RecallMetrics& reverse_metrics = match_result.reverse_match.recall_metrics;
         all_reverse_recall_metrics.push_back(reverse_metrics);
 
+        const BCTMetrics& bct_metrics = match_result.bct_metrics;
+        all_bct_metrics.push_back(bct_metrics);
+
         double avg_before_epi = ComputeAverage(forward_metrics.epi_input_counts);
         double avg_after_epi = ComputeAverage(forward_metrics.epi_output_counts);
 
@@ -413,6 +419,9 @@ void Dataset::PerformEdgeBasedVO() {
         per_image_avg_before_lowe.push_back(avg_before_lowe);
         per_image_avg_after_lowe.push_back(avg_after_lowe);
 
+        per_image_avg_before_bct.push_back(match_result.bct_metrics.matches_before_bct);
+        per_image_avg_after_bct.push_back(match_result.bct_metrics.matches_after_bct);
+
 
         rev_per_image_avg_before_epi.push_back(rev_avg_before_epi);
         rev_per_image_avg_after_epi.push_back(rev_avg_after_epi);
@@ -443,6 +452,7 @@ void Dataset::PerformEdgeBasedVO() {
     double total_cluster_recall = 0.0;
     double total_ncc_recall = 0.0;
     double total_lowe_recall = 0.0;
+    double total_bct_recall = 0.0;
 
     double total_epi_precision = 0.0;
     double total_disp_precision = 0.0;
@@ -450,6 +460,17 @@ void Dataset::PerformEdgeBasedVO() {
     double total_cluster_precision = 0.0;
     double total_ncc_precision = 0.0;
     double total_lowe_precision = 0.0;
+    double total_bct_precision = 0.0;
+
+    double total_epi_time = 0.0;
+    double total_disp_time = 0.0;
+    double total_shift_time = 0.0;
+    double total_clust_time = 0.0;
+    double total_patch_time = 0.0;
+    double total_ncc_time = 0.0;
+    double total_lowe_time = 0.0;
+    double total_image_time = 0.0;
+    double total_bct_time = 0.0;
 
 
     double rev_total_epi_recall = 0.0;
@@ -480,6 +501,21 @@ void Dataset::PerformEdgeBasedVO() {
         total_cluster_precision += m.per_image_clust_precision;
         total_ncc_precision += m.per_image_ncc_precision;
         total_lowe_precision += m.per_image_lowe_precision;
+
+        total_epi_time += m.per_image_epi_time;
+        total_disp_time += m.per_image_disp_time;
+        total_shift_time += m.per_image_shift_time;
+        total_clust_time += m.per_image_clust_time;
+        total_patch_time += m.per_image_patch_time;
+        total_ncc_time += m.per_image_ncc_time;
+        total_lowe_time += m.per_image_lowe_time;
+        total_image_time += m.per_image_total_time;
+    }
+
+    for (const BCTMetrics& m : all_bct_metrics) {
+        total_bct_recall += m.per_image_bct_recall;
+        total_bct_precision += m.per_image_bct_precision;
+        total_bct_time += m.per_image_bct_time;
     }
 
 
@@ -507,7 +543,8 @@ void Dataset::PerformEdgeBasedVO() {
     double avg_shift_recall = (total_images > 0) ? total_shift_recall / total_images : 0.0;
     double avg_cluster_recall = (total_images > 0) ? total_cluster_recall / total_images : 0.0;
     double avg_ncc_recall = (total_images > 0) ? total_ncc_recall / total_images : 0.0;
-    double avg_lowe_recall = (total_images > 0) ? total_lowe_recall / total_images: 0.0;
+    double avg_lowe_recall = (total_images > 0) ? total_lowe_recall / total_images : 0.0;
+    double avg_bct_recall = (total_images > 0) ? total_bct_recall / total_images : 0.0;
 
     double avg_epi_precision   = (total_images > 0) ? total_epi_precision / total_images : 0.0;
     double avg_disp_precision  = (total_images > 0) ? total_disp_precision / total_images : 0.0;
@@ -515,6 +552,17 @@ void Dataset::PerformEdgeBasedVO() {
     double avg_cluster_precision = (total_images > 0) ? total_cluster_precision / total_images : 0.0;
     double avg_ncc_precision = (total_images > 0) ? total_ncc_precision / total_images : 0.0;
     double avg_lowe_precision = (total_images > 0) ? total_lowe_precision / total_images: 0.0;
+    double avg_bct_precision = (total_images > 0) ? total_bct_precision / total_images: 0.0;
+
+    double avg_epi_time = (total_images > 0) ? total_epi_time / total_images : 0.0;
+    double avg_disp_time = (total_images > 0) ? total_disp_time / total_images : 0.0;
+    double avg_shift_time = (total_images > 0) ? total_shift_time / total_images : 0.0;
+    double avg_clust_time = (total_images > 0) ? total_clust_time / total_images : 0.0;
+    double avg_patch_time = (total_images > 0) ? total_patch_time / total_images : 0.0;
+    double avg_ncc_time = (total_images > 0) ? total_ncc_time / total_images : 0.0;
+    double avg_lowe_time = (total_images > 0) ? total_lowe_time / total_images : 0.0;
+    double avg_total_time = (total_images > 0) ? total_image_time / total_images : 0.0;
+    double avg_bct_time = (total_images > 0) ? total_bct_time / total_images : 0.0;
 
 
     double rev_avg_epi_recall   = (rev_total_images > 0) ? rev_total_epi_recall / rev_total_images : 0.0;
@@ -535,20 +583,25 @@ void Dataset::PerformEdgeBasedVO() {
     std::filesystem::create_directories(edge_stat_dir);
 
     std::ofstream recall_csv(edge_stat_dir + "/recall_metrics.csv");
-    recall_csv << "ImageIndex,EpiDistanceRecall,MaxDisparityRecall,EpiShiftRecall,EpiClusterRecall,NCCRecall,LoweRecall\n";
+    recall_csv << "ImageIndex,EpiDistanceRecall,MaxDisparityRecall,EpiShiftRecall,EpiClusterRecall,NCCRecall,LoweRecall,BidirectionalRecall\n";
 
     std::ofstream reverse_recall_csv(edge_stat_dir + "/reverse_recall_metrics.csv");
     reverse_recall_csv << "ImageIndex,EpiDistanceRecall,MaxDisparityRecall,EpiShiftRecall,EpiClusterRecall,NCCRecall,LoweRecall\n";
 
+    std::ofstream time_elapsed_csv(edge_stat_dir + "/time_elapsed_metrics.csv");
+    time_elapsed_csv << "ImageIndex,EpiDistanceTime,MaxDisparityTime,EpiShiftTime,EpiClusterTime,PatchTime,NCCTime,LoweTime,TotalLoopTime,BidirectionalTime\n";
+
     for (size_t i = 0; i < all_forward_recall_metrics.size(); i++) {
         const auto& m = all_forward_recall_metrics[i];
+        const auto& bct = all_bct_metrics[i];
         recall_csv << i << ","
                 << std::fixed << std::setprecision(4) << m.epi_distance_recall * 100 << ","
                 << std::fixed << std::setprecision(4) << m.max_disparity_recall * 100 << ","
                 << std::fixed << std::setprecision(4) << m.epi_shift_recall * 100 << ","
                 << std::fixed << std::setprecision(4) << m.epi_cluster_recall * 100 << ","
                 << std::fixed << std::setprecision(4) << m.ncc_recall * 100 << ","
-                << std::fixed << std::setprecision(4) << m.lowe_recall * 100 << "\n";
+                << std::fixed << std::setprecision(4) << m.lowe_recall * 100 << ","
+                << std::fixed << std::setprecision(4) << bct.per_image_bct_recall * 100 << "\n";
     }
 
     recall_csv << "Average,"
@@ -557,7 +610,8 @@ void Dataset::PerformEdgeBasedVO() {
             << std::fixed << std::setprecision(4) << avg_shift_recall * 100 << ","
             << std::fixed << std::setprecision(4) << avg_cluster_recall * 100 << ","
             << std::fixed << std::setprecision(4) << avg_ncc_recall * 100 << ","
-            << std::fixed << std::setprecision(4) << avg_lowe_recall * 100 << "\n";
+            << std::fixed << std::setprecision(4) << avg_lowe_recall * 100 << ","
+            << std::fixed << std::setprecision(4) << avg_bct_recall * 100 << "\n";
 
 
     for (size_t i = 0; i < all_reverse_recall_metrics.size(); i++) {
@@ -578,6 +632,32 @@ void Dataset::PerformEdgeBasedVO() {
             << std::fixed << std::setprecision(4) << rev_avg_cluster_recall * 100 << ","
             << std::fixed << std::setprecision(4) << rev_avg_ncc_recall * 100 << ","
             << std::fixed << std::setprecision(4) << rev_avg_lowe_recall * 100 << "\n";
+
+    for (size_t i = 0; i < all_forward_recall_metrics.size(); i++) {
+        const auto& m = all_forward_recall_metrics[i];
+        const auto& bct = all_bct_metrics[i];
+        time_elapsed_csv << i << ","
+                << std::fixed << std::setprecision(4) << m.per_image_epi_time<< ","
+                << std::fixed << std::setprecision(4) << m.per_image_disp_time<< ","
+                << std::fixed << std::setprecision(4) << m.per_image_shift_time<< ","
+                << std::fixed << std::setprecision(4) << m.per_image_clust_time<< ","
+                << std::fixed << std::setprecision(4) << m.per_image_patch_time<< ","
+                << std::fixed << std::setprecision(4) << m.per_image_ncc_time<< ","
+                << std::fixed << std::setprecision(4) << m.per_image_lowe_time<< ","
+                << std::fixed << std::setprecision(4) << m.per_image_total_time<< ","
+                << std::fixed << std::setprecision(4) << bct.per_image_bct_time<< "\n";
+    }
+
+    time_elapsed_csv << "Average,"
+            << std::fixed << std::setprecision(4) << avg_epi_time<< ","
+            << std::fixed << std::setprecision(4) << avg_disp_time<< ","
+            << std::fixed << std::setprecision(4) << avg_shift_time<< ","
+            << std::fixed << std::setprecision(4) << avg_clust_time<< ","
+            << std::fixed << std::setprecision(4) << avg_patch_time<< ","
+            << std::fixed << std::setprecision(4) << avg_ncc_time<< ","
+            << std::fixed << std::setprecision(4) << avg_lowe_time<< ","
+            << std::fixed << std::setprecision(4) << avg_total_time<< ","
+            << std::fixed << std::setprecision(4) << avg_bct_time<< "\n";
     
     std::ofstream count_csv(edge_stat_dir + "/count_metrics.csv");
     count_csv 
@@ -587,7 +667,8 @@ void Dataset::PerformEdgeBasedVO() {
         << "before_epi_cluster,after_epi_cluster,average_before_epi_cluster,average_after_epi_cluster,"
         << "before_patch, after_patch, average_before_patch, average_after_patch,"
         << "before_ncc,after_ncc,average_before_ncc,average_after_ncc,"
-        << "before_lowe,after_lowe,average_before_lowe,after_after_lowe\n";
+        << "before_lowe,after_lowe,average_before_lowe,after_after_lowe,"
+        << "before_bct,after_bct,average_before_bct,after_after_bct\n";
 
 
     std::ofstream reverse_count_csv(edge_stat_dir + "/reverse_count_metrics.csv");
@@ -620,6 +701,9 @@ void Dataset::PerformEdgeBasedVO() {
 
     double total_avg_before_lowe = 0.0;
     double total_avg_after_lowe = 0.0;
+
+    double total_avg_before_bct = 0.0;
+    double total_avg_after_bct = 0.0;
 
 
     double rev_total_avg_before_epi = 0.0;
@@ -668,6 +752,9 @@ void Dataset::PerformEdgeBasedVO() {
         total_avg_before_lowe += per_image_avg_before_lowe[i];
         total_avg_after_lowe += per_image_avg_after_lowe[i];
 
+        total_avg_before_bct += per_image_avg_before_bct[i];
+        total_avg_after_bct += per_image_avg_after_bct[i];
+
         count_csv
             << static_cast<int>(std::ceil(per_image_avg_before_epi[i])) << ","
             << static_cast<int>(std::ceil(per_image_avg_after_epi[i])) << ","
@@ -695,6 +782,10 @@ void Dataset::PerformEdgeBasedVO() {
             << ","
             << static_cast<int>(std::ceil(per_image_avg_before_lowe[i])) << ","
             << static_cast<int>(std::ceil(per_image_avg_after_lowe[i])) << ","
+            << ","
+            << ","
+            << static_cast<int>(std::ceil(per_image_avg_before_bct[i])) << ","
+            << static_cast<int>(std::ceil(per_image_avg_after_bct[i])) << ","
             <<"\n";
     }
 
@@ -771,6 +862,9 @@ void Dataset::PerformEdgeBasedVO() {
     int avg_of_avgs_before_lowe = 0;
     int avg_of_avgs_after_lowe = 0;
 
+    int avg_of_avgs_before_bct = 0;
+    int avg_of_avgs_after_bct = 0;
+
 
     int rev_avg_of_avgs_before_epi = 0;
     int rev_avg_of_avgs_after_epi = 0;
@@ -814,6 +908,9 @@ void Dataset::PerformEdgeBasedVO() {
 
         avg_of_avgs_before_lowe = std::ceil(total_avg_before_lowe / num_rows);
         avg_of_avgs_after_lowe = std::ceil(total_avg_after_lowe / num_rows);
+
+        avg_of_avgs_before_bct = std::ceil(total_avg_before_bct / num_rows);
+        avg_of_avgs_after_bct = std::ceil(total_avg_after_bct / num_rows);
     }
 
 
@@ -868,7 +965,11 @@ void Dataset::PerformEdgeBasedVO() {
         << ","
         << ","
         << avg_of_avgs_before_lowe << ","            
-        << avg_of_avgs_after_lowe << "\n";  
+        << avg_of_avgs_after_lowe << ","
+        << ","
+        << ","
+        << avg_of_avgs_before_bct << ","            
+        << avg_of_avgs_after_bct << "\n";  
 
     reverse_count_csv 
         << ","                                   
@@ -901,17 +1002,19 @@ void Dataset::PerformEdgeBasedVO() {
         << rev_avg_of_avgs_after_lowe << "\n";  
     
     std::ofstream precision_csv(edge_stat_dir + "/precision_metrics.csv");
-    precision_csv << "ImageIndex,EpiDistancePrecision,MaxDisparityPrecision,EpiShiftPrecision,EpiClusterPrecision,NCCPrecision,LowePrecision\n";
+    precision_csv << "ImageIndex,EpiDistancePrecision,MaxDisparityPrecision,EpiShiftPrecision,EpiClusterPrecision,NCCPrecision,LowePrecision,BidirectionalPrecision\n";
 
     for (size_t i = 0; i < all_forward_recall_metrics.size(); i++) {
         const auto& m = all_forward_recall_metrics[i];
+        const auto& bct = all_bct_metrics[i];
         precision_csv << i << ","
                 << std::fixed << std::setprecision(4) << m.per_image_epi_precision * 100 << ","
                 << std::fixed << std::setprecision(4) << m.per_image_disp_precision * 100 << ","
                 << std::fixed << std::setprecision(4) << m.per_image_shift_precision * 100 << ","
                 << std::fixed << std::setprecision(4) << m.per_image_clust_precision * 100 << ","
                 << std::fixed << std::setprecision(4) << m.per_image_ncc_precision * 100 << ","
-                << std::fixed << std::setprecision(4) << m.per_image_lowe_precision * 100 << "\n";
+                << std::fixed << std::setprecision(4) << m.per_image_lowe_precision * 100 << ","
+                << std::fixed << std::setprecision(4) << bct.per_image_bct_precision * 100 << "\n";
     }
 
     precision_csv << "Average,"
@@ -920,7 +1023,8 @@ void Dataset::PerformEdgeBasedVO() {
         << std::fixed << std::setprecision(4) << avg_shift_precision * 100 << ","
         << std::fixed << std::setprecision(4) << avg_cluster_precision * 100 << ","
         << std::fixed << std::setprecision(4) << avg_ncc_precision * 100 << ","
-        << std::fixed << std::setprecision(4) << avg_lowe_precision * 100 << "\n";
+        << std::fixed << std::setprecision(4) << avg_lowe_precision * 100 << ","
+        << std::fixed << std::setprecision(4) << avg_bct_precision * 100 << "\n";
 
 
     std::ofstream reverse_precision_csv(edge_stat_dir + "/reverse_precision_metrics.csv");
@@ -1058,21 +1162,22 @@ BidirectionalMatchResult Dataset::DisplayMatches(const cv::Mat& left_image, cons
 
     std::vector<std::pair<cv::Point2d, cv::Point2d>> confirmed_matches;
 
+    int matches_before_bct = static_cast<int>(forward_match.matches.size());
+
     const double match_tolerance = 3;
 
-    std::cout << "Forward match count: " << forward_match.matches.size() << std::endl;
-    std::cout << "Reverse match count: " << reverse_match.matches.size() << std::endl;
+    auto bct_start = std::chrono::high_resolution_clock::now();
 
     for (const auto& [left_edge, patch_match_forward] : forward_match.matches) {
         const auto& right_contributing_edges = patch_match_forward.contributing_edges;
         for (const auto& right_edge : right_contributing_edges) {
 
             for (const auto& [rev_right_edge, patch_match_rev] : reverse_match.matches) {
-                if (cv::norm(rev_right_edge - right_edge) < match_tolerance) {
+                if (cv::norm(rev_right_edge - right_edge) <= match_tolerance) {
 
                     for (const auto& rev_contributing_left : patch_match_rev.contributing_edges) {
-                        if (cv::norm(rev_contributing_left - left_edge) < match_tolerance) {
-
+                        if (cv::norm(rev_contributing_left - left_edge) <= match_tolerance) {
+                            
                             confirmed_matches.emplace_back(left_edge, right_edge);
                             goto next_left_edge;
                         }
@@ -1083,15 +1188,41 @@ BidirectionalMatchResult Dataset::DisplayMatches(const cv::Mat& left_image, cons
         next_left_edge:;
     }
 
-    std::cout << "Bidirectional consistent matches: " << confirmed_matches.size() << std::endl;
+    auto bct_end = std::chrono::high_resolution_clock::now();
+    double total_time_bct = std::chrono::duration<double, std::milli>(bct_end - bct_start).count();
 
-    return BidirectionalMatchResult{forward_match, reverse_match, confirmed_matches};
+    double per_image_bct_time = (matches_before_bct > 0) ? total_time_bct / matches_before_bct : 0.0;
+
+    int matches_after_bct = static_cast<int>(confirmed_matches.size());
+
+    std::cout << "Matches before BCT: " << matches_before_bct << std::endl;
+    std::cout << "Matches after BCT:  " << matches_after_bct << std::endl;
+
+    double per_image_bct_precision = (matches_before_bct > 0) ? static_cast<double>(matches_after_bct) / matches_before_bct: 0.0;
+
+    int bct_denonimator = forward_match.recall_metrics.lowe_true_positive + forward_match.recall_metrics.lowe_false_negative;
+    int bct_true_positives = static_cast<int>(confirmed_matches.size());
+
+    double bct_recall = (bct_denonimator > 0) ? static_cast<double>(bct_true_positives) / bct_denonimator : 0.0;
+
+    std::cout << "BCT Precision: "<< std::fixed << std::setprecision(2) << per_image_bct_precision * 100 << "%" << std::endl;
+    std::cout << "BCT Recall Rate: "<< std::fixed << std::setprecision(2) << bct_recall * 100 << "%" << std::endl;
+
+    BCTMetrics bct_metrics;
+    bct_metrics.matches_before_bct = matches_before_bct;
+    bct_metrics.matches_after_bct = matches_after_bct;
+    bct_metrics.per_image_bct_recall = bct_recall;
+    bct_metrics.per_image_bct_precision = per_image_bct_precision;
+    bct_metrics.per_image_bct_time = per_image_bct_time;
+
+    return BidirectionalMatchResult{forward_match, reverse_match, confirmed_matches, bct_metrics};
 }
 
 MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_primary_edges, const std::vector<cv::Point2d>& selected_ground_truth_edges,
    const std::vector<double>& selected_primary_orientations, const std::vector<cv::Point2d>& primary_edge_coords, const std::vector<double>& primary_edge_orientations,
    const std::vector<cv::Point2d>& secondary_edge_coords, const std::vector<double>& secondary_edge_orientations, const std::vector<cv::Mat>& primary_patch_set_one, 
    const std::vector<cv::Mat>& primary_patch_set_two, const std::vector<Eigen::Vector3d>& epipolar_lines_secondary, const cv::Mat& primary_image, const cv::Mat& secondary_image, bool left_to_right) {
+    auto total_start = std::chrono::high_resolution_clock::now();
 
     std::vector<int> epi_input_counts;
     std::vector<int> epi_output_counts;
@@ -1143,6 +1274,15 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
 
     double selected_max_disparity = 23.0063;
 
+    int time_epi_edges_evaluated = 0;
+    int time_disp_edges_evaluated = 0;
+    int time_shift_edges_evaluated = 0;
+    int time_clust_edges_evaluated = 0;
+    int time_patch_edges_evaluated = 0;
+    int time_ncc_edges_evaluated = 0;
+    int time_lowe_edges_evaluated = 0;
+
+
     int epi_edges_evaluated = 0;
     int disp_edges_evaluated = 0;
     int shift_edges_evaluated = 0;
@@ -1150,9 +1290,17 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
     int ncc_edges_evaluated = 0;
     int lowe_edges_evaluated = 0;
 
+    double time_epi = 0.0;
+    double time_disp = 0.0;
+    double time_shift = 0.0;
+    double time_patch = 0.0;
+    double time_cluster = 0.0;
+    double time_ncc = 0.0;
+    double time_lowe = 0.0;
+
     std::vector<std::pair<cv::Point2d, PatchMatch>> final_matches;
 
-    int skip = 100;
+    int skip = left_to_right ? 100 : 1;
     for (size_t i = 0; i < selected_primary_edges.size(); i += skip) {
         const auto& primary_edge = selected_primary_edges[i];
         const auto& primary_orientation = selected_primary_orientations[i];
@@ -1183,6 +1331,8 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
         }
 
         ///////////////////////////////EPIPOLAR DISTANCE THRESHOLD///////////////////////////////
+        auto start_epi = std::chrono::high_resolution_clock::now();
+
         std::pair<std::vector<cv::Point2d>, std::vector<double>> secondary_candidates_data = ExtractEpipolarEdges(epipolar_line, secondary_edge_coords, secondary_edge_orientations, 0.5);
         std::vector<cv::Point2d> secondary_candidate_edges = secondary_candidates_data.first;
         std::vector<double> secondary_candidate_orientations = secondary_candidates_data.second;
@@ -1191,6 +1341,10 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
         std::vector<cv::Point2d> test_secondary_candidate_edges = test_secondary_candidates_data.first;
 
         epi_input_counts.push_back(secondary_edge_coords.size());
+
+        time_epi_edges_evaluated++;
+        auto end_epi = std::chrono::high_resolution_clock::now();
+        time_epi += std::chrono::duration<double, std::milli>(end_epi - start_epi).count();
         ///////////////////////////////EPIPOLAR DISTANCE THRESHOLD RECALL//////////////////////////
         int epi_precision_numerator = 0;
         bool match_found = false;
@@ -1227,6 +1381,8 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
             epi_edges_evaluated++; 
         }
         ///////////////////////////////MAXIMUM DISPARITY THRESHOLD//////////////////////////
+        auto start_disp = std::chrono::high_resolution_clock::now();
+        
         epi_output_counts.push_back(secondary_candidate_edges.size());
 
         std::vector<cv::Point2d> filtered_secondary_edge_coords;
@@ -1247,6 +1403,11 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
         }
 
         disp_input_counts.push_back(secondary_candidate_edges.size());
+
+        time_disp_edges_evaluated++;
+
+        auto end_disp = std::chrono::high_resolution_clock::now();
+        time_disp += std::chrono::duration<double, std::milli>(end_disp - start_disp).count();
         ///////////////////////////////MAXIMUM DISPARITY THRESHOLD RECALL//////////////////////////
         int disp_precision_numerator = 0;
         bool disp_match_found = false;
@@ -1270,6 +1431,8 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
             disp_edges_evaluated++;
         }
         ///////////////////////////////EPIPOLAR SHIFT THRESHOLD//////////////////////////
+        auto start_shift = std::chrono::high_resolution_clock::now();
+
         disp_output_counts.push_back(filtered_secondary_edge_coords.size());
 
         std::vector<cv::Point2d> shifted_secondary_edge_coords;
@@ -1287,6 +1450,11 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
         }
 
         shift_input_counts.push_back(filtered_secondary_edge_coords.size());
+
+        time_shift_edges_evaluated++;
+
+        auto end_shift = std::chrono::high_resolution_clock::now();
+        time_shift += std::chrono::duration<double, std::milli>(end_shift - start_shift).count();
         ///////////////////////////////EPIPOLAR SHIFT THRESHOLD RECALL//////////////////////////
         int shift_precision_numerator = 0;
         bool shift_match_found = false;
@@ -1310,6 +1478,8 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
             shift_edges_evaluated++;
         }
         ///////////////////////////////EPIPOLAR CLUSTER THRESHOLD//////////////////////////
+        auto start_cluster = std::chrono::high_resolution_clock::now();
+
         shift_output_counts.push_back(shifted_secondary_edge_coords.size());
 
         std::vector<std::pair<std::vector<cv::Point2d>, std::vector<double>>> clusters = ClusterEpipolarShiftedEdges(shifted_secondary_edge_coords, shifted_secondary_edge_orientations);
@@ -1339,11 +1509,17 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
             cluster.center_coord = avg_point;
             cluster.center_orientation = avg_orientation;
             cluster.contributing_edges = cluster_edges;
+            cluster.contributing_orientations = cluster_orientations;
 
             cluster_centers.push_back(cluster);
         }
 
         clust_input_counts.push_back(shifted_secondary_edge_coords.size());
+
+        time_clust_edges_evaluated++;
+
+        auto end_cluster = std::chrono::high_resolution_clock::now();
+        time_cluster += std::chrono::duration<double, std::milli>(end_cluster - start_cluster).count();
         ///////////////////////////////EPIPOLAR CLUSTER THRESHOLD RECALL//////////////////////////
         int clust_precision_numerator = 0;
         bool cluster_match_found = false;
@@ -1367,6 +1543,8 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
             clust_edges_evaluated++;
         }
         ///////////////////////////////EXTRACT PATCHES THRESHOLD////////////////////////////////////////////
+        auto start_patch = std::chrono::high_resolution_clock::now();
+
         clust_output_counts.push_back(cluster_centers.size());
 
         std::vector<cv::Point2d> cluster_coords;
@@ -1401,7 +1579,14 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
         );
 
         patch_input_counts.push_back(cluster_centers.size());
+
+        time_patch_edges_evaluated++;
+
+        auto end_patch = std::chrono::high_resolution_clock::now();
+        time_patch += std::chrono::duration<double, std::milli>(end_patch - start_patch).count();
        ///////////////////////////////NCC THRESHOLD/////////////////////////////////////////////////////
+       auto start_ncc = std::chrono::high_resolution_clock::now();
+
        patch_output_counts.push_back(filtered_cluster_centers.size());
        int ncc_precision_numerator = 0;
 
@@ -1439,6 +1624,7 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
                     info.orientation = filtered_cluster_centers[i].center_orientation;
                     info.final_score = final_score;
                     info.contributing_edges = filtered_cluster_centers[i].contributing_edges;
+                    info.contributing_orientations = filtered_cluster_centers[i].contributing_orientations;
                     passed_ncc_matches.push_back(info);
 
                    if (cv::norm(filtered_cluster_centers[i].center_coord - ground_truth_edge) <= 3.0) {
@@ -1453,6 +1639,7 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
                     info.orientation = filtered_cluster_centers[i].center_orientation;
                     info.final_score = final_score;
                     info.contributing_edges = filtered_cluster_centers[i].contributing_edges;
+                    info.contributing_orientations = filtered_cluster_centers[i].contributing_orientations;
                     passed_ncc_matches.push_back(info);
 
                    if (cv::norm(filtered_cluster_centers[i].center_coord - ground_truth_edge) <= 3.0) {
@@ -1467,6 +1654,7 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
                     info.orientation = filtered_cluster_centers[i].center_orientation;
                     info.final_score = final_score;
                     info.contributing_edges = filtered_cluster_centers[i].contributing_edges;
+                    info.contributing_orientations = filtered_cluster_centers[i].contributing_orientations;
                     passed_ncc_matches.push_back(info);
 
                    if (cv::norm(filtered_cluster_centers[i].center_coord - ground_truth_edge) <= 3.0) {
@@ -1490,7 +1678,14 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
        }
        ncc_input_counts.push_back(filtered_cluster_centers.size());
        ncc_output_counts.push_back(passed_ncc_matches.size());
+
+       time_ncc_edges_evaluated++;
+
+        auto end_ncc = std::chrono::high_resolution_clock::now();
+        time_ncc += std::chrono::duration<double, std::milli>(end_ncc - start_ncc).count();
         ///////////////////////////////LOWES RATIO TEST//////////////////////////////////////////////
+        auto start_lowe = std::chrono::high_resolution_clock::now();
+
         lowe_input_counts.push_back(passed_ncc_matches.size());
         int lowe_precision_numerator = 0;
 
@@ -1553,7 +1748,14 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
         if (!passed_ncc_matches.empty()) {
             lowe_edges_evaluated++;
         }
+
+        time_lowe_edges_evaluated++;
+
+        auto end_lowe = std::chrono::high_resolution_clock::now();
+        time_lowe += std::chrono::duration<double, std::milli>(end_lowe - start_lowe).count();
     }   
+    auto total_end = std::chrono::high_resolution_clock::now();
+    double total_time = std::chrono::duration<double, std::milli>(total_end - total_start).count();
 
     double epi_distance_recall = 0.0;
     if ((epi_true_positive + epi_false_negative) > 0) {
@@ -1609,8 +1811,8 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
           << std::fixed << std::setprecision(2)
           << lowe_recall * 100 << "%" << std::endl;
 
-    double per_image_epi_precision = (epi_edges_evaluated > 0)
-    ? (per_edge_epi_precision / epi_edges_evaluated)
+    double per_image_epi_precision = (time_epi_edges_evaluated > 0)
+    ? (per_edge_epi_precision / time_epi_edges_evaluated)
     : 0.0;
     double per_image_disp_precision = (disp_edges_evaluated > 0)
     ? (per_edge_disp_precision / disp_edges_evaluated)
@@ -1647,6 +1849,32 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
         << std::fixed << std::setprecision(2) 
         << per_image_lowe_precision * 100 << "%" << std::endl;
 
+
+    double per_image_epi_time = (time_epi_edges_evaluated> 0)
+    ? (time_epi / time_epi_edges_evaluated)
+    : 0.0;
+    double per_image_disp_time = (time_disp_edges_evaluated > 0)
+    ? (time_disp / time_disp_edges_evaluated)
+    : 0.0;
+    double per_image_shift_time = (time_shift_edges_evaluated > 0)
+    ? (time_shift / time_shift_edges_evaluated)
+    : 0.0;
+    double per_image_clust_time= (time_clust_edges_evaluated > 0)
+    ? (time_cluster / time_clust_edges_evaluated)
+    : 0.0;
+    double per_image_patch_time = (time_patch_edges_evaluated > 0)
+    ? (time_patch / time_patch_edges_evaluated)
+    : 0.0;
+    double per_image_ncc_time = (time_ncc_edges_evaluated > 0)
+    ? (time_ncc / time_ncc_edges_evaluated)
+    : 0.0;
+    double per_image_lowe_time = (time_lowe_edges_evaluated> 0)
+    ? (time_lowe / time_lowe_edges_evaluated)
+    : 0.0;
+    double per_image_total_time = (selected_primary_edges.size() > 0)
+    ? (total_time / selected_primary_edges.size())
+    : 0.0;
+
     return MatchResult {
         RecallMetrics {
             epi_distance_recall,
@@ -1674,7 +1902,17 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
             per_image_shift_precision,
             per_image_clust_precision,
             per_image_ncc_precision,
-            per_image_lowe_precision
+            per_image_lowe_precision,
+            lowe_true_positive,
+            lowe_false_negative,
+            per_image_epi_time,
+            per_image_disp_time,
+            per_image_shift_time,
+            per_image_clust_time,
+            per_image_patch_time,
+            per_image_ncc_time,
+            per_image_lowe_time,
+            per_image_total_time
         },
         final_matches
     };
