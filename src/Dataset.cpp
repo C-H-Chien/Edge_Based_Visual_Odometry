@@ -177,7 +177,7 @@ void Dataset::write_ncc_vals_to_files( int img_index ) {
 }
 
 void Dataset::PerformEdgeBasedVO() {
-    int num_pairs = 247;
+    int num_pairs = 10;
     std::vector<std::pair<cv::Mat, cv::Mat>> image_pairs;
     std::vector<cv::Mat> left_ref_disparity_maps;
     std::vector<cv::Mat> right_ref_disparity_maps;
@@ -1104,7 +1104,8 @@ BidirectionalMatchResult Dataset::DisplayMatches(const cv::Mat& left_image, cons
         epipolar_lines_right,
         left_image,
         right_image,
-        true
+        true,
+        &reverse_gt_data
     );
 
     ///////////////////////////////REVERSE DIRECTION///////////////////////////////
@@ -1157,7 +1158,8 @@ BidirectionalMatchResult Dataset::DisplayMatches(const cv::Mat& left_image, cons
         epipolar_lines_left,
         right_image,
         left_image,
-        false
+        false,
+        nullptr
     );
 
     std::vector<std::pair<cv::Point2d, cv::Point2d>> confirmed_matches;
@@ -1221,7 +1223,8 @@ BidirectionalMatchResult Dataset::DisplayMatches(const cv::Mat& left_image, cons
 MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_primary_edges, const std::vector<cv::Point2d>& selected_ground_truth_edges,
    const std::vector<double>& selected_primary_orientations, const std::vector<cv::Point2d>& primary_edge_coords, const std::vector<double>& primary_edge_orientations,
    const std::vector<cv::Point2d>& secondary_edge_coords, const std::vector<double>& secondary_edge_orientations, const std::vector<cv::Mat>& primary_patch_set_one, 
-   const std::vector<cv::Mat>& primary_patch_set_two, const std::vector<Eigen::Vector3d>& epipolar_lines_secondary, const cv::Mat& primary_image, const cv::Mat& secondary_image, bool left_to_right) {
+   const std::vector<cv::Mat>& primary_patch_set_two, const std::vector<Eigen::Vector3d>& epipolar_lines_secondary, const cv::Mat& primary_image, const cv::Mat& secondary_image, 
+   bool left_to_right, const std::vector<std::tuple<cv::Point2d, cv::Point2d, double>>* reverse_gt) {
     auto total_start = std::chrono::high_resolution_clock::now();
 
     std::vector<int> epi_input_counts;
