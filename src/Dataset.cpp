@@ -177,7 +177,7 @@ void Dataset::write_ncc_vals_to_files( int img_index ) {
 }
 
 void Dataset::PerformEdgeBasedVO() {
-    int num_pairs = 10;
+    int num_pairs = 247;
     std::vector<std::pair<cv::Mat, cv::Mat>> image_pairs;
     std::vector<cv::Mat> left_ref_disparity_maps;
     std::vector<cv::Mat> right_ref_disparity_maps;
@@ -207,29 +207,7 @@ void Dataset::PerformEdgeBasedVO() {
     std::vector<double> per_image_avg_before_bct;
     std::vector<double> per_image_avg_after_bct;
 
-    std::vector<double> rev_per_image_avg_before_epi;
-    std::vector<double> rev_per_image_avg_after_epi;
-
-    std::vector<double> rev_per_image_avg_before_disp;
-    std::vector<double> rev_per_image_avg_after_disp;
-
-    std::vector<double> rev_per_image_avg_before_shift;
-    std::vector<double> rev_per_image_avg_after_shift;
-
-    std::vector<double> rev_per_image_avg_before_clust;
-    std::vector<double> rev_per_image_avg_after_clust;
-
-    std::vector<double> rev_per_image_avg_before_patch;
-    std::vector<double> rev_per_image_avg_after_patch;
-
-    std::vector<double> rev_per_image_avg_before_ncc;
-    std::vector<double> rev_per_image_avg_after_ncc;
-
-    std::vector<double> rev_per_image_avg_before_lowe;
-    std::vector<double> rev_per_image_avg_after_lowe;
-
     std::vector<RecallMetrics> all_forward_recall_metrics;
-    std::vector<RecallMetrics> all_reverse_recall_metrics;
     std::vector<BCTMetrics> all_bct_metrics;
 
     if (dataset_type == "EuRoC"){
@@ -255,8 +233,6 @@ void Dataset::PerformEdgeBasedVO() {
     LOG_INFO("Start looping over all image pairs");
 
     for (size_t i = 0; i < image_pairs.size(); i++) {
-    // for (size_t i = 0; i < 3; i++) {
-
         ncc_one_vs_err.clear();
         ncc_two_vs_err.clear();
 
@@ -349,9 +325,6 @@ void Dataset::PerformEdgeBasedVO() {
         const RecallMetrics& forward_metrics = match_result.forward_match.recall_metrics;
         all_forward_recall_metrics.push_back(forward_metrics);
 
-        const RecallMetrics& reverse_metrics = match_result.reverse_match.recall_metrics;
-        all_reverse_recall_metrics.push_back(reverse_metrics);
-
         const BCTMetrics& bct_metrics = match_result.bct_metrics;
         all_bct_metrics.push_back(bct_metrics);
 
@@ -375,28 +348,6 @@ void Dataset::PerformEdgeBasedVO() {
 
         double avg_before_lowe = ComputeAverage(forward_metrics.lowe_input_counts);
         double avg_after_lowe = ComputeAverage(forward_metrics.lowe_output_counts);
-
-
-        double rev_avg_before_epi = ComputeAverage(reverse_metrics.epi_input_counts);
-        double rev_avg_after_epi = ComputeAverage(reverse_metrics.epi_output_counts);
-
-        double rev_avg_before_disp = ComputeAverage(reverse_metrics.disp_input_counts);
-        double rev_avg_after_disp = ComputeAverage(reverse_metrics.disp_output_counts);
-
-        double rev_avg_before_shift = ComputeAverage(reverse_metrics.shift_input_counts);
-        double rev_avg_after_shift = ComputeAverage(reverse_metrics.shift_output_counts);
-
-        double rev_avg_before_clust = ComputeAverage(reverse_metrics.clust_input_counts);
-        double rev_avg_after_clust = ComputeAverage(reverse_metrics.clust_output_counts);
-
-        double rev_avg_before_patch = ComputeAverage(reverse_metrics.patch_input_counts);
-        double rev_avg_after_patch = ComputeAverage(reverse_metrics.patch_output_counts);
-
-        double rev_avg_before_ncc = ComputeAverage(reverse_metrics.ncc_input_counts);
-        double rev_avg_after_ncc = ComputeAverage(reverse_metrics.ncc_output_counts);
-
-        double rev_avg_before_lowe = ComputeAverage(reverse_metrics.lowe_input_counts);
-        double rev_avg_after_lowe = ComputeAverage(reverse_metrics.lowe_output_counts);
 
         per_image_avg_before_epi.push_back(avg_before_epi);
         per_image_avg_after_epi.push_back(avg_after_epi);
@@ -422,27 +373,6 @@ void Dataset::PerformEdgeBasedVO() {
         per_image_avg_before_bct.push_back(match_result.bct_metrics.matches_before_bct);
         per_image_avg_after_bct.push_back(match_result.bct_metrics.matches_after_bct);
 
-
-        rev_per_image_avg_before_epi.push_back(rev_avg_before_epi);
-        rev_per_image_avg_after_epi.push_back(rev_avg_after_epi);
-
-        rev_per_image_avg_before_disp.push_back(rev_avg_before_disp);
-        rev_per_image_avg_after_disp.push_back(rev_avg_after_disp);
-
-        rev_per_image_avg_before_shift.push_back(rev_avg_before_shift);
-        rev_per_image_avg_after_shift.push_back(rev_avg_after_shift);
-
-        rev_per_image_avg_before_clust.push_back(rev_avg_before_clust);
-        rev_per_image_avg_after_clust.push_back(rev_avg_after_clust);
-
-        rev_per_image_avg_before_patch.push_back(rev_avg_before_patch);
-        rev_per_image_avg_after_patch.push_back(rev_avg_after_patch);
-
-        rev_per_image_avg_before_ncc.push_back(rev_avg_before_ncc);
-        rev_per_image_avg_after_ncc.push_back(rev_avg_after_ncc);
-
-        rev_per_image_avg_before_lowe.push_back(rev_avg_before_lowe);
-        rev_per_image_avg_after_lowe.push_back(rev_avg_after_lowe);
         }                                
     }
 
@@ -471,21 +401,6 @@ void Dataset::PerformEdgeBasedVO() {
     double total_lowe_time = 0.0;
     double total_image_time = 0.0;
     double total_bct_time = 0.0;
-
-
-    double rev_total_epi_recall = 0.0;
-    double rev_total_disp_recall = 0.0;
-    double rev_total_shift_recall = 0.0;
-    double rev_total_cluster_recall = 0.0;
-    double rev_total_ncc_recall = 0.0;
-    double rev_total_lowe_recall = 0.0;
-
-    double rev_total_epi_precision = 0.0;
-    double rev_total_disp_precision = 0.0;
-    double rev_total_shift_precision = 0.0;
-    double rev_total_cluster_precision = 0.0;
-    double rev_total_ncc_precision = 0.0;
-    double rev_total_lowe_precision = 0.0;
 
     for (const RecallMetrics& m : all_forward_recall_metrics) {
         total_epi_recall += m.epi_distance_recall;
@@ -518,25 +433,7 @@ void Dataset::PerformEdgeBasedVO() {
         total_bct_time += m.per_image_bct_time;
     }
 
-
-    for (const RecallMetrics& m : all_reverse_recall_metrics) {
-        rev_total_epi_recall += m.epi_distance_recall;
-        rev_total_disp_recall += m.max_disparity_recall;
-        rev_total_shift_recall += m.epi_shift_recall;
-        rev_total_cluster_recall += m.epi_cluster_recall;
-        rev_total_ncc_recall += m.ncc_recall;
-        rev_total_lowe_recall += m.lowe_recall;
-
-        rev_total_epi_precision += m.per_image_epi_precision;
-        rev_total_disp_precision += m.per_image_disp_precision;
-        rev_total_shift_precision += m.per_image_shift_precision;
-        rev_total_cluster_precision += m.per_image_clust_precision;
-        rev_total_ncc_precision += m.per_image_ncc_precision;
-        rev_total_lowe_precision += m.per_image_lowe_precision;
-    }
-
     int total_images = static_cast<int>(all_forward_recall_metrics.size());
-    int rev_total_images = static_cast<int>(all_reverse_recall_metrics.size());
 
     double avg_epi_recall   = (total_images > 0) ? total_epi_recall / total_images : 0.0;
     double avg_disp_recall  = (total_images > 0) ? total_disp_recall / total_images : 0.0;
@@ -564,29 +461,11 @@ void Dataset::PerformEdgeBasedVO() {
     double avg_total_time = (total_images > 0) ? total_image_time / total_images : 0.0;
     double avg_bct_time = (total_images > 0) ? total_bct_time / total_images : 0.0;
 
-
-    double rev_avg_epi_recall   = (rev_total_images > 0) ? rev_total_epi_recall / rev_total_images : 0.0;
-    double rev_avg_disp_recall  = (rev_total_images > 0) ? rev_total_disp_recall / rev_total_images : 0.0;
-    double rev_avg_shift_recall = (rev_total_images > 0) ? rev_total_shift_recall / rev_total_images : 0.0;
-    double rev_avg_cluster_recall = (rev_total_images > 0) ? rev_total_cluster_recall / rev_total_images : 0.0;
-    double rev_avg_ncc_recall = (rev_total_images > 0) ? rev_total_ncc_recall / rev_total_images : 0.0;
-    double rev_avg_lowe_recall = (rev_total_images > 0) ? rev_total_lowe_recall / rev_total_images: 0.0;
-
-    double rev_avg_epi_precision   = (rev_total_images > 0) ? rev_total_epi_precision / rev_total_images : 0.0;
-    double rev_avg_disp_precision  = (rev_total_images > 0) ? rev_total_disp_precision / rev_total_images : 0.0;
-    double rev_avg_shift_precision = (rev_total_images > 0) ? rev_total_shift_precision / rev_total_images : 0.0;
-    double rev_avg_cluster_precision = (rev_total_images > 0) ? rev_total_cluster_precision / rev_total_images : 0.0;
-    double rev_avg_ncc_precision = (rev_total_images > 0) ? rev_total_ncc_precision / rev_total_images : 0.0;
-    double rev_avg_lowe_precision = (rev_total_images > 0) ? rev_total_lowe_precision / rev_total_images: 0.0;
-
     std::string edge_stat_dir = output_path + "/edge stats";
     std::filesystem::create_directories(edge_stat_dir);
 
     std::ofstream recall_csv(edge_stat_dir + "/recall_metrics.csv");
     recall_csv << "ImageIndex,EpiDistanceRecall,MaxDisparityRecall,EpiShiftRecall,EpiClusterRecall,NCCRecall,LoweRecall,BidirectionalRecall\n";
-
-    std::ofstream reverse_recall_csv(edge_stat_dir + "/reverse_recall_metrics.csv");
-    reverse_recall_csv << "ImageIndex,EpiDistanceRecall,MaxDisparityRecall,EpiShiftRecall,EpiClusterRecall,NCCRecall,LoweRecall\n";
 
     std::ofstream time_elapsed_csv(edge_stat_dir + "/time_elapsed_metrics.csv");
     time_elapsed_csv << "ImageIndex,EpiDistanceTime,MaxDisparityTime,EpiShiftTime,EpiClusterTime,PatchTime,NCCTime,LoweTime,TotalLoopTime,BidirectionalTime\n";
@@ -613,51 +492,31 @@ void Dataset::PerformEdgeBasedVO() {
             << std::fixed << std::setprecision(4) << avg_lowe_recall * 100 << ","
             << std::fixed << std::setprecision(4) << avg_bct_recall * 100 << "\n";
 
-
-    for (size_t i = 0; i < all_reverse_recall_metrics.size(); i++) {
-        const auto& m = all_reverse_recall_metrics[i];
-        reverse_recall_csv << i << ","
-                << std::fixed << std::setprecision(4) << m.epi_distance_recall * 100 << ","
-                << std::fixed << std::setprecision(4) << m.max_disparity_recall * 100 << ","
-                << std::fixed << std::setprecision(4) << m.epi_shift_recall * 100 << ","
-                << std::fixed << std::setprecision(4) << m.epi_cluster_recall * 100 << ","
-                << std::fixed << std::setprecision(4) << m.ncc_recall * 100 << ","
-                << std::fixed << std::setprecision(4) << m.lowe_recall * 100 << "\n";
-    }
-
-    reverse_recall_csv << "Average,"
-            << std::fixed << std::setprecision(4) << rev_avg_epi_recall * 100 << ","
-            << std::fixed << std::setprecision(4) << rev_avg_disp_recall * 100 << ","
-            << std::fixed << std::setprecision(4) << rev_avg_shift_recall * 100 << ","
-            << std::fixed << std::setprecision(4) << rev_avg_cluster_recall * 100 << ","
-            << std::fixed << std::setprecision(4) << rev_avg_ncc_recall * 100 << ","
-            << std::fixed << std::setprecision(4) << rev_avg_lowe_recall * 100 << "\n";
-
     for (size_t i = 0; i < all_forward_recall_metrics.size(); i++) {
         const auto& m = all_forward_recall_metrics[i];
         const auto& bct = all_bct_metrics[i];
         time_elapsed_csv << i << ","
-                << std::fixed << std::setprecision(4) << m.per_image_epi_time<< ","
-                << std::fixed << std::setprecision(4) << m.per_image_disp_time<< ","
-                << std::fixed << std::setprecision(4) << m.per_image_shift_time<< ","
-                << std::fixed << std::setprecision(4) << m.per_image_clust_time<< ","
-                << std::fixed << std::setprecision(4) << m.per_image_patch_time<< ","
-                << std::fixed << std::setprecision(4) << m.per_image_ncc_time<< ","
-                << std::fixed << std::setprecision(4) << m.per_image_lowe_time<< ","
-                << std::fixed << std::setprecision(4) << m.per_image_total_time<< ","
-                << std::fixed << std::setprecision(4) << bct.per_image_bct_time<< "\n";
+                << std::fixed << std::setprecision(4) << m.per_image_epi_time << ","
+                << std::fixed << std::setprecision(4) << m.per_image_disp_time << ","
+                << std::fixed << std::setprecision(4) << m.per_image_shift_time << ","
+                << std::fixed << std::setprecision(4) << m.per_image_clust_time << ","
+                << std::fixed << std::setprecision(4) << m.per_image_patch_time << ","
+                << std::fixed << std::setprecision(4) << m.per_image_ncc_time << ","
+                << std::fixed << std::setprecision(4) << m.per_image_lowe_time << ","
+                << std::fixed << std::setprecision(4) << m.per_image_total_time << ","
+                << std::fixed << std::setprecision(4) << bct.per_image_bct_time << "\n";
     }
 
     time_elapsed_csv << "Average,"
-            << std::fixed << std::setprecision(4) << avg_epi_time<< ","
-            << std::fixed << std::setprecision(4) << avg_disp_time<< ","
-            << std::fixed << std::setprecision(4) << avg_shift_time<< ","
-            << std::fixed << std::setprecision(4) << avg_clust_time<< ","
-            << std::fixed << std::setprecision(4) << avg_patch_time<< ","
-            << std::fixed << std::setprecision(4) << avg_ncc_time<< ","
-            << std::fixed << std::setprecision(4) << avg_lowe_time<< ","
-            << std::fixed << std::setprecision(4) << avg_total_time<< ","
-            << std::fixed << std::setprecision(4) << avg_bct_time<< "\n";
+            << std::fixed << std::setprecision(4) << avg_epi_time << ","
+            << std::fixed << std::setprecision(4) << avg_disp_time << ","
+            << std::fixed << std::setprecision(4) << avg_shift_time << ","
+            << std::fixed << std::setprecision(4) << avg_clust_time << ","
+            << std::fixed << std::setprecision(4) << avg_patch_time << ","
+            << std::fixed << std::setprecision(4) << avg_ncc_time << ","
+            << std::fixed << std::setprecision(4) << avg_lowe_time << ","
+            << std::fixed << std::setprecision(4) << avg_total_time << ","
+            << std::fixed << std::setprecision(4) << avg_bct_time << "\n";
     
     std::ofstream count_csv(edge_stat_dir + "/count_metrics.csv");
     count_csv 
@@ -668,18 +527,7 @@ void Dataset::PerformEdgeBasedVO() {
         << "before_patch, after_patch, average_before_patch, average_after_patch,"
         << "before_ncc,after_ncc,average_before_ncc,average_after_ncc,"
         << "before_lowe,after_lowe,average_before_lowe,after_after_lowe,"
-        << "before_bct,after_bct,average_before_bct,after_after_bct\n";
-
-
-    std::ofstream reverse_count_csv(edge_stat_dir + "/reverse_count_metrics.csv");
-        reverse_count_csv 
-            << "before_epi_distance,after_epi_distance,average_before_epi_distance,average_after_epi_distance,"
-            << "before_max_disp,after_max_disp,average_before_max_disp,average_after_max_disp,"
-            << "before_epi_shift,after_epi_shift,average_before_epi_shift,average_after_epi_shift,"
-            << "before_epi_cluster,after_epi_cluster,average_before_epi_cluster,average_after_epi_cluster,"
-            << "before_patch, after_patch, average_before_patch, average_after_patch,"
-            << "before_ncc,after_ncc,average_before_ncc,average_after_ncc,"
-            << "before_lowe,after_lowe,average_before_lowe,after_after_lowe\n";
+        << "before_bct (PER IMAGE),after_bct (PER IMAGE),average_before_bct (PER IMAGE),after_after_bct (PER IMAGE)\n";
 
     double total_avg_before_epi = 0.0;
     double total_avg_after_epi = 0.0;
@@ -705,31 +553,8 @@ void Dataset::PerformEdgeBasedVO() {
     double total_avg_before_bct = 0.0;
     double total_avg_after_bct = 0.0;
 
-
-    double rev_total_avg_before_epi = 0.0;
-    double rev_total_avg_after_epi = 0.0;
-
-    double rev_total_avg_before_disp = 0.0;
-    double rev_total_avg_after_disp = 0.0;
-
-    double rev_total_avg_before_shift = 0.0;
-    double rev_total_avg_after_shift = 0.0;
-
-    double rev_total_avg_before_clust = 0.0;
-    double rev_total_avg_after_clust = 0.0;
-
-    double rev_total_avg_before_patch = 0.0;
-    double rev_total_avg_after_patch = 0.0;
-
-    double rev_total_avg_before_ncc = 0.0;
-    double rev_total_avg_after_ncc = 0.0;
-
-    double rev_total_avg_before_lowe = 0.0;
-    double rev_total_avg_after_lowe = 0.0;
-
     size_t num_rows = per_image_avg_before_epi.size();
-    size_t rev_num_rows = rev_per_image_avg_before_epi.size();
-
+    
     for (size_t i = 0; i < num_rows; ++i) {
         total_avg_before_epi += per_image_avg_before_epi[i];
         total_avg_after_epi += per_image_avg_after_epi[i];
@@ -789,58 +614,6 @@ void Dataset::PerformEdgeBasedVO() {
             <<"\n";
     }
 
-
-    for (size_t i = 0; i < rev_num_rows; ++i) {
-        rev_total_avg_before_epi += rev_per_image_avg_before_epi[i];
-        rev_total_avg_after_epi += rev_per_image_avg_after_epi[i];
-
-        rev_total_avg_before_disp += rev_per_image_avg_before_disp[i];
-        rev_total_avg_after_disp += rev_per_image_avg_after_disp[i];
-
-        rev_total_avg_before_shift += rev_per_image_avg_before_shift[i];
-        rev_total_avg_after_shift += rev_per_image_avg_after_shift[i];
-
-        rev_total_avg_before_clust += rev_per_image_avg_before_clust[i];
-        rev_total_avg_after_clust += rev_per_image_avg_after_clust[i];
-
-        rev_total_avg_before_patch += rev_per_image_avg_before_patch[i];
-        rev_total_avg_after_patch += rev_per_image_avg_after_patch[i];
-
-        rev_total_avg_before_ncc += rev_per_image_avg_before_ncc[i];
-        rev_total_avg_after_ncc += rev_per_image_avg_after_ncc[i];
-
-        rev_total_avg_before_lowe += rev_per_image_avg_before_lowe[i];
-        rev_total_avg_after_lowe += rev_per_image_avg_after_lowe[i];
-
-        reverse_count_csv
-            << static_cast<int>(std::ceil(rev_per_image_avg_before_epi[i])) << ","
-            << static_cast<int>(std::ceil(rev_per_image_avg_after_epi[i])) << ","
-            << ","
-            << ","
-            << static_cast<int>(std::ceil(rev_per_image_avg_before_disp[i])) << ","
-            << static_cast<int>(std::ceil(rev_per_image_avg_after_disp[i])) << ","
-            << ","
-            << ","
-            << static_cast<int>(std::ceil(rev_per_image_avg_before_shift[i])) << ","
-            << static_cast<int>(std::ceil(rev_per_image_avg_after_shift[i])) << ","
-            << ","
-            << ","
-            << static_cast<int>(std::ceil(rev_per_image_avg_before_clust[i])) << ","
-            << static_cast<int>(std::ceil(rev_per_image_avg_after_clust[i])) << ","
-            << ","
-            << ","
-            << static_cast<int>(std::ceil(rev_per_image_avg_before_patch[i])) << ","
-            << static_cast<int>(std::ceil(rev_per_image_avg_after_patch[i])) << ","
-            << ","
-            << ","
-            << static_cast<int>(std::ceil(rev_per_image_avg_before_ncc[i])) << ","
-            << static_cast<int>(std::ceil(rev_per_image_avg_after_ncc[i])) << ","
-            << ","
-            << ","
-            << static_cast<int>(std::ceil(rev_per_image_avg_before_lowe[i])) << ","
-            << static_cast<int>(std::ceil(rev_per_image_avg_after_lowe[i])) << ","
-            <<"\n";
-    }
     int avg_of_avgs_before_epi = 0;
     int avg_of_avgs_after_epi = 0;
 
@@ -864,28 +637,6 @@ void Dataset::PerformEdgeBasedVO() {
 
     int avg_of_avgs_before_bct = 0;
     int avg_of_avgs_after_bct = 0;
-
-
-    int rev_avg_of_avgs_before_epi = 0;
-    int rev_avg_of_avgs_after_epi = 0;
-
-    int rev_avg_of_avgs_before_disp = 0;
-    int rev_avg_of_avgs_after_disp = 0;
-
-    int rev_avg_of_avgs_before_shift = 0;
-    int rev_avg_of_avgs_after_shift = 0;
-
-    int rev_avg_of_avgs_before_clust = 0;
-    int rev_avg_of_avgs_after_clust = 0;
-
-    int rev_avg_of_avgs_before_patch = 0;
-    int rev_avg_of_avgs_after_patch = 0;
-    
-    int rev_avg_of_avgs_before_ncc = 0;
-    int rev_avg_of_avgs_after_ncc = 0;
-
-    int rev_avg_of_avgs_before_lowe = 0;
-    int rev_avg_of_avgs_after_lowe = 0;
 
     if (num_rows > 0) {
         avg_of_avgs_before_epi = std::ceil(total_avg_before_epi / num_rows);
@@ -911,30 +662,6 @@ void Dataset::PerformEdgeBasedVO() {
 
         avg_of_avgs_before_bct = std::ceil(total_avg_before_bct / num_rows);
         avg_of_avgs_after_bct = std::ceil(total_avg_after_bct / num_rows);
-    }
-
-
-    if (rev_num_rows > 0) {
-        rev_avg_of_avgs_before_epi = std::ceil(rev_total_avg_before_epi / rev_num_rows);
-        rev_avg_of_avgs_after_epi = std::ceil(rev_total_avg_after_epi / rev_num_rows);
-
-        rev_avg_of_avgs_before_disp = std::ceil(rev_total_avg_before_disp / rev_num_rows);
-        rev_avg_of_avgs_after_disp = std::ceil(rev_total_avg_after_disp / rev_num_rows);
-
-        rev_avg_of_avgs_before_shift = std::ceil(rev_total_avg_before_shift / rev_num_rows);
-        rev_avg_of_avgs_after_shift = std::ceil(rev_total_avg_after_shift / rev_num_rows);
-
-        rev_avg_of_avgs_before_clust = std::ceil(rev_total_avg_before_clust / rev_num_rows);
-        rev_avg_of_avgs_after_clust = std::ceil(rev_total_avg_after_clust / rev_num_rows);
-
-        rev_avg_of_avgs_before_patch = std::ceil(rev_total_avg_before_patch / rev_num_rows);
-        rev_avg_of_avgs_after_patch = std::ceil(rev_total_avg_after_patch / rev_num_rows);
-
-        rev_avg_of_avgs_before_ncc = std::ceil(rev_total_avg_before_ncc / rev_num_rows);
-        rev_avg_of_avgs_after_ncc = std::ceil(rev_total_avg_after_ncc / rev_num_rows);
-
-        rev_avg_of_avgs_before_lowe = std::ceil(rev_total_avg_before_lowe / rev_num_rows);
-        rev_avg_of_avgs_after_lowe = std::ceil(rev_total_avg_after_lowe / rev_num_rows);
     }
 
     count_csv 
@@ -970,36 +697,6 @@ void Dataset::PerformEdgeBasedVO() {
         << ","
         << avg_of_avgs_before_bct << ","            
         << avg_of_avgs_after_bct << "\n";  
-
-    reverse_count_csv 
-        << ","                                   
-        << ","                                                                     
-        << rev_avg_of_avgs_before_epi << ","       
-        << rev_avg_of_avgs_after_epi << ","   
-        << "," 
-        << ","     
-        << rev_avg_of_avgs_before_disp << ","   
-        << rev_avg_of_avgs_after_disp << ","
-        << ","      
-        << ","                              
-        << rev_avg_of_avgs_before_shift << ","              
-        << rev_avg_of_avgs_after_shift << ","    
-        << ","   
-        << ","                                            
-        << rev_avg_of_avgs_before_clust << ","            
-        << rev_avg_of_avgs_after_clust << ","
-        << ","
-        << ","
-        << rev_avg_of_avgs_before_patch << ","            
-        << rev_avg_of_avgs_after_patch << ","
-        << ","
-        << ","
-        << rev_avg_of_avgs_before_ncc << ","            
-        << rev_avg_of_avgs_after_ncc << ","
-        << ","
-        << ","
-        << rev_avg_of_avgs_before_lowe << ","            
-        << rev_avg_of_avgs_after_lowe << "\n";  
     
     std::ofstream precision_csv(edge_stat_dir + "/precision_metrics.csv");
     precision_csv << "ImageIndex,EpiDistancePrecision,MaxDisparityPrecision,EpiShiftPrecision,EpiClusterPrecision,NCCPrecision,LowePrecision,BidirectionalPrecision\n";
@@ -1025,29 +722,6 @@ void Dataset::PerformEdgeBasedVO() {
         << std::fixed << std::setprecision(4) << avg_ncc_precision * 100 << ","
         << std::fixed << std::setprecision(4) << avg_lowe_precision * 100 << ","
         << std::fixed << std::setprecision(4) << avg_bct_precision * 100 << "\n";
-
-
-    std::ofstream reverse_precision_csv(edge_stat_dir + "/reverse_precision_metrics.csv");
-    reverse_precision_csv << "ImageIndex,EpiDistancePrecision,MaxDisparityPrecision,EpiShiftPrecision,EpiClusterPrecision,NCCPrecision,LowePrecision\n";
-
-    for (size_t i = 0; i < all_reverse_recall_metrics.size(); i++) {
-        const auto& m = all_reverse_recall_metrics[i];
-        reverse_precision_csv << i << ","
-                << std::fixed << std::setprecision(4) << m.per_image_epi_precision * 100 << ","
-                << std::fixed << std::setprecision(4) << m.per_image_disp_precision * 100 << ","
-                << std::fixed << std::setprecision(4) << m.per_image_shift_precision * 100 << ","
-                << std::fixed << std::setprecision(4) << m.per_image_clust_precision * 100 << ","
-                << std::fixed << std::setprecision(4) << m.per_image_ncc_precision * 100 << ","
-                << std::fixed << std::setprecision(4) << m.per_image_lowe_precision * 100 << "\n";
-    }
-
-    reverse_precision_csv << "Average,"
-        << std::fixed << std::setprecision(4) << rev_avg_epi_precision * 100 << ","
-        << std::fixed << std::setprecision(4) << rev_avg_disp_precision * 100 << ","
-        << std::fixed << std::setprecision(4) << rev_avg_shift_precision * 100 << ","
-        << std::fixed << std::setprecision(4) << rev_avg_cluster_precision * 100 << ","
-        << std::fixed << std::setprecision(4) << rev_avg_ncc_precision * 100 << ","
-        << std::fixed << std::setprecision(4) << rev_avg_lowe_precision * 100 << "\n";
 }
 
 BidirectionalMatchResult Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, std::vector<cv::Point2d> right_edge_coords, std::vector<double> right_edge_orientations) {
@@ -1076,14 +750,14 @@ BidirectionalMatchResult Dataset::DisplayMatches(const cv::Mat& left_image, cons
         left_image,
         left_edge_coords,
         left_edge_orientations,
-        &ground_truth_right_edges,
         left_orthogonal_one,
         left_orthogonal_two,
         filtered_left_edges,
         filtered_left_orientations,
-        &filtered_ground_truth_right_edges,
         left_patch_set_one,
-        left_patch_set_two
+        left_patch_set_two,
+        &ground_truth_right_edges,
+        &filtered_ground_truth_right_edges
     );
 
     Eigen::Matrix3d fundamental_matrix_21 = ConvertToEigenMatrix(fund_mat_21);
@@ -1093,30 +767,29 @@ BidirectionalMatchResult Dataset::DisplayMatches(const cv::Mat& left_image, cons
 
     MatchResult forward_match = CalculateMatches(
         filtered_left_edges,
-        filtered_ground_truth_right_edges,
         filtered_left_orientations,
-        left_edge_coords,
-        left_edge_orientations,
         right_edge_coords,
         right_edge_orientations,
         left_patch_set_one,
         left_patch_set_two,
         epipolar_lines_right,
-        left_image,
         right_image,
-        true,
-        &reverse_gt_data
+        filtered_ground_truth_right_edges
     );
 
     ///////////////////////////////REVERSE DIRECTION///////////////////////////////
     std::vector<cv::Point2d> reverse_primary_edges;
-    std::vector<cv::Point2d> reverse_ground_truth_edges;
     std::vector<double> reverse_primary_orientations;
 
-    for (const auto& data : reverse_gt_data) {
-        reverse_primary_edges.push_back(std::get<0>(data));
-        reverse_ground_truth_edges.push_back(std::get<1>(data));  
-        reverse_primary_orientations.push_back(std::get<2>(data));
+    for (const auto& match_pair : forward_match.matches) {
+        const PatchMatch& match_info = match_pair.second;
+
+        for (const auto& edge : match_info.contributing_edges) {
+            reverse_primary_edges.push_back(edge);
+        }
+        for (const auto& orientation : match_info.contributing_orientations) {
+            reverse_primary_orientations.push_back(orientation);
+        }
     }
 
     auto [right_orthogonal_one, right_orthogonal_two] = CalculateOrthogonalShifts(reverse_primary_edges, reverse_primary_orientations, ORTHOGONAL_SHIFT_MAG);
@@ -1133,33 +806,27 @@ BidirectionalMatchResult Dataset::DisplayMatches(const cv::Mat& left_image, cons
         right_image,
         reverse_primary_edges,
         reverse_primary_orientations,
-        &reverse_ground_truth_edges,
         right_orthogonal_one,
         right_orthogonal_two,
         filtered_right_edges,
         filtered_right_orientations,
-        &filtered_ground_truth_left_edges,
         right_patch_set_one,
-        right_patch_set_two
+        right_patch_set_two,
+        nullptr,
+        nullptr
     );
 
     std::vector<Eigen::Vector3d> epipolar_lines_left = CalculateEpipolarLine(fundamental_matrix_12, filtered_right_edges);
 
     MatchResult reverse_match = CalculateMatches(
         filtered_right_edges,
-        filtered_ground_truth_left_edges,
         filtered_right_orientations,
-        right_edge_coords,
-        right_edge_orientations,
         left_edge_coords,
         left_edge_orientations,
         right_patch_set_one,
         right_patch_set_two,
         epipolar_lines_left,
-        right_image,
-        left_image,
-        false,
-        nullptr
+        left_image
     );
 
     std::vector<std::pair<cv::Point2d, cv::Point2d>> confirmed_matches;
@@ -1197,18 +864,12 @@ BidirectionalMatchResult Dataset::DisplayMatches(const cv::Mat& left_image, cons
 
     int matches_after_bct = static_cast<int>(confirmed_matches.size());
 
-    std::cout << "Matches before BCT: " << matches_before_bct << std::endl;
-    std::cout << "Matches after BCT:  " << matches_after_bct << std::endl;
-
     double per_image_bct_precision = (matches_before_bct > 0) ? static_cast<double>(matches_after_bct) / matches_before_bct: 0.0;
 
     int bct_denonimator = forward_match.recall_metrics.lowe_true_positive + forward_match.recall_metrics.lowe_false_negative;
     int bct_true_positives = static_cast<int>(confirmed_matches.size());
 
     double bct_recall = (bct_denonimator > 0) ? static_cast<double>(bct_true_positives) / bct_denonimator : 0.0;
-
-    std::cout << "BCT Precision: "<< std::fixed << std::setprecision(2) << per_image_bct_precision * 100 << "%" << std::endl;
-    std::cout << "BCT Recall Rate: "<< std::fixed << std::setprecision(2) << bct_recall * 100 << "%" << std::endl;
 
     BCTMetrics bct_metrics;
     bct_metrics.matches_before_bct = matches_before_bct;
@@ -1220,11 +881,9 @@ BidirectionalMatchResult Dataset::DisplayMatches(const cv::Mat& left_image, cons
     return BidirectionalMatchResult{forward_match, reverse_match, confirmed_matches, bct_metrics};
 }
 
-MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_primary_edges, const std::vector<cv::Point2d>& selected_ground_truth_edges,
-   const std::vector<double>& selected_primary_orientations, const std::vector<cv::Point2d>& primary_edge_coords, const std::vector<double>& primary_edge_orientations,
-   const std::vector<cv::Point2d>& secondary_edge_coords, const std::vector<double>& secondary_edge_orientations, const std::vector<cv::Mat>& primary_patch_set_one, 
-   const std::vector<cv::Mat>& primary_patch_set_two, const std::vector<Eigen::Vector3d>& epipolar_lines_secondary, const cv::Mat& primary_image, const cv::Mat& secondary_image, 
-   bool left_to_right, const std::vector<std::tuple<cv::Point2d, cv::Point2d, double>>* reverse_gt) {
+MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_primary_edges, const std::vector<double>& selected_primary_orientations, const std::vector<cv::Point2d>& secondary_edge_coords, 
+    const std::vector<double>& secondary_edge_orientations, const std::vector<cv::Mat>& primary_patch_set_one, const std::vector<cv::Mat>& primary_patch_set_two, const std::vector<Eigen::Vector3d>& epipolar_lines_secondary, 
+    const cv::Mat& secondary_image, const std::vector<cv::Point2d>& selected_ground_truth_edges) {
     auto total_start = std::chrono::high_resolution_clock::now();
 
     std::vector<int> epi_input_counts;
@@ -1301,13 +960,20 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
     double time_ncc = 0.0;
     double time_lowe = 0.0;
 
+    cv::Point2d ground_truth_edge;
+
     std::vector<std::pair<cv::Point2d, PatchMatch>> final_matches;
 
-    int skip = left_to_right ? 100 : 1;
+    int skip = (!selected_ground_truth_edges.empty()) ? 1 : 1;
+
     for (size_t i = 0; i < selected_primary_edges.size(); i += skip) {
         const auto& primary_edge = selected_primary_edges[i];
         const auto& primary_orientation = selected_primary_orientations[i];
-        const auto& ground_truth_edge = selected_ground_truth_edges[i];
+
+        if (!selected_ground_truth_edges.empty()) {
+            ground_truth_edge = selected_ground_truth_edges[i];
+        }
+
         const auto& epipolar_line = epipolar_lines_secondary[i];
         const auto& primary_patch_one = primary_patch_set_one[i];
         const auto& primary_patch_two = primary_patch_set_two[i];
@@ -1349,39 +1015,41 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
         auto end_epi = std::chrono::high_resolution_clock::now();
         time_epi += std::chrono::duration<double, std::milli>(end_epi - start_epi).count();
         ///////////////////////////////EPIPOLAR DISTANCE THRESHOLD RECALL//////////////////////////
-        int epi_precision_numerator = 0;
-        bool match_found = false;
+        if(!selected_ground_truth_edges.empty()){
+            int epi_precision_numerator = 0;
+            bool match_found = false;
 
-        for (const auto& candidate : secondary_candidate_edges) {
-            if (cv::norm(candidate - ground_truth_edge) <= 0.5) {
-                epi_precision_numerator++;
-                match_found = true;
-                // break;
-            }
-        }
-
-        if (match_found) {
-            epi_true_positive++;
-        } 
-        else {
-            bool gt_match_found = false;
-            for (const auto& test_candidate : test_secondary_candidate_edges) {
-                if (cv::norm(test_candidate - ground_truth_edge) <= 0.5) {
-                    gt_match_found = true;
-                    break;
+            for (const auto& candidate : secondary_candidate_edges) {
+                if (cv::norm(candidate - ground_truth_edge) <= 0.5) {
+                    epi_precision_numerator++;
+                    match_found = true;
+                    // break;
                 }
             }
 
-            if (!gt_match_found) {
-                epi_true_negative++;
-                continue;
-            } else {
-                epi_false_negative++;
+            if (match_found) {
+                epi_true_positive++;
+            } 
+            else {
+                bool gt_match_found = false;
+                for (const auto& test_candidate : test_secondary_candidate_edges) {
+                    if (cv::norm(test_candidate - ground_truth_edge) <= 0.5) {
+                        gt_match_found = true;
+                        break;
+                    }
+                }
+
+                if (!gt_match_found) {
+                    epi_true_negative++;
+                    continue;
+                } else {
+                    epi_false_negative++;
+                }
             }
-        }
-        if (!secondary_candidate_edges.empty()) {
-            per_edge_epi_precision += static_cast<double>(epi_precision_numerator) / secondary_candidate_edges.size();
-            epi_edges_evaluated++; 
+            if (!secondary_candidate_edges.empty()) {
+                per_edge_epi_precision += static_cast<double>(epi_precision_numerator) / secondary_candidate_edges.size();
+                epi_edges_evaluated++; 
+            }
         }
         ///////////////////////////////MAXIMUM DISPARITY THRESHOLD//////////////////////////
         auto start_disp = std::chrono::high_resolution_clock::now();
@@ -1394,7 +1062,7 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
         for (size_t j = 0; j < secondary_candidate_edges.size(); j++) {
             const cv::Point2d& secondary_edge = secondary_candidate_edges[j];
 
-            double disparity = (left_to_right) ? (primary_edge.x - secondary_edge.x) : (secondary_edge.x - primary_edge.x);
+            double disparity = (!selected_ground_truth_edges.empty()) ? (primary_edge.x - secondary_edge.x) : (secondary_edge.x - primary_edge.x);
 
             bool within_horizontal = (disparity >= 0) && (disparity <= selected_max_disparity);
             bool within_vertical = std::abs(secondary_edge.y - primary_edge.y) <= selected_max_disparity;
@@ -1412,26 +1080,28 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
         auto end_disp = std::chrono::high_resolution_clock::now();
         time_disp += std::chrono::duration<double, std::milli>(end_disp - start_disp).count();
         ///////////////////////////////MAXIMUM DISPARITY THRESHOLD RECALL//////////////////////////
-        int disp_precision_numerator = 0;
-        bool disp_match_found = false;
+        if (!selected_ground_truth_edges.empty()) {
+            int disp_precision_numerator = 0;
+            bool disp_match_found = false;
 
-        for(const auto& filtered_candidate : filtered_secondary_edge_coords){
-            if (cv::norm(filtered_candidate - ground_truth_edge) <= 0.5){
-                disp_precision_numerator++;
-                disp_match_found = true;
-                // break;
+            for(const auto& filtered_candidate : filtered_secondary_edge_coords){
+                if (cv::norm(filtered_candidate - ground_truth_edge) <= 0.5){
+                    disp_precision_numerator++;
+                    disp_match_found = true;
+                    // break;
+                }
             }
-        }
 
-        if (disp_match_found){
-            disp_true_positive++;
-        } 
-        else {
-            disp_false_negative++;
-        }
-        if (!filtered_secondary_edge_coords.empty()) {
-            per_edge_disp_precision += static_cast<double>(disp_precision_numerator) / filtered_secondary_edge_coords.size();
-            disp_edges_evaluated++;
+            if (disp_match_found){
+                disp_true_positive++;
+            } 
+            else {
+                disp_false_negative++;
+            }
+            if (!filtered_secondary_edge_coords.empty()) {
+                per_edge_disp_precision += static_cast<double>(disp_precision_numerator) / filtered_secondary_edge_coords.size();
+                disp_edges_evaluated++;
+            }
         }
         ///////////////////////////////EPIPOLAR SHIFT THRESHOLD//////////////////////////
         auto start_shift = std::chrono::high_resolution_clock::now();
@@ -1459,26 +1129,28 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
         auto end_shift = std::chrono::high_resolution_clock::now();
         time_shift += std::chrono::duration<double, std::milli>(end_shift - start_shift).count();
         ///////////////////////////////EPIPOLAR SHIFT THRESHOLD RECALL//////////////////////////
-        int shift_precision_numerator = 0;
-        bool shift_match_found = false;
+        if (!selected_ground_truth_edges.empty()) {
+            int shift_precision_numerator = 0;
+            bool shift_match_found = false;
 
-        for(const auto& shifted_candidate : shifted_secondary_edge_coords){
-            if (cv::norm(shifted_candidate - ground_truth_edge) <= 3.0){
-                shift_precision_numerator++;
-                shift_match_found = true;
-                // break;
+            for(const auto& shifted_candidate : shifted_secondary_edge_coords){
+                if (cv::norm(shifted_candidate - ground_truth_edge) <= 3.0){
+                    shift_precision_numerator++;
+                    shift_match_found = true;
+                    // break;
+                }
             }
-        }
 
-        if (shift_match_found){
-            shift_true_positive++;
-        } 
-        else {
-            shift_false_negative++;
-        }
-        if (!shifted_secondary_edge_coords.empty()) {
-            per_edge_shift_precision += static_cast<double>(shift_precision_numerator) / shifted_secondary_edge_coords.size();
-            shift_edges_evaluated++;
+            if (shift_match_found){
+                shift_true_positive++;
+            } 
+            else {
+                shift_false_negative++;
+            }
+            if (!shifted_secondary_edge_coords.empty()) {
+                per_edge_shift_precision += static_cast<double>(shift_precision_numerator) / shifted_secondary_edge_coords.size();
+                shift_edges_evaluated++;
+            }
         }
         ///////////////////////////////EPIPOLAR CLUSTER THRESHOLD//////////////////////////
         auto start_cluster = std::chrono::high_resolution_clock::now();
@@ -1524,26 +1196,28 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
         auto end_cluster = std::chrono::high_resolution_clock::now();
         time_cluster += std::chrono::duration<double, std::milli>(end_cluster - start_cluster).count();
         ///////////////////////////////EPIPOLAR CLUSTER THRESHOLD RECALL//////////////////////////
-        int clust_precision_numerator = 0;
-        bool cluster_match_found = false;
+        if (!selected_ground_truth_edges.empty()) {
+            int clust_precision_numerator = 0;
+            bool cluster_match_found = false;
 
-        for (const auto& cluster : cluster_centers) {
-            if (cv::norm(cluster.center_coord - ground_truth_edge) <= 3.0) {
-                clust_precision_numerator++;
-                cluster_match_found = true;
-                // break;
+            for (const auto& cluster : cluster_centers) {
+                if (cv::norm(cluster.center_coord - ground_truth_edge) <= 3.0) {
+                    clust_precision_numerator++;
+                    cluster_match_found = true;
+                    // break;
+                }
             }
-        }
 
-        if (cluster_match_found) {
-            cluster_true_positive++;
-        }
-        else {
-            cluster_false_negative++;
-        }
-        if (!cluster_centers.empty()) {
-            per_edge_clust_precision += static_cast<double>(clust_precision_numerator) / cluster_centers.size();
-            clust_edges_evaluated++;
+            if (cluster_match_found) {
+                cluster_true_positive++;
+            }
+            else {
+                cluster_false_negative++;
+            }
+            if (!cluster_centers.empty()) {
+                per_edge_clust_precision += static_cast<double>(clust_precision_numerator) / cluster_centers.size();
+                clust_edges_evaluated++;
+            }
         }
         ///////////////////////////////EXTRACT PATCHES THRESHOLD////////////////////////////////////////////
         auto start_patch = std::chrono::high_resolution_clock::now();
@@ -1630,11 +1304,13 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
                     info.contributing_orientations = filtered_cluster_centers[i].contributing_orientations;
                     passed_ncc_matches.push_back(info);
 
-                   if (cv::norm(filtered_cluster_centers[i].center_coord - ground_truth_edge) <= 3.0) {
-                       ncc_match_found = true;
-                       ncc_precision_numerator++;
-                    //    break;
-                   }
+                    if (!selected_ground_truth_edges.empty()) {
+                        if (cv::norm(filtered_cluster_centers[i].center_coord - ground_truth_edge) <= 3.0) {
+                            ncc_match_found = true;
+                            ncc_precision_numerator++;
+                            //    break;
+                        }
+                    }
                }
                else if (ncc_one >= ncc_threshold_strong_one_side || ncc_two >= ncc_threshold_strong_one_side) {
                     PatchMatch info;
@@ -1645,11 +1321,13 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
                     info.contributing_orientations = filtered_cluster_centers[i].contributing_orientations;
                     passed_ncc_matches.push_back(info);
 
-                   if (cv::norm(filtered_cluster_centers[i].center_coord - ground_truth_edge) <= 3.0) {
-                       ncc_match_found = true;
-                       ncc_precision_numerator++;
-                    //    break;
-                   }
+                    if (!selected_ground_truth_edges.empty()) {
+                        if (cv::norm(filtered_cluster_centers[i].center_coord - ground_truth_edge) <= 3.0) {
+                            ncc_match_found = true;
+                            ncc_precision_numerator++;
+                            //    break;
+                        }
+                    }
                }
                else if (ncc_one >= ncc_threshold_weak_both_sides && ncc_two >= ncc_threshold_weak_both_sides && filtered_cluster_centers.size() == 1) {
                     PatchMatch info;
@@ -1660,11 +1338,13 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
                     info.contributing_orientations = filtered_cluster_centers[i].contributing_orientations;
                     passed_ncc_matches.push_back(info);
 
-                   if (cv::norm(filtered_cluster_centers[i].center_coord - ground_truth_edge) <= 3.0) {
-                       ncc_match_found = true;
-                       ncc_precision_numerator++;
-                    //    break;
-                   }
+                    if (!selected_ground_truth_edges.empty()) {
+                        if (cv::norm(filtered_cluster_centers[i].center_coord - ground_truth_edge) <= 3.0) {
+                            ncc_match_found = true;
+                            ncc_precision_numerator++;
+                            //    break;
+                        }
+                    }
                }
            }
 
@@ -1715,13 +1395,16 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
             double lowe_ratio = second_best_score / best_score;
 
             if (lowe_ratio < 1) {
-                if (cv::norm(best_match.coord - ground_truth_edge) <= 3.0) {
-                    lowe_precision_numerator++;
-                    lowe_true_positive++;
+                if (!selected_ground_truth_edges.empty()) {
+                    if (cv::norm(best_match.coord - ground_truth_edge) <= 3.0) {
+                        lowe_precision_numerator++;
+                        lowe_true_positive++;
+                    }
+                    else {
+                        lowe_false_negative++;
+                    }
                 }
-                else {
-                    lowe_false_negative++;
-                }
+
                 final_matches.emplace_back(primary_edge, best_match);
                 lowe_output_counts.push_back(1);
             }
@@ -1733,12 +1416,15 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
         else if (passed_ncc_matches.size() == 1){
             best_match = passed_ncc_matches[0];
 
-            if (cv::norm(best_match.coord - ground_truth_edge) <= 3.0) {
-                lowe_precision_numerator++;
-                lowe_true_positive++;
-            } else {
-                lowe_false_negative++;
+            if (!selected_ground_truth_edges.empty()) {
+                if (cv::norm(best_match.coord - ground_truth_edge) <= 3.0) {
+                    lowe_precision_numerator++;
+                    lowe_true_positive++;
+                } else {
+                    lowe_false_negative++;
+                }
             }
+
             final_matches.emplace_back(primary_edge, best_match);
             lowe_output_counts.push_back(1);
         }
@@ -1759,7 +1445,7 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
     }   
     auto total_end = std::chrono::high_resolution_clock::now();
     double total_time = std::chrono::duration<double, std::milli>(total_end - total_start).count();
-
+    
     double epi_distance_recall = 0.0;
     if ((epi_true_positive + epi_false_negative) > 0) {
         epi_distance_recall = static_cast<double>(epi_true_positive) / (epi_true_positive + epi_false_negative);
@@ -1790,32 +1476,32 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
         lowe_recall = static_cast<double>(lowe_true_positive) / (lowe_true_positive + lowe_false_negative);
     }
 
-    std::cout << "Epipolar Distance Recall: " 
-            << std::fixed << std::setprecision(2) 
-            << epi_distance_recall * 100 << "%" << std::endl;
+    // std::cout << "Epipolar Distance Recall: " 
+    //         << std::fixed << std::setprecision(2) 
+    //         << epi_distance_recall * 100 << "%" << std::endl;
 
-    std::cout << "Max Disparity Threshold Recall: "
-          << std::fixed << std::setprecision(2)
-          << max_disparity_recall * 100 << "%" << std::endl;
+    // std::cout << "Max Disparity Threshold Recall: "
+    //       << std::fixed << std::setprecision(2)
+    //       << max_disparity_recall * 100 << "%" << std::endl;
 
-    std::cout << "Epipolar Shift Threshold Recall: "
-          << std::fixed << std::setprecision(2)
-          << epi_shift_recall * 100 << "%" << std::endl;
+    // std::cout << "Epipolar Shift Threshold Recall: "
+    //       << std::fixed << std::setprecision(2)
+    //       << epi_shift_recall * 100 << "%" << std::endl;
 
-    std::cout << "Epipolar Cluster Threshold Recall: "
-          << std::fixed << std::setprecision(2)
-          << epi_cluster_recall * 100 << "%" << std::endl;
+    // std::cout << "Epipolar Cluster Threshold Recall: "
+    //       << std::fixed << std::setprecision(2)
+    //       << epi_cluster_recall * 100 << "%" << std::endl;
 
-    std::cout << "NCC Threshold Recall: "
-          << std::fixed << std::setprecision(2)
-          << ncc_recall * 100 << "%" << std::endl;
+    // std::cout << "NCC Threshold Recall: "
+    //       << std::fixed << std::setprecision(2)
+    //       << ncc_recall * 100 << "%" << std::endl;
 
-    std::cout << "LRT Threshold Recall: "
-          << std::fixed << std::setprecision(2)
-          << lowe_recall * 100 << "%" << std::endl;
+    // std::cout << "LRT Threshold Recall: "
+    //       << std::fixed << std::setprecision(2)
+    //       << lowe_recall * 100 << "%" << std::endl;
 
-    double per_image_epi_precision = (time_epi_edges_evaluated > 0)
-    ? (per_edge_epi_precision / time_epi_edges_evaluated)
+    double per_image_epi_precision = (epi_edges_evaluated > 0)
+    ? (per_edge_epi_precision / epi_edges_evaluated)
     : 0.0;
     double per_image_disp_precision = (disp_edges_evaluated > 0)
     ? (per_edge_disp_precision / disp_edges_evaluated)
@@ -1833,27 +1519,27 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
     ? (per_edge_lowe_precision / lowe_edges_evaluated)
     : 0.0;
 
-    std::cout << "Epipolar Distance Precision: " 
-        << std::fixed << std::setprecision(2) 
-        << per_image_epi_precision * 100 << "%" << std::endl;
-    std::cout << "Maximum Disparity Precision: " 
-        << std::fixed << std::setprecision(2) 
-        << per_image_disp_precision * 100 << "%" << std::endl;
-    std::cout << "Epipolar Shift Precision: " 
-        << std::fixed << std::setprecision(2) 
-        << per_image_shift_precision * 100 << "%" << std::endl;
-    std::cout << "Epipolar Cluster Precision: " 
-        << std::fixed << std::setprecision(2) 
-        << per_image_clust_precision * 100 << "%" << std::endl;
-    std::cout << "NCC Precision: " 
-        << std::fixed << std::setprecision(2) 
-        << per_image_ncc_precision * 100 << "%" << std::endl;
-    std::cout << "LRT Precision: " 
-        << std::fixed << std::setprecision(2) 
-        << per_image_lowe_precision * 100 << "%" << std::endl;
+    // std::cout << "Epipolar Distance Precision: " 
+    //     << std::fixed << std::setprecision(2) 
+    //     << per_image_epi_precision * 100 << "%" << std::endl;
+    // std::cout << "Maximum Disparity Precision: " 
+    //     << std::fixed << std::setprecision(2) 
+    //     << per_image_disp_precision * 100 << "%" << std::endl;
+    // std::cout << "Epipolar Shift Precision: " 
+    //     << std::fixed << std::setprecision(2) 
+    //     << per_image_shift_precision * 100 << "%" << std::endl;
+    // std::cout << "Epipolar Cluster Precision: " 
+    //     << std::fixed << std::setprecision(2) 
+    //     << per_image_clust_precision * 100 << "%" << std::endl;
+    // std::cout << "NCC Precision: " 
+    //     << std::fixed << std::setprecision(2) 
+    //     << per_image_ncc_precision * 100 << "%" << std::endl;
+    // std::cout << "LRT Precision: " 
+    //     << std::fixed << std::setprecision(2) 
+    //     << per_image_lowe_precision * 100 << "%" << std::endl;
 
 
-    double per_image_epi_time = (time_epi_edges_evaluated> 0)
+    double per_image_epi_time = (time_epi_edges_evaluated > 0)
     ? (time_epi / time_epi_edges_evaluated)
     : 0.0;
     double per_image_disp_time = (time_disp_edges_evaluated > 0)
@@ -2020,14 +1706,14 @@ void Dataset::ExtractPatches(
     const cv::Mat& image,
     const std::vector<cv::Point2d>& edges,
     const std::vector<double>& orientations,
-    const std::vector<cv::Point2d>* right_edges, 
     const std::vector<cv::Point2d>& shifted_one,
     const std::vector<cv::Point2d>& shifted_two,
     std::vector<cv::Point2d>& filtered_edges_out,
     std::vector<double>& filtered_orientations_out,
-    std::vector<cv::Point2d>* filtered_right_edges_out,
     std::vector<cv::Mat>& patch_set_one_out,
-    std::vector<cv::Mat>& patch_set_two_out
+    std::vector<cv::Mat>& patch_set_two_out,
+    const std::vector<cv::Point2d>* ground_truth_edges, 
+    std::vector<cv::Point2d>* filtered_gt_edges_out
 )
 {
     int half_patch = std::ceil(patch_size / 2);
@@ -2064,8 +1750,8 @@ void Dataset::ExtractPatches(
             patch_set_one_out.push_back(patch1);
             patch_set_two_out.push_back(patch2);
 
-            if (right_edges && filtered_right_edges_out) {
-                filtered_right_edges_out->push_back((*right_edges)[i]);
+            if (ground_truth_edges && filtered_gt_edges_out) {
+                filtered_gt_edges_out->push_back((*ground_truth_edges)[i]);
             }
         }
     }

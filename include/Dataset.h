@@ -40,7 +40,6 @@ struct PatchMatch{
     double final_score;
     std::vector<cv::Point2d> contributing_edges;
     std::vector<double> contributing_orientations;
-    std::vector<cv::Point2d> contributing_gt_left_edges;
 };
 
 struct RecallMetrics {
@@ -183,17 +182,23 @@ private:
 
    void PrintDatasetInfo();
    BidirectionalMatchResult DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, std::vector<cv::Point2d> right_edge_coords, std::vector<double> right_edge_orientations);
-   MatchResult CalculateMatches(const std::vector<cv::Point2d>& selected_primary_edges, const std::vector<cv::Point2d>& selected_ground_truth_edges,
-   const std::vector<double>& selected_primary_orientations, const std::vector<cv::Point2d>& primary_edge_coords, const std::vector<double>& primary_edge_orientations,
-   const std::vector<cv::Point2d>& secondary_edge_coords, const std::vector<double>& secondary_edge_orientations, const std::vector<cv::Mat>& primary_patch_set_one, 
-   const std::vector<cv::Mat>& primary_patch_set_two, const std::vector<Eigen::Vector3d>& epipolar_lines_secondary, const cv::Mat& primary_image, const cv::Mat& secondary_image, 
-   bool left_to_right = true, const std::vector<std::tuple<cv::Point2d, cv::Point2d, double>>* reverse_gt = nullptr);
+
+    MatchResult CalculateMatches(const std::vector<cv::Point2d>& selected_primary_edges, const std::vector<double>& selected_primary_orientations, const std::vector<cv::Point2d>& secondary_edge_coords, 
+    const std::vector<double>& secondary_edge_orientations, const std::vector<cv::Mat>& primary_patch_set_one, const std::vector<cv::Mat>& primary_patch_set_two, const std::vector<Eigen::Vector3d>& epipolar_lines_secondary, 
+    const cv::Mat& secondary_image, const std::vector<cv::Point2d>& selected_ground_truth_edges = std::vector<cv::Point2d>());
+
    double ComputeNCC(const cv::Mat& patch_one, const cv::Mat& patch_two);
+
    std::pair<std::vector<cv::Point2d>, std::vector<cv::Point2d>> CalculateOrthogonalShifts(const std::vector<cv::Point2d>& edge_points, const std::vector<double>& orientations, double shift_magnitude);
+
    std::vector<std::pair<std::vector<cv::Point2d>, std::vector<double>>> ClusterEpipolarShiftedEdges(std::vector<cv::Point2d>& valid_corrected_edges, std::vector<double>& valid_corrected_orientations); 
+
    std::vector<Eigen::Vector3d> ReprojectOrientations(const std::vector<Eigen::Vector3d>& tangent_vectors, std::vector<Eigen::Matrix3d> rot_mat_list);
+
    std::vector<Eigen::Vector3d> ReconstructOrientations();
+
    void CalculateDepths();
+
    void ExtractClusterPatches(
       int patch_size,
       const cv::Mat& image,
@@ -206,50 +211,74 @@ private:
       std::vector<cv::Mat>& patch_set_one_out,
       std::vector<cv::Mat>& patch_set_two_out
    );
+
    void ExtractPatches(
     int patch_size,
     const cv::Mat& image,
     const std::vector<cv::Point2d>& edges,
     const std::vector<double>& orientations,
-    const std::vector<cv::Point2d>* right_edges, 
     const std::vector<cv::Point2d>& shifted_one,
     const std::vector<cv::Point2d>& shifted_two,
     std::vector<cv::Point2d>& filtered_edges_out,
     std::vector<double>& filtered_orientations_out,
-    std::vector<cv::Point2d>* filtered_right_edges_out,
     std::vector<cv::Mat>& patch_set_one_out,
-    std::vector<cv::Mat>& patch_set_two_out
+    std::vector<cv::Mat>& patch_set_two_out,
+    const std::vector<cv::Point2d>* ground_truth_edges = nullptr, 
+    std::vector<cv::Point2d>* filtered_gt_edges_out = nullptr
    );
+
    std::pair<std::vector<cv::Point2d>, std::vector<double>> ExtractEpipolarEdges(const Eigen::Vector3d& epipolar_line, const std::vector<cv::Point2d>& edge_locations, const std::vector<double>& edge_orientations, double distance_threshold); 
+   
    std::vector<Eigen::Vector3d> CalculateEpipolarLine(const Eigen::Matrix3d& fund_mat, const std::vector<cv::Point2d>& edges);
+   
    std::tuple<std::vector<cv::Point2d>, std::vector<double>, std::vector<cv::Point2d>> PickRandomEdges(int patch_size, const std::vector<cv::Point2d>& edges, const std::vector<cv::Point2d>& ground_truth_right_edges, const std::vector<double>& orientations, size_t num_points, int img_width, int img_height);
+   
    Eigen::Matrix3d ConvertToEigenMatrix(const std::vector<std::vector<double>>& matrix);
+   
    std::vector<std::pair<cv::Mat, cv::Mat>> LoadEuRoCImages(const std::string& csv_path, const std::string& left_path, const std::string& right_path, int num_images);
+   
    std::vector<std::pair<cv::Mat, cv::Mat>> LoadETH3DImages(const std::string &stereo_pairs_path, int num_images);
+   
    std::vector<double> LoadMaximumDisparityValues(const std::string& stereo_pairs_path, int num_images);
+   
    std::vector<cv::Mat> LoadETH3DLeftReferenceMaps(const std::string &stereo_pairs_path, int num_maps);
+   
    std::vector<cv::Mat> LoadETH3DRightReferenceMaps(const std::string &stereo_pairs_path, int num_maps);
+   
    void WriteDisparityToBinary(const std::string& filepath, const cv::Mat& disparity_map);
+   
    cv::Mat ReadDisparityFromBinary(const std::string& filepath);
+   
    cv::Mat LoadDisparityFromCSV(const std::string& path);
+   
    void WriteEdgesToBinary(const std::string& filepath,
                            const std::vector<cv::Point2d>& locations,
                            const std::vector<double>& orientations); 
+
    void ReadEdgesFromBinary(const std::string& filepath,
                                    std::vector<cv::Point2d>& locations,
                                    std::vector<double>& orientations);
+
    void ProcessEdges(const cv::Mat& image,
                      const std::string& filepath,
                      std::shared_ptr<ThirdOrderEdgeDetectionCPU>& toed,
                      std::vector<cv::Point2d>& locations,
                      std::vector<double>& orientations);
+
    void VisualizeGTRightEdge(const cv::Mat &left_image, const cv::Mat &right_image, const std::vector<std::pair<cv::Point2d, cv::Point2d>> &edge_pairs);
+   
    void CalculateGTRightEdge(const std::vector<cv::Point2d> &left_third_order_edges_locations, const std::vector<double> &left_third_order_edges_orientation, const cv::Mat &disparity_map, const cv::Mat &left_image, const cv::Mat &right_image);
+   
    void CalculateGTLeftEdge(const std::vector<cv::Point2d>& right_third_order_edges_locations,const std::vector<double>& right_third_order_edges_orientation,const cv::Mat& disparity_map_right_reference,const cv::Mat& left_image,const cv::Mat& right_image);
+   
    cv::Point2d PerformEpipolarShift( cv::Point2d original_edge_location, double edge_orientation, std::vector<double> epipolar_line_coeffs, bool& b_pass_epipolar_tengency_check);
+   
    void Load_GT_Poses( std::string GT_Poses_File_Path );
+   
    std::vector<double> GT_time_stamps;
+   
    std::vector<double> Img_time_stamps;
+   
    void Align_Images_and_GT_Poses();
 
    bool compute_grad_depth = false;
