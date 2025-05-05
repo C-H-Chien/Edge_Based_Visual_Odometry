@@ -27,17 +27,19 @@
 //> Chiang-Heng Chien (chiang-heng_chien@brown.edu), Saul Lopez Lucas (saul_lopez_lucas@brown.edu)
 // =======================================================================================================
 
-struct ClusterCenter {
+struct EdgeCluster {
     cv::Point2d center_coord;                  
-    double center_orientation;                 
+    double center_orientation;      
+
     std::vector<cv::Point2d> contributing_edges;
     std::vector<double> contributing_orientations;
 };
 
-struct PatchMatch{
+struct EdgeMatch {
     cv::Point2d coord;
     double orientation;
     double final_score;
+
     std::vector<cv::Point2d> contributing_edges;
     std::vector<double> contributing_orientations;
 };
@@ -86,12 +88,17 @@ struct RecallMetrics {
     double per_image_total_time;
 };
 
-struct MatchResult {
-    RecallMetrics recall_metrics;
-    std::vector<std::pair<cv::Point2d, PatchMatch>> matches; 
+struct SourceEdge {
+    cv::Point2d position;
+    double orientation;
 };
 
-struct BCTMetrics{
+struct EdgeMatchResult {
+    RecallMetrics recall_metrics;
+    std::vector<std::pair<SourceEdge, EdgeMatch>> edge_to_cluster_matches; 
+};
+
+struct BidirectionalMetrics{
     int matches_before_bct;
     int matches_after_bct;
     double per_image_bct_recall;
@@ -99,11 +106,16 @@ struct BCTMetrics{
     double per_image_bct_time;
 };
 
-struct BidirectionalMatchResult {
-    MatchResult forward_match;
-    MatchResult reverse_match;
-    std::vector<std::pair<cv::Point2d, cv::Point2d>> confirmed_matches;
-    BCTMetrics bct_metrics;
+struct ConfirmedMatchEdge {
+    cv::Point2d position;
+    double orientation;
+};
+
+struct StereoMatchResult {
+    EdgeMatchResult forward_match;
+    EdgeMatchResult reverse_match;
+    std::vector<std::pair<ConfirmedMatchEdge, ConfirmedMatchEdge>> confirmed_matches;
+    BidirectionalMetrics bidirectional_metrics;
 };
 
 extern cv::Mat merged_visualization_global;
@@ -172,18 +184,12 @@ private:
    double baseline;
    double max_disparity;
 
-   std::vector<cv::Point2d> matched_left_edges;
-   std::vector<cv::Point2d> matched_right_edges;
-   std::vector<double> matched_left_orientations;
-   std::vector<double> matched_right_orientations;
-   std::vector<double> left_edge_depths;
-
    void write_ncc_vals_to_files( int img_index );
 
    void PrintDatasetInfo();
-   BidirectionalMatchResult DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, std::vector<cv::Point2d> right_edge_coords, std::vector<double> right_edge_orientations);
+   StereoMatchResult DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, std::vector<cv::Point2d> right_edge_coords, std::vector<double> right_edge_orientations);
 
-    MatchResult CalculateMatches(const std::vector<cv::Point2d>& selected_primary_edges, const std::vector<double>& selected_primary_orientations, const std::vector<cv::Point2d>& secondary_edge_coords, 
+    EdgeMatchResult CalculateMatches(const std::vector<cv::Point2d>& selected_primary_edges, const std::vector<double>& selected_primary_orientations, const std::vector<cv::Point2d>& secondary_edge_coords, 
     const std::vector<double>& secondary_edge_orientations, const std::vector<cv::Mat>& primary_patch_set_one, const std::vector<cv::Mat>& primary_patch_set_two, const std::vector<Eigen::Vector3d>& epipolar_lines_secondary, 
     const cv::Mat& secondary_image, const std::vector<cv::Point2d>& selected_ground_truth_edges = std::vector<cv::Point2d>());
 
@@ -193,20 +199,14 @@ private:
 
    std::vector<std::pair<std::vector<cv::Point2d>, std::vector<double>>> ClusterEpipolarShiftedEdges(std::vector<cv::Point2d>& valid_corrected_edges, std::vector<double>& valid_corrected_orientations); 
 
-   std::vector<Eigen::Vector3d> ReprojectOrientations(const std::vector<Eigen::Vector3d>& tangent_vectors, std::vector<Eigen::Matrix3d> rot_mat_list);
-
-   std::vector<Eigen::Vector3d> ReconstructOrientations();
-
-   void CalculateDepths();
-
    void ExtractClusterPatches(
       int patch_size,
       const cv::Mat& image,
-      const std::vector<ClusterCenter>& cluster_centers,
+      const std::vector<EdgeCluster>& cluster_centers,
       const std::vector<cv::Point2d>* right_edges, 
       const std::vector<cv::Point2d>& shifted_one,
       const std::vector<cv::Point2d>& shifted_two,
-      std::vector<ClusterCenter>& cluster_centers_out,
+      std::vector<EdgeCluster>& cluster_centers_out,
       std::vector<cv::Point2d>* filtered_right_edges_out,
       std::vector<cv::Mat>& patch_set_one_out,
       std::vector<cv::Mat>& patch_set_two_out

@@ -177,7 +177,7 @@ void Dataset::write_ncc_vals_to_files( int img_index ) {
 }
 
 void Dataset::PerformEdgeBasedVO() {
-    int num_pairs = 247;
+    int num_pairs = 1;
     std::vector<std::pair<cv::Mat, cv::Mat>> image_pairs;
     std::vector<cv::Mat> left_ref_disparity_maps;
     std::vector<cv::Mat> right_ref_disparity_maps;
@@ -208,7 +208,7 @@ void Dataset::PerformEdgeBasedVO() {
     std::vector<double> per_image_avg_after_bct;
 
     std::vector<RecallMetrics> all_forward_recall_metrics;
-    std::vector<BCTMetrics> all_bct_metrics;
+    std::vector<BidirectionalMetrics> all_bct_metrics;
 
     if (dataset_type == "EuRoC"){
         std::string left_path = dataset_path + "/" + sequence_name + "/mav0/cam0/data/";
@@ -291,7 +291,7 @@ void Dataset::PerformEdgeBasedVO() {
         CalculateGTRightEdge(left_third_order_edges_locations, left_third_order_edges_orientation, left_ref_map, left_edge_map, right_edge_map);
         CalculateGTLeftEdge(right_third_order_edges_locations, right_third_order_edges_orientation, right_ref_map, left_edge_map, right_edge_map);
 
-        BidirectionalMatchResult match_result = DisplayMatches(
+        StereoMatchResult match_result = DisplayMatches(
             left_undistorted,
             right_undistorted,
             right_third_order_edges_locations,
@@ -311,10 +311,13 @@ void Dataset::PerformEdgeBasedVO() {
         for (const auto& [left_edge, right_edge] : match_result.confirmed_matches) {
             cv::Scalar color = PickUniqueColor(index, total_matches);
 
-            cv::circle(merged_visualization, left_edge, 4, color, cv::FILLED);
-            cv::Point2d right_shifted(right_edge.x + left_visualization.cols, right_edge.y);
+            cv::Point2d left_position = left_edge.position;
+            cv::Point2d right_position = right_edge.position;
+
+            cv::circle(merged_visualization, left_position, 4, color, cv::FILLED);
+            cv::Point2d right_shifted(right_position.x + left_visualization.cols, right_position.y);
             cv::circle(merged_visualization, right_shifted, 4, color, cv::FILLED);
-            cv::line(merged_visualization, left_edge, right_shifted, color, 1);
+            cv::line(merged_visualization, left_position, right_shifted, color, 1);
 
             ++index;
         }
@@ -325,8 +328,8 @@ void Dataset::PerformEdgeBasedVO() {
         const RecallMetrics& forward_metrics = match_result.forward_match.recall_metrics;
         all_forward_recall_metrics.push_back(forward_metrics);
 
-        const BCTMetrics& bct_metrics = match_result.bct_metrics;
-        all_bct_metrics.push_back(bct_metrics);
+        const BidirectionalMetrics& bidirectional_metrics = match_result.bidirectional_metrics;
+        all_bct_metrics.push_back(bidirectional_metrics);
 
         double avg_before_epi = ComputeAverage(forward_metrics.epi_input_counts);
         double avg_after_epi = ComputeAverage(forward_metrics.epi_output_counts);
@@ -370,8 +373,8 @@ void Dataset::PerformEdgeBasedVO() {
         per_image_avg_before_lowe.push_back(avg_before_lowe);
         per_image_avg_after_lowe.push_back(avg_after_lowe);
 
-        per_image_avg_before_bct.push_back(match_result.bct_metrics.matches_before_bct);
-        per_image_avg_after_bct.push_back(match_result.bct_metrics.matches_after_bct);
+        per_image_avg_before_bct.push_back(match_result.bidirectional_metrics.matches_before_bct);
+        per_image_avg_after_bct.push_back(match_result.bidirectional_metrics.matches_after_bct);
 
         }                                
     }
@@ -427,7 +430,7 @@ void Dataset::PerformEdgeBasedVO() {
         total_image_time += m.per_image_total_time;
     }
 
-    for (const BCTMetrics& m : all_bct_metrics) {
+    for (const BidirectionalMetrics& m : all_bct_metrics) {
         total_bct_recall += m.per_image_bct_recall;
         total_bct_precision += m.per_image_bct_precision;
         total_bct_time += m.per_image_bct_time;
@@ -724,7 +727,7 @@ void Dataset::PerformEdgeBasedVO() {
         << std::fixed << std::setprecision(4) << avg_bct_precision * 100 << "\n";
 }
 
-BidirectionalMatchResult Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, std::vector<cv::Point2d> right_edge_coords, std::vector<double> right_edge_orientations) {
+StereoMatchResult Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, std::vector<cv::Point2d> right_edge_coords, std::vector<double> right_edge_orientations) {
     ///////////////////////////////FORWARD DIRECTION///////////////////////////////
     std::vector<cv::Point2d> left_edge_coords;
     std::vector<cv::Point2d> ground_truth_right_edges;
@@ -765,7 +768,7 @@ BidirectionalMatchResult Dataset::DisplayMatches(const cv::Mat& left_image, cons
 
     std::vector<Eigen::Vector3d> epipolar_lines_right = CalculateEpipolarLine(fundamental_matrix_21, filtered_left_edges);
 
-    MatchResult forward_match = CalculateMatches(
+    EdgeMatchResult forward_match = CalculateMatches(
         filtered_left_edges,
         filtered_left_orientations,
         right_edge_coords,
@@ -781,8 +784,8 @@ BidirectionalMatchResult Dataset::DisplayMatches(const cv::Mat& left_image, cons
     std::vector<cv::Point2d> reverse_primary_edges;
     std::vector<double> reverse_primary_orientations;
 
-    for (const auto& match_pair : forward_match.matches) {
-        const PatchMatch& match_info = match_pair.second;
+    for (const auto& match_pair : forward_match.edge_to_cluster_matches) {
+        const EdgeMatch& match_info = match_pair.second;
 
         for (const auto& edge : match_info.contributing_edges) {
             reverse_primary_edges.push_back(edge);
@@ -818,7 +821,7 @@ BidirectionalMatchResult Dataset::DisplayMatches(const cv::Mat& left_image, cons
 
     std::vector<Eigen::Vector3d> epipolar_lines_left = CalculateEpipolarLine(fundamental_matrix_12, filtered_right_edges);
 
-    MatchResult reverse_match = CalculateMatches(
+    EdgeMatchResult reverse_match = CalculateMatches(
         filtered_right_edges,
         filtered_right_orientations,
         left_edge_coords,
@@ -829,26 +832,34 @@ BidirectionalMatchResult Dataset::DisplayMatches(const cv::Mat& left_image, cons
         left_image
     );
 
-    std::vector<std::pair<cv::Point2d, cv::Point2d>> confirmed_matches;
+    std::vector<std::pair<ConfirmedMatchEdge, ConfirmedMatchEdge>> confirmed_matches;
 
-    int matches_before_bct = static_cast<int>(forward_match.matches.size());
+    int matches_before_bct = static_cast<int>(forward_match.edge_to_cluster_matches.size());
 
     const double match_tolerance = 3;
 
     auto bct_start = std::chrono::high_resolution_clock::now();
 
-    for (const auto& [left_edge, patch_match_forward] : forward_match.matches) {
-        const auto& right_contributing_edges = patch_match_forward.contributing_edges;
-        for (const auto& right_edge : right_contributing_edges) {
+    for (const auto& [left_oriented_edge, patch_match_forward] : forward_match.edge_to_cluster_matches) {
+        const cv::Point2d& left_position = left_oriented_edge.position;
+        const double left_orientation = left_oriented_edge.orientation;
 
-            for (const auto& [rev_right_edge, patch_match_rev] : reverse_match.matches) {
-                if (cv::norm(rev_right_edge - right_edge) <= match_tolerance) {
+        const auto& right_contributing_edges = patch_match_forward.contributing_edges;
+        const auto& right_contributing_orientations = patch_match_forward.contributing_orientations;
+        for (size_t i = 0; i < right_contributing_edges.size(); ++i) {
+            const cv::Point2d& right_position = right_contributing_edges[i];
+            const double right_orientation = right_contributing_orientations[i];
+
+            for (const auto& [rev_right_edge, patch_match_rev] : reverse_match.edge_to_cluster_matches) {
+                if (cv::norm(rev_right_edge.position - right_position) <= match_tolerance) {
 
                     for (const auto& rev_contributing_left : patch_match_rev.contributing_edges) {
-                        if (cv::norm(rev_contributing_left - left_edge) <= match_tolerance) {
+                        if (cv::norm(rev_contributing_left - left_position) <= match_tolerance) {
                             
-                            confirmed_matches.emplace_back(left_edge, right_edge);
-                            goto next_left_edge;
+                        ConfirmedMatchEdge left_confirmed{left_position, left_orientation};
+                        ConfirmedMatchEdge right_confirmed{right_position, right_orientation};
+                        confirmed_matches.emplace_back(left_confirmed, right_confirmed);
+                        goto next_left_edge;
                         }
                     }
                 }
@@ -871,17 +882,17 @@ BidirectionalMatchResult Dataset::DisplayMatches(const cv::Mat& left_image, cons
 
     double bct_recall = (bct_denonimator > 0) ? static_cast<double>(bct_true_positives) / bct_denonimator : 0.0;
 
-    BCTMetrics bct_metrics;
-    bct_metrics.matches_before_bct = matches_before_bct;
-    bct_metrics.matches_after_bct = matches_after_bct;
-    bct_metrics.per_image_bct_recall = bct_recall;
-    bct_metrics.per_image_bct_precision = per_image_bct_precision;
-    bct_metrics.per_image_bct_time = per_image_bct_time;
+    BidirectionalMetrics bidirectional_metrics;
+    bidirectional_metrics.matches_before_bct = matches_before_bct;
+    bidirectional_metrics.matches_after_bct = matches_after_bct;
+    bidirectional_metrics.per_image_bct_recall = bct_recall;
+    bidirectional_metrics.per_image_bct_precision = per_image_bct_precision;
+    bidirectional_metrics.per_image_bct_time = per_image_bct_time;
 
-    return BidirectionalMatchResult{forward_match, reverse_match, confirmed_matches, bct_metrics};
+    return StereoMatchResult{forward_match, reverse_match, confirmed_matches, bidirectional_metrics};
 }
 
-MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_primary_edges, const std::vector<double>& selected_primary_orientations, const std::vector<cv::Point2d>& secondary_edge_coords, 
+EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_primary_edges, const std::vector<double>& selected_primary_orientations, const std::vector<cv::Point2d>& secondary_edge_coords, 
     const std::vector<double>& secondary_edge_orientations, const std::vector<cv::Mat>& primary_patch_set_one, const std::vector<cv::Mat>& primary_patch_set_two, const std::vector<Eigen::Vector3d>& epipolar_lines_secondary, 
     const cv::Mat& secondary_image, const std::vector<cv::Point2d>& selected_ground_truth_edges) {
     auto total_start = std::chrono::high_resolution_clock::now();
@@ -962,7 +973,7 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
 
     cv::Point2d ground_truth_edge;
 
-    std::vector<std::pair<cv::Point2d, PatchMatch>> final_matches;
+    std::vector<std::pair<SourceEdge, EdgeMatch>> final_matches;
 
     int skip = (!selected_ground_truth_edges.empty()) ? 1 : 1;
 
@@ -1158,7 +1169,7 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
         shift_output_counts.push_back(shifted_secondary_edge_coords.size());
 
         std::vector<std::pair<std::vector<cv::Point2d>, std::vector<double>>> clusters = ClusterEpipolarShiftedEdges(shifted_secondary_edge_coords, shifted_secondary_edge_orientations);
-        std::vector<ClusterCenter> cluster_centers;
+        std::vector<EdgeCluster> cluster_centers;
 
         for (size_t j = 0; j < clusters.size(); j++) {
             const auto& cluster_edges = clusters[j].first;
@@ -1180,7 +1191,7 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
             cv::Point2d avg_point = sum_point * (1.0 / cluster_edges.size());
             double avg_orientation = sum_orientation * (1.0 / cluster_orientations.size());
 
-            ClusterCenter cluster;
+            EdgeCluster cluster;
             cluster.center_coord = avg_point;
             cluster.center_orientation = avg_orientation;
             cluster.contributing_edges = cluster_edges;
@@ -1238,7 +1249,7 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
             ORTHOGONAL_SHIFT_MAG
         );
 
-        std::vector<ClusterCenter> filtered_cluster_centers;
+        std::vector<EdgeCluster> filtered_cluster_centers;
         std::vector<cv::Mat> secondary_patch_set_one;
         std::vector<cv::Mat> secondary_patch_set_two;
 
@@ -1272,7 +1283,7 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
        double ncc_threshold_strong_one_side = 0.65;
 
        bool ncc_match_found = false;
-       std::vector<PatchMatch> passed_ncc_matches;
+       std::vector<EdgeMatch> passed_ncc_matches;
 
        if (!primary_patch_one.empty() && !primary_patch_two.empty() &&
            !secondary_patch_set_one.empty() && !secondary_patch_set_two.empty()) {
@@ -1296,7 +1307,7 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
                ncc_two_vs_err.push_back(pair_ncc_two_err);
 #endif
                if (ncc_one >= ncc_threshold_strong_both_sides && ncc_two >= ncc_threshold_strong_both_sides) {
-                    PatchMatch info;
+                    EdgeMatch info;
                     info.coord = filtered_cluster_centers[i].center_coord;
                     info.orientation = filtered_cluster_centers[i].center_orientation;
                     info.final_score = final_score;
@@ -1313,7 +1324,7 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
                     }
                }
                else if (ncc_one >= ncc_threshold_strong_one_side || ncc_two >= ncc_threshold_strong_one_side) {
-                    PatchMatch info;
+                    EdgeMatch info;
                     info.coord = filtered_cluster_centers[i].center_coord;
                     info.orientation = filtered_cluster_centers[i].center_orientation;
                     info.final_score = final_score;
@@ -1330,7 +1341,7 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
                     }
                }
                else if (ncc_one >= ncc_threshold_weak_both_sides && ncc_two >= ncc_threshold_weak_both_sides && filtered_cluster_centers.size() == 1) {
-                    PatchMatch info;
+                    EdgeMatch info;
                     info.coord = filtered_cluster_centers[i].center_coord;
                     info.orientation = filtered_cluster_centers[i].center_orientation;
                     info.final_score = final_score;
@@ -1372,11 +1383,11 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
         lowe_input_counts.push_back(passed_ncc_matches.size());
         int lowe_precision_numerator = 0;
 
-        PatchMatch best_match;
+        EdgeMatch best_match;
         double best_score = -1;
 
         if(passed_ncc_matches.size() >= 2){
-            PatchMatch second_best_match;
+            EdgeMatch second_best_match;
             double second_best_score = -1;
 
             for(const auto& match : passed_ncc_matches){
@@ -1404,8 +1415,8 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
                         lowe_false_negative++;
                     }
                 }
-
-                final_matches.emplace_back(primary_edge, best_match);
+                SourceEdge source_edge {primary_edge, primary_orientation};
+                final_matches.emplace_back(source_edge, best_match);
                 lowe_output_counts.push_back(1);
             }
             else {
@@ -1424,8 +1435,9 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
                     lowe_false_negative++;
                 }
             }
-
-            final_matches.emplace_back(primary_edge, best_match);
+            
+            SourceEdge source_edge {primary_edge, primary_orientation};
+            final_matches.emplace_back(source_edge, best_match);
             lowe_output_counts.push_back(1);
         }
         else {
@@ -1564,7 +1576,7 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
     ? (total_time / selected_primary_edges.size())
     : 0.0;
 
-    return MatchResult {
+    return EdgeMatchResult {
         RecallMetrics {
             epi_distance_recall,
             max_disparity_recall,
@@ -1606,6 +1618,8 @@ MatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_p
         final_matches
     };
 }  
+
+
 
 double Dataset::ComputeNCC(const cv::Mat& patch_one, const cv::Mat& patch_two){
     double mean_one = (cv::mean(patch_one))[0];
@@ -1651,11 +1665,11 @@ std::pair<std::vector<cv::Point2d>, std::vector<cv::Point2d>> Dataset::Calculate
 void Dataset::ExtractClusterPatches(
     int patch_size,
     const cv::Mat& image,
-    const std::vector<ClusterCenter>& cluster_centers,
+    const std::vector<EdgeCluster>& cluster_centers,
     const std::vector<cv::Point2d>* right_edges, 
     const std::vector<cv::Point2d>& shifted_one,
     const std::vector<cv::Point2d>& shifted_two,
-    std::vector<ClusterCenter>& cluster_centers_out,
+    std::vector<EdgeCluster>& cluster_centers_out,
     std::vector<cv::Point2d>* filtered_right_edges_out,
     std::vector<cv::Mat>& patch_set_one_out,
     std::vector<cv::Mat>& patch_set_two_out
@@ -1891,151 +1905,42 @@ std::tuple<std::vector<cv::Point2d>, std::vector<double>, std::vector<cv::Point2
     return {selected_points, selected_orientations, selected_ground_truth_points};
 }
 
-std::vector<Eigen::Vector3d> Dataset::ReprojectOrientations(const std::vector<Eigen::Vector3d>& tangent_vectors, std::vector<Eigen::Matrix3d> rot_mat_list){
-    // std::cout << "Vector Sizes:" << std::endl;
-    // std::cout << "tangent_vectors.size(): " << tangent_vectors.size() << std::endl;
-    // std::cout << "rot_mat_list.size(): " << rot_mat_list.size() << std::endl;
-    // std::cout << "matched_left_edges.size(): " << matched_left_edges.size() << std::endl;
-    // std::cout << "left_edge_depths.size(): " << left_edge_depths.size() << std::endl;
+cv::Point2d Dataset::PerformEpipolarShift( 
+    cv::Point2d original_edge_location, double edge_orientation,
+    std::vector<double> epipolar_line_coeffs, bool& b_pass_epipolar_tengency_check )
+{
+    cv::Point2d corrected_edge;
+    assert(epipolar_line_coeffs.size() == 3);
+    double EL_coeff_A = epipolar_line_coeffs[0];
+    double EL_coeff_B = epipolar_line_coeffs[1];
+    double EL_coeff_C = epipolar_line_coeffs[2];
+    double a1_line  = -epipolar_line_coeffs[0] / epipolar_line_coeffs[1];
+    double b1_line  = -1;
+    double c1_line  = -epipolar_line_coeffs[2] / epipolar_line_coeffs[1];
+    
+    //> Parameters of the line passing through the original edge along its direction (tangent) vector
+    double a_edgeH2 = tan(edge_orientation);
+    double b_edgeH2 = -1;
+    double c_edgeH2 = -(a_edgeH2*original_edge_location.x - original_edge_location.y); //−(a⋅x2−y2)
 
-    if (tangent_vectors.size() != matched_left_edges.size() ||
-       tangent_vectors.size() != left_edge_depths.size()) {
-       std::cerr << "ERROR: Mismatch in vector sizes!" << std::endl;
-       return {};
-   }
+    //> Find the intersected point of the two lines
+    corrected_edge.x = (b1_line * c_edgeH2 - b_edgeH2 * c1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line);
+    corrected_edge.y = (c1_line * a_edgeH2 - c_edgeH2 * a1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line);
+    
+    //> Find (i) the displacement between the original edge and the corrected edge, and
+    //       (ii) the intersection angle between the epipolar line and the line passing through the original edge along its direction vector
+    double epipolar_shift_displacement = cv::norm(corrected_edge - original_edge_location);
+    double m_epipolar = -a1_line / b1_line; //> Slope of epipolar line
+    double angle_diff_rad = abs(edge_orientation - atan(m_epipolar));
+    double angle_diff_deg = angle_diff_rad * (180.0 / M_PI);
+    if (angle_diff_deg > 180){
+        angle_diff_deg -= 180;
+    }
 
-   Eigen::Vector3d e3(0, 0, 1);
-   std::vector<Eigen::Vector3d> reprojected_orientations;
-
-   for (size_t i = 0; i < tangent_vectors.size(); i++) {
-       Eigen::Vector3d T = rot_mat_list[i] * tangent_vectors[i];
-
-       Eigen::Vector3d small_gamma(matched_left_edges[i].x, matched_left_edges[i].y, 1.0);
-       Eigen::Vector3d big_gamma = left_edge_depths[i] * small_gamma;
-
-       Eigen::Vector3d numerator = (e3.transpose() * big_gamma) * T - (e3.transpose() * T) * big_gamma;
-       double denominator = numerator.norm();
-
-       Eigen::Vector3d t = numerator / denominator;
-       reprojected_orientations.push_back(t);
-   }
-   return reprojected_orientations;
-}
-
-std::vector<Eigen::Vector3d> Dataset::ReconstructOrientations() {
-   if (matched_left_edges.size() != matched_right_edges.size() ||
-       matched_left_edges.size() != matched_left_orientations.size() ||
-       matched_right_edges.size() != matched_right_orientations.size()) {
-       std::cerr << "ERROR: Mismatch in number of edge matches and orientations!" << std::endl;
-       return {};
-   }
-
-   Eigen::Matrix3d R21 = ConvertToEigenMatrix(rot_mat_21);
-  
-   Eigen::Matrix3d K_left;
-   K_left << left_intr[0], 0, left_intr[2],
-        0, left_intr[1], left_intr[3],
-        0, 0, 1;
-  
-   Eigen::Matrix3d K_right;
-   K_right << right_intr[0], 0, right_intr[2],
-        0, right_intr[1], right_intr[3],
-        0, 0, 1;
-
-   Eigen::Matrix3d K_left_inv = K_left.inverse();
-   Eigen::Matrix3d K_right_inv = K_right.inverse();
-
-   std::vector<Eigen::Vector3d> reconstructed_orientations;
-
-   for (size_t i = 0; i < matched_left_edges.size(); i++) {
-       Eigen::Vector3d gamma_one(matched_left_edges[i].x, matched_left_edges[i].y, 1.0);
-       Eigen::Vector3d gamma_two(matched_right_edges[i].x, matched_right_edges[i].y, 1.0);
-
-       Eigen::Vector3d gamma_one_meter = K_left_inv * gamma_one;
-       Eigen::Vector3d gamma_two_meter = K_right_inv * gamma_two;
-
-       double theta_one = matched_left_orientations[i];
-       double theta_two = matched_right_orientations[i];
-
-       Eigen::Vector3d t_one(std::cos(theta_one), std::sin(theta_one), 0);
-       Eigen::Vector3d t_two(std::cos(theta_two), std::sin(theta_two), 0);
-
-       Eigen::Vector3d r_t = R21 * t_one;
-       Eigen::Vector3d r_gamma = R21 * gamma_one_meter;
-
-       Eigen::Vector3d t_cross_r_t = t_two.cross(r_t);
-       Eigen::Vector3d t_cross_r_gamma = t_two.cross(r_gamma);
-
-       Eigen::Vector3d numerator = -(gamma_two_meter.dot(t_cross_r_t)) * gamma_one_meter + (gamma_two_meter.dot(t_cross_r_gamma)) * t_one;
-       double denominator = numerator.norm();
-
-       Eigen::Vector3d T1 = numerator / denominator;
-
-       reconstructed_orientations.push_back(T1);
-   }
-   return reconstructed_orientations;
-}
-
-void Dataset::CalculateDepths() {
-   if (matched_left_edges.size() != matched_right_edges.size()) {
-       std::cerr << "ERROR: Number of left and right edge matches do not match!" << std::endl;
-       return;
-   }
-
-   Eigen::Matrix3d R = ConvertToEigenMatrix(rot_mat_21);
-   Eigen::Vector3d T;
-
-   for (int i = 0; i < 3; i++) {
-       T(i) = trans_vec_21[i];
-   }
-
-   Eigen::Matrix3d K_left;
-   K_left << left_intr[0], 0, left_intr[2],
-        0, left_intr[1], left_intr[3],
-        0, 0, 1;
-  
-   Eigen::Matrix3d K_right;
-   K_right << right_intr[0], 0, right_intr[2],
-        0, right_intr[1], right_intr[3],
-        0, 0, 1;
-
-   Eigen::Matrix3d K_left_inv = K_left.inverse();
-   Eigen::Matrix3d K_right_inv = K_right.inverse();
-
-   Eigen::Vector3d e1(1, 0, 0);
-   Eigen::Vector3d e3(0, 0, 1);
-
-   left_edge_depths.clear();
-
-   for (size_t i = 0; i < matched_left_edges.size(); i++) {
-       Eigen::Vector3d gamma(matched_left_edges[i].x, matched_left_edges[i].y, 1.0);
-       Eigen::Vector3d gamma_bar(matched_right_edges[i].x, matched_right_edges[i].y, 1.0);
-
-       Eigen::Vector3d gamma_meter = K_left_inv * gamma;
-       Eigen::Vector3d gamma_bar_meter = K_right_inv * gamma_bar;
-
-       double e1_gamma_bar = (e1.transpose() * gamma_bar_meter)(0, 0);
-       double e3_R_gamma = (e3.transpose() * R * gamma_meter)(0, 0);
-       double e1_R_gamma = (e1.transpose() * R * gamma_meter)(0, 0);
-       double e1_T = (e1.transpose() * T)(0, 0);
-       double e3_T = (e3.transpose() * T)(0, 0);
-
-       double numerator = (e1_T * e3_R_gamma) - (e3_T * e1_R_gamma);
-       double denominator = (e3_R_gamma * e1_gamma_bar) - e1_R_gamma;
-
-       if (std::abs(denominator) > 1e-6) {
-           double rho = numerator / denominator;
-           left_edge_depths.push_back(rho);
-       } else {
-           std::cerr << "WARNING: Skipping depth computation for edge " << i << " due to near-zero denominator!" << std::endl;
-           left_edge_depths.push_back(0.0);
-       }
-   }
-
-   std::cout << "Computed depths for " << left_edge_depths.size() << " edges:\n";
-   for (size_t i = 0; i < left_edge_depths.size(); i++) {
-       std::cout << "Edge " << i + 1 << ": Depth = " << left_edge_depths[i] << " meters\n";
-   }
+    //> check if the corrected edge passes the epoplar tengency test (intersection angle < 4 degrees and displacement < 6 pixels)
+    b_pass_epipolar_tengency_check = (epipolar_shift_displacement < EPIP_TENGENCY_PROXIM_THRESH && abs(angle_diff_deg - 0) > EPIP_TENGENCY_ORIENT_THRESH && abs(angle_diff_deg - 180) > EPIP_TENGENCY_ORIENT_THRESH) ? (true) : (false);
+    
+    return corrected_edge;
 }
 
 void Dataset::VisualizeGTRightEdge(const cv::Mat &left_image, const cv::Mat &right_image, const std::vector<std::pair<cv::Point2d, cv::Point2d>> &left_right_edges) {
@@ -2184,65 +2089,6 @@ void Dataset::CalculateGTLeftEdge(const std::vector<cv::Point2d>& right_third_or
     }
 
     csv_file.flush();
-}
-
-cv::Point2d Dataset::PerformEpipolarShift( 
-    cv::Point2d original_edge_location, double edge_orientation,
-    std::vector<double> epipolar_line_coeffs, bool& b_pass_epipolar_tengency_check )
-{
-    cv::Point2d corrected_edge;
-    assert(epipolar_line_coeffs.size() == 3);
-    double EL_coeff_A = epipolar_line_coeffs[0];
-    double EL_coeff_B = epipolar_line_coeffs[1];
-    double EL_coeff_C = epipolar_line_coeffs[2];
-    double a1_line  = -epipolar_line_coeffs[0] / epipolar_line_coeffs[1];
-    double b1_line  = -1;
-    double c1_line  = -epipolar_line_coeffs[2] / epipolar_line_coeffs[1];
-    
-    //> Parameters of the line passing through the original edge along its direction (tangent) vector
-    double a_edgeH2 = tan(edge_orientation);
-    double b_edgeH2 = -1;
-    double c_edgeH2 = -(a_edgeH2*original_edge_location.x - original_edge_location.y); //−(a⋅x2−y2)
-
-    //> Find the intersected point of the two lines
-    corrected_edge.x = (b1_line * c_edgeH2 - b_edgeH2 * c1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line);
-    corrected_edge.y = (c1_line * a_edgeH2 - c_edgeH2 * a1_line) / (a1_line * b_edgeH2 - a_edgeH2 * b1_line);
-    
-    //> Find (i) the displacement between the original edge and the corrected edge, and
-    //       (ii) the intersection angle between the epipolar line and the line passing through the original edge along its direction vector
-    double epipolar_shift_displacement = cv::norm(corrected_edge - original_edge_location);
-    double m_epipolar = -a1_line / b1_line; //> Slope of epipolar line
-    double angle_diff_rad = abs(edge_orientation - atan(m_epipolar));
-    double angle_diff_deg = angle_diff_rad * (180.0 / M_PI);
-    if (angle_diff_deg > 180){
-        angle_diff_deg -= 180;
-    }
-
-    //> check if the corrected edge passes the epoplar tengency test (intersection angle < 4 degrees and displacement < 6 pixels)
-    b_pass_epipolar_tengency_check = (epipolar_shift_displacement < EPIP_TENGENCY_PROXIM_THRESH && abs(angle_diff_deg - 0) > EPIP_TENGENCY_ORIENT_THRESH && abs(angle_diff_deg - 180) > EPIP_TENGENCY_ORIENT_THRESH) ? (true) : (false);
-    
-    return corrected_edge;
-}
-
-std::vector<double> Dataset::LoadMaximumDisparityValues(const std::string& stereo_pairs_path, int num_pairs) {
-    std::vector<double> max_disparities;
-    std::string csv_filename = stereo_pairs_path + "/maximum_disparity_values.csv";
-    std::ifstream file(csv_filename);
-    std::string line;
-
-    if (!file.is_open()) {
-        std::cerr << "ERROR: Could not open file " << csv_filename << "!"<<std::endl;
-        return max_disparities; 
-    }
-
-    int count = 0;
-    while (std::getline(file, line) && count < num_pairs) {
-        max_disparities.push_back(std::stod(line));
-        count++;
-    }
-
-    file.close();
-    return max_disparities;
 }
 
 std::vector<std::pair<cv::Mat, cv::Mat>> Dataset::LoadEuRoCImages(const std::string& csv_path, const std::string& left_path, const std::string& right_path,
