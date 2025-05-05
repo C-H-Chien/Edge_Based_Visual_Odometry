@@ -177,7 +177,7 @@ void Dataset::write_ncc_vals_to_files( int img_index ) {
 }
 
 void Dataset::PerformEdgeBasedVO() {
-    int num_pairs = 1;
+    int num_pairs = 5;
     std::vector<std::pair<cv::Mat, cv::Mat>> image_pairs;
     std::vector<cv::Mat> left_ref_disparity_maps;
     std::vector<cv::Mat> right_ref_disparity_maps;
@@ -297,6 +297,8 @@ void Dataset::PerformEdgeBasedVO() {
             right_third_order_edges_locations,
             right_third_order_edges_orientation
         );
+
+        std::vector<cv::Point3d> points_3d = Calculate3DPoints(match_result.confirmed_matches);
 
         cv::Mat left_visualization, right_visualization;
         cv::cvtColor(left_edge_map, left_visualization, cv::COLOR_GRAY2BGR);
@@ -1619,7 +1621,77 @@ EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& select
     };
 }  
 
+std::vector<cv::Point3d> Dataset::Calculate3DPoints(
+    const std::vector<std::pair<ConfirmedMatchEdge, ConfirmedMatchEdge>>& confirmed_matches
+) {
+    std::vector<cv::Point3d> points_3d;
 
+    if (confirmed_matches.empty()) {
+        std::cerr << "WARNING: No confirmed matches to triangulate.\n";
+        return points_3d;
+    }
+
+    cv::Mat K_left = (cv::Mat_<double>(3, 3) <<
+        left_intr[0], 0,            left_intr[2],
+        0,           left_intr[1], left_intr[3],
+        0,           0,            1);
+
+    cv::Mat K_right = (cv::Mat_<double>(3, 3) <<
+        right_intr[0], 0,             right_intr[2],
+        0,            right_intr[1], right_intr[3],
+        0,            0,             1);
+
+    cv::Mat R_left = cv::Mat::eye(3, 3, CV_64F);
+    cv::Mat T_left = cv::Mat::zeros(3, 1, CV_64F);
+
+    cv::Mat R_right(3, 3, CV_64F);
+    for (int i = 0; i < 3; ++i)
+        for (int j = 0; j < 3; ++j)
+            R_right.at<double>(i, j) = rot_mat_21[i][j];
+
+    cv::Mat T_right = (cv::Mat_<double>(3, 1) <<
+        trans_vec_21[0],
+        trans_vec_21[1],
+        trans_vec_21[2]);
+
+    cv::Mat extrinsic_left, extrinsic_right;
+    cv::hconcat(R_left, T_left, extrinsic_left);
+    cv::hconcat(R_right, T_right, extrinsic_right);
+
+    cv::Mat P_left = K_left * extrinsic_left;
+    cv::Mat P_right = K_right * extrinsic_right;
+
+    std::vector<cv::Point2f> points_left, points_right;
+    for (const auto& [left, right] : confirmed_matches) {
+        points_left.emplace_back(static_cast<cv::Point2f>(left.position));
+        points_right.emplace_back(static_cast<cv::Point2f>(right.position));
+    }
+
+    cv::Mat points_4d_homogeneous;
+    cv::triangulatePoints(P_left, P_right, points_left, points_right, points_4d_homogeneous);
+
+    int skipped = 0;
+    for (int i = 0; i < points_4d_homogeneous.cols; ++i) {
+        float w = points_4d_homogeneous.at<float>(3, i);
+        if (std::abs(w) > 1e-5) {
+            points_3d.emplace_back(
+                points_4d_homogeneous.at<float>(0, i) / w,
+                points_4d_homogeneous.at<float>(1, i) / w,
+                points_4d_homogeneous.at<float>(2, i) / w
+            );
+        } else {
+            ++skipped;
+        }
+    }
+
+    int total = static_cast<int>(points_4d_homogeneous.cols);
+    if (skipped > 0.1 * total) {
+        std::cerr << "WARNING: " << skipped << " out of " << total
+                << " triangulated points had near-zero depth (w ≈ 0) and were skipped.\n";
+    }
+
+    return points_3d;
+}
 
 double Dataset::ComputeNCC(const cv::Mat& patch_one, const cv::Mat& patch_two){
     double mean_one = (cv::mean(patch_one))[0];
