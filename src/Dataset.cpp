@@ -232,14 +232,35 @@ void Dataset::PerformEdgeBasedVO() {
 
     LOG_INFO("Start looping over all image pairs");
 
-    for (size_t i = 0; i < image_pairs.size(); i++) {
-        ncc_one_vs_err.clear();
-        ncc_two_vs_err.clear();
+    //Figure out a solution for this (will skip the last image pair)
+    for (size_t i = 0; i + 1 < image_pairs.size(); ++i) {
+        const cv::Mat& curr_left_img = image_pairs[i].first;
+        const cv::Mat& curr_right_img = image_pairs[i].second;
 
-        const cv::Mat& left_img = image_pairs[i].first;
-        const cv::Mat& right_img = image_pairs[i].second;
         const cv::Mat& left_ref_map = left_ref_disparity_maps[i]; 
         const cv::Mat& right_ref_map = right_ref_disparity_maps[i];
+
+        const cv::Mat& next_left_img = image_pairs[i + 1].first;
+        const cv::Mat& next_right_img = image_pairs[i + 1].second;
+
+        std::vector<cv::Mat> curr_left_pyramid, curr_right_pyramid;
+        std::vector<cv::Mat> next_left_pyramid, next_right_pyramid;
+        int pyramid_levels = 4;
+
+        BuildImagePyramids(
+            curr_left_img,
+            curr_right_img,
+            next_left_img,
+            next_right_img,
+            pyramid_levels,
+            curr_left_pyramid,
+            curr_right_pyramid,
+            next_left_pyramid,
+            next_right_pyramid
+        );
+
+        ncc_one_vs_err.clear();
+        ncc_two_vs_err.clear();
         {
 
         std::cout << "Image Pair #" << i << "\n";
@@ -249,8 +270,8 @@ void Dataset::PerformEdgeBasedVO() {
         cv::Mat right_dist_coeff_mat(right_dist_coeffs);
 
         cv::Mat left_undistorted, right_undistorted;
-        cv::undistort(left_img, left_undistorted, left_calib, left_dist_coeff_mat);
-        cv::undistort(right_img, right_undistorted, right_calib, right_dist_coeff_mat);
+        cv::undistort(curr_left_img, left_undistorted, left_calib, left_dist_coeff_mat);
+        cv::undistort(curr_right_img, right_undistorted, right_calib, right_dist_coeff_mat);
 
         if (Total_Num_Of_Imgs == 0) {
             img_height = left_undistorted.rows;
@@ -1771,6 +1792,33 @@ std::vector<Eigen::Vector3d> Dataset::Calculate3DOrientations(
     return tangent_vectors;
 }
 
+void Dataset::BuildImagePyramids(
+    const cv::Mat& curr_left_image,
+    const cv::Mat& curr_right_image,
+    const cv::Mat& next_left_image,
+    const cv::Mat& next_right_image,
+    int num_levels,
+    std::vector<cv::Mat>& curr_left_pyramid,
+    std::vector<cv::Mat>& curr_right_pyramid,
+    std::vector<cv::Mat>& next_left_pyramid,
+    std::vector<cv::Mat>& next_right_pyramid
+) {
+    curr_left_pyramid.clear();
+    curr_right_pyramid.clear();
+    next_left_pyramid.clear();
+    next_right_pyramid.clear();
+
+    curr_left_pyramid.reserve(num_levels);
+    curr_right_pyramid.reserve(num_levels);
+    next_left_pyramid.reserve(num_levels);
+    next_right_pyramid.reserve(num_levels);
+
+    cv::buildPyramid(curr_left_image, curr_left_pyramid, num_levels - 1);
+    cv::buildPyramid(curr_right_image, curr_right_pyramid, num_levels - 1);
+    cv::buildPyramid(next_left_image, next_left_pyramid, num_levels - 1);
+    cv::buildPyramid(next_right_image, next_right_pyramid, num_levels - 1);
+}
+
 std::vector<cv::Point3d> Dataset::LinearTriangulatePoints(
     const std::vector<std::pair<ConfirmedMatchEdge, ConfirmedMatchEdge>>& confirmed_matches
 ) {
@@ -2333,15 +2381,15 @@ std::vector<std::pair<cv::Mat, cv::Mat>> Dataset::LoadEuRoCImages(const std::str
        std::string left_img_path = left_path + timestamp + ".png";
        std::string right_img_path = right_path + timestamp + ".png";
       
-       cv::Mat left_img = cv::imread(left_img_path, cv::IMREAD_GRAYSCALE);
-       cv::Mat right_img = cv::imread(right_img_path, cv::IMREAD_GRAYSCALE);
+       cv::Mat curr_left_img = cv::imread(left_img_path, cv::IMREAD_GRAYSCALE);
+       cv::Mat curr_right_img = cv::imread(right_img_path, cv::IMREAD_GRAYSCALE);
       
-       if (left_img.empty() || right_img.empty()) {
+       if (curr_left_img.empty() || curr_right_img.empty()) {
            std::cerr << "ERROR: Could not load the images: " << left_img_path << " or " << right_img_path << "!" << std::endl;
            continue;
        }
       
-       image_pairs.emplace_back(left_img, right_img);
+       image_pairs.emplace_back(curr_left_img, curr_right_img);
    }
   
    csv_file.close();

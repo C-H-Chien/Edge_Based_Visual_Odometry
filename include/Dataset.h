@@ -205,6 +205,17 @@ private:
     std::vector<Eigen::Vector3d> Calculate3DOrientations(
     const std::vector<std::pair<ConfirmedMatchEdge, ConfirmedMatchEdge>>& confirmed_matches); 
 
+    void BuildImagePyramids(
+    const cv::Mat& curr_left_image,
+    const cv::Mat& curr_right_image,
+    const cv::Mat& next_left_image,
+    const cv::Mat& next_right_image,
+    int num_levels,
+    std::vector<cv::Mat>& curr_left_pyramid,
+    std::vector<cv::Mat>& curr_right_pyramid,
+    std::vector<cv::Mat>& next_left_pyramid,
+    std::vector<cv::Mat>& next_right_pyramid);
+
     std::vector<cv::Point3d> LinearTriangulatePoints(
     const std::vector<std::pair<ConfirmedMatchEdge, ConfirmedMatchEdge>>& confirmed_matches
     );
