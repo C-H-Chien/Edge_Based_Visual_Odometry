@@ -1,17 +1,20 @@
 //> Macro definitions
 #define USE_GLOGS                       (false)
-
 #define USE_CPP17                       (true)
 
+//> OpenMP settings
+#define ACTIVATE_OPENCV_SUPPORT         (true)
+#define USE_DEFINED_NUM_OF_CORES        (true)
+#if USE_DEFINED_NUM_OF_CORES
+#define USE_NUM_CORES_FOR_OMP           (8)
+#endif
+
+//> Stereo edge matching settings
 #define EPIP_TENGENCY_ORIENT_THRESH     (12)    //> in degrees
 #define EPIP_TENGENCY_PROXIM_THRESH     (4)     //> in pixels
 #define EDGE_CLUSTER_THRESH             (0.3)   //> in pixels
-
 #define ORTHOGONAL_SHIFT_MAG            (5)     //> in pixels
 #define PATCH_SIZE                      (7)     //> in pixels
-
-//> Number of CPU cores to process
-#define NUM_OF_CPU_CORES                (6)
 
 //> Define output file folder
 #define OUTPUT_WRITE_PATH               std::string("../output_files/")

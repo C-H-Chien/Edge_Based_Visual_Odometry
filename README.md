@@ -29,20 +29,21 @@ where ``XX`` is the ommited version number. OpenCV (with opencv_contrib) and YAM
 ## Usage
 Under the ``bin`` folder, if glog is used
 ```bash
-./main_VO --config_file=../config/tum.yaml
+./main_VO
 ```
 If not, do
 ```bash
-./main_VO --config_file ../config/tum.yaml
+./main_VO --config_file ../your-config-file.yaml
 ```
-where the configuration file can be customized depending on the dataset in use. See ``.yaml`` files under the ``config`` folder for more information. If no ``--config_file`` input argument is given, the default value will be used which is defined in ``cmd/main_VO.cpp`` if glog is used. Otherwise, a help message will show up. <br />
+where the configuration file ``your-config-file.yaml`` can be customized depending on the dataset in use. See ``.yaml`` files under the ``config`` folder for more information. <br />
+If no ``--config_file`` input argument is given, the default value will be used which is defined in ``cmd/main_VO.cpp`` if glog is used. Otherwise, a help message will show up. <br />
 You shall find executive files under the ``bin`` folder. The code to be executed is ``./main_VO`` while ``./test_functions`` executes ``test_functions.cpp`` used to test certain functionalities. <br />
 
 ## Outputs
 Output files will be written under the ``output`` folder. This part is to be updated.
 
-## Notes
-Make sure that the path of your YAML-CPP header files matches the path in the ``CMakeLists.txt``. See [this line](https://github.com/C-H-Chien/Edge_Based_Visual_Odometry/blob/main/CMakeLists.txt#L43).
+## Credits
+The third-order edge detection is borrowed from [Third-Order-Edge-Detector](https://github.com/C-H-Chien/Third-Order-Edge-Detector).
 
 ## Authors
 Saul Lopez Lucas (saul_lopez_lucas@brown.edu) <br />
