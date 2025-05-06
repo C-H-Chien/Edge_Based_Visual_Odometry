@@ -300,6 +300,17 @@ void Dataset::PerformEdgeBasedVO() {
 
         std::vector<cv::Point3d> points_opencv = Calculate3DPoints(match_result.confirmed_matches);
         std::vector<cv::Point3d> points_linear = LinearTriangulatePoints(match_result.confirmed_matches);
+        std::vector<Eigen::Vector3d> orientations_3d = Calculate3DOrientations(match_result.confirmed_matches);
+
+        std::vector<OrientedPoint3D> oriented_points;
+
+        for (size_t i = 0; i < points_opencv.size(); ++i) {
+            OrientedPoint3D op;
+            op.position = points_opencv[i];
+            op.orientation = orientations_3d[i];
+            oriented_points.push_back(op);
+        }
+
 
         if (points_opencv.size() != points_linear.size()) {
             std::cerr << "Mismatch in number of 3D points: OpenCV=" << points_opencv.size()
@@ -1716,6 +1727,48 @@ std::vector<cv::Point3d> Dataset::Calculate3DPoints(
     }
 
     return points_3d;
+}
+
+std::vector<Eigen::Vector3d> Dataset::Calculate3DOrientations(
+    const std::vector<std::pair<ConfirmedMatchEdge, ConfirmedMatchEdge>>& confirmed_matches
+) {
+    std::vector<Eigen::Vector3d> tangent_vectors;
+
+    if (confirmed_matches.empty()) {
+        std::cerr << "WARNING: No confirmed matches to compute 3D orientations.\n";
+        return tangent_vectors;
+    }
+
+    Eigen::Matrix3d K;
+    K << left_intr[0], 0, left_intr[2],
+         0, left_intr[1], left_intr[3],
+         0, 0, 1;
+
+    Eigen::Matrix3d R21;
+    for (int i = 0; i < 3; ++i)
+        for (int j = 0; j < 3; ++j)
+            R21(i, j) = rot_mat_21[i][j];
+
+    for (const auto& [left_edge, right_edge] : confirmed_matches) {
+        Eigen::Vector3d gamma1 = K.inverse() * Eigen::Vector3d(left_edge.position.x, left_edge.position.y, 1.0);
+        Eigen::Vector3d gamma2 = K.inverse() * Eigen::Vector3d(right_edge.position.x, right_edge.position.y, 1.0);
+
+        double theta1 = left_edge.orientation;
+        double theta2 = right_edge.orientation;
+
+        Eigen::Vector3d t1(std::cos(theta1), std::sin(theta1), 0.0);
+        Eigen::Vector3d t2(std::cos(theta2), std::sin(theta2), 0.0);
+
+        Eigen::Vector3d n1 = gamma1.cross(t1);
+        Eigen::Vector3d n2 = R21.transpose() * (t2.cross(gamma2));
+
+        Eigen::Vector3d T = n1.cross(n2);
+        T.normalize(); 
+
+        tangent_vectors.push_back(T);
+    }
+
+    return tangent_vectors;
 }
 
 std::vector<cv::Point3d> Dataset::LinearTriangulatePoints(

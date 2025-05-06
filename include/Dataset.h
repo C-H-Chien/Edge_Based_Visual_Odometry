@@ -118,6 +118,11 @@ struct StereoMatchResult {
     BidirectionalMetrics bidirectional_metrics;
 };
 
+struct OrientedPoint3D {
+    cv::Point3d position;          
+    Eigen::Vector3d orientation;  
+};
+
 extern cv::Mat merged_visualization_global;
 class Dataset {
 public:
@@ -196,6 +201,9 @@ private:
     std::vector<cv::Point3d> Calculate3DPoints(
         const std::vector<std::pair<ConfirmedMatchEdge, ConfirmedMatchEdge>>& confirmed_matches
     );
+
+    std::vector<Eigen::Vector3d> Calculate3DOrientations(
+    const std::vector<std::pair<ConfirmedMatchEdge, ConfirmedMatchEdge>>& confirmed_matches); 
 
     std::vector<cv::Point3d> LinearTriangulatePoints(
     const std::vector<std::pair<ConfirmedMatchEdge, ConfirmedMatchEdge>>& confirmed_matches
