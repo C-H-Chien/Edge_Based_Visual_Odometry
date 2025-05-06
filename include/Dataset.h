@@ -197,6 +197,10 @@ private:
         const std::vector<std::pair<ConfirmedMatchEdge, ConfirmedMatchEdge>>& confirmed_matches
     );
 
+    std::vector<cv::Point3d> LinearTriangulatePoints(
+    const std::vector<std::pair<ConfirmedMatchEdge, ConfirmedMatchEdge>>& confirmed_matches
+    );
+
    double ComputeNCC(const cv::Mat& patch_one, const cv::Mat& patch_two);
 
    std::pair<std::vector<cv::Point2d>, std::vector<cv::Point2d>> CalculateOrthogonalShifts(const std::vector<cv::Point2d>& edge_points, const std::vector<double>& orientations, double shift_magnitude);

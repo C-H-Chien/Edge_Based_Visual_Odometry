@@ -177,7 +177,7 @@ void Dataset::write_ncc_vals_to_files( int img_index ) {
 }
 
 void Dataset::PerformEdgeBasedVO() {
-    int num_pairs = 5;
+    int num_pairs = 1;
     std::vector<std::pair<cv::Mat, cv::Mat>> image_pairs;
     std::vector<cv::Mat> left_ref_disparity_maps;
     std::vector<cv::Mat> right_ref_disparity_maps;
@@ -298,7 +298,31 @@ void Dataset::PerformEdgeBasedVO() {
             right_third_order_edges_orientation
         );
 
-        std::vector<cv::Point3d> points_3d = Calculate3DPoints(match_result.confirmed_matches);
+        std::vector<cv::Point3d> points_opencv = Calculate3DPoints(match_result.confirmed_matches);
+        std::vector<cv::Point3d> points_linear = LinearTriangulatePoints(match_result.confirmed_matches);
+
+        if (points_opencv.size() != points_linear.size()) {
+            std::cerr << "Mismatch in number of 3D points: OpenCV=" << points_opencv.size()
+                    << ", Linear=" << points_linear.size() << "\n";
+        } else {
+            std::cout << "Comparing " << points_opencv.size() << " 3D points...\n";
+
+            double total_error = 0.0;
+            for (size_t i = 0; i < points_opencv.size(); ++i) {
+                const auto& pt1 = points_opencv[i];
+                const auto& pt2 = points_linear[i];
+
+                double error = cv::norm(pt1 - pt2);
+                total_error += error;
+
+                std::cout << "Point " << i << ": OpenCV = [" << pt1 << "], "
+                        << "Linear = [" << pt2 << "], "
+                        << "Error = " << error << "\n";
+            }
+
+            std::cout << "Average triangulation error: "
+                    << (total_error / points_opencv.size()) << " units.\n";
+        }
 
         cv::Mat left_visualization, right_visualization;
         cv::cvtColor(left_edge_map, left_visualization, cv::COLOR_GRAY2BGR);
@@ -977,7 +1001,8 @@ EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& select
 
     std::vector<std::pair<SourceEdge, EdgeMatch>> final_matches;
 
-    int skip = (!selected_ground_truth_edges.empty()) ? 1 : 1;
+    //MAKE SURE TO UPDATE THIS ACCORDINGLY
+    int skip = (!selected_ground_truth_edges.empty()) ? 100 : 1;
 
     for (size_t i = 0; i < selected_primary_edges.size(); i += skip) {
         const auto& primary_edge = selected_primary_edges[i];
@@ -1691,6 +1716,71 @@ std::vector<cv::Point3d> Dataset::Calculate3DPoints(
     }
 
     return points_3d;
+}
+
+std::vector<cv::Point3d> Dataset::LinearTriangulatePoints(
+    const std::vector<std::pair<ConfirmedMatchEdge, ConfirmedMatchEdge>>& confirmed_matches
+) {
+    std::vector<cv::Point3d> triangulated_points;
+
+    if (confirmed_matches.empty()) {
+        std::cerr << "WARNING: No confirmed matches to triangulate using linear method.\n";
+        return triangulated_points;
+    }
+
+    Eigen::Matrix3d K;
+    K << left_intr[0], 0, left_intr[2],
+         0, left_intr[1], left_intr[3],
+         0, 0, 1;
+
+    Eigen::Matrix3d R;
+    for (int i = 0; i < 3; ++i)
+        for (int j = 0; j < 3; ++j)
+            R(i, j) = rot_mat_21[i][j];
+
+    Eigen::Vector3d T(trans_vec_21[0], trans_vec_21[1], trans_vec_21[2]);
+
+    for (const auto& [left_edge, right_edge] : confirmed_matches) {
+        std::vector<Eigen::Vector2d> pts;
+        pts.emplace_back(left_edge.position.x, left_edge.position.y);
+        pts.emplace_back(right_edge.position.x, right_edge.position.y);
+
+        std::vector<Eigen::Vector2d> pts_meters;
+        for (const auto& pt : pts) {
+            Eigen::Vector3d homo_pt(pt.x(), pt.y(), 1.0);
+            Eigen::Vector3d pt_cam = K.inverse() * homo_pt;
+            pts_meters.emplace_back(pt_cam.x(), pt_cam.y());
+        }
+
+        Eigen::MatrixXd A(4, 4); 
+
+        A.row(0) << 0.0, -1.0, pts_meters[0].y(), 0.0;
+        A.row(1) << 1.0,  0.0, -pts_meters[0].x(), 0.0;
+
+        Eigen::Matrix3d Rp = R;
+        Eigen::Vector3d Tp = T;
+        Eigen::Vector2d mp = pts_meters[1];
+
+        A.row(2) << mp.y() * Rp(2, 0) - Rp(1, 0),
+                    mp.y() * Rp(2, 1) - Rp(1, 1),
+                    mp.y() * Rp(2, 2) - Rp(1, 2),
+                    mp.y() * Tp.z()   - Tp.y();
+
+        A.row(3) << Rp(0, 0) - mp.x() * Rp(2, 0),
+                    Rp(0, 1) - mp.x() * Rp(2, 1),
+                    Rp(0, 2) - mp.x() * Rp(2, 2),
+                    Tp.x()   - mp.x() * Tp.z();
+
+        Eigen::Matrix4d ATA = A.transpose() * A;
+        Eigen::Vector4d gamma = ATA.jacobiSvd(Eigen::ComputeFullV).matrixV().col(3);
+
+        if (std::abs(gamma(3)) > 1e-5) {
+            gamma /= gamma(3);
+            triangulated_points.emplace_back(gamma(0), gamma(1), gamma(2));
+        }
+    }
+
+    return triangulated_points;
 }
 
 double Dataset::ComputeNCC(const cv::Mat& patch_one, const cv::Mat& patch_two){
