@@ -177,7 +177,7 @@ void Dataset::write_ncc_vals_to_files( int img_index ) {
 }
 
 void Dataset::PerformEdgeBasedVO() {
-    int num_pairs = 1;
+    int num_pairs = 10;
     std::vector<std::pair<cv::Mat, cv::Mat>> image_pairs;
     std::vector<cv::Mat> left_ref_disparity_maps;
     std::vector<cv::Mat> right_ref_disparity_maps;
@@ -323,38 +323,140 @@ void Dataset::PerformEdgeBasedVO() {
         std::vector<cv::Point3d> points_linear = LinearTriangulatePoints(match_result.confirmed_matches);
         std::vector<Eigen::Vector3d> orientations_3d = Calculate3DOrientations(match_result.confirmed_matches);
 
-        std::vector<OrientedPoint3D> oriented_points;
-
-        for (size_t i = 0; i < points_opencv.size(); ++i) {
-            OrientedPoint3D op;
-            op.position = points_opencv[i];
-            op.orientation = orientations_3d[i];
-            oriented_points.push_back(op);
+        // Prepare edge points for LK tracking
+        std::vector<cv::Point2d> edge_points_t;
+        for (const auto& [left_edge, _] : match_result.confirmed_matches) {
+            edge_points_t.push_back(left_edge.position);
         }
 
+        // Output vectors for optical flow
+        std::vector<cv::Point2d> edge_points_tp1;
+        std::vector<uchar> status;
+        std::vector<float> errors;
 
-        if (points_opencv.size() != points_linear.size()) {
-            std::cerr << "Mismatch in number of 3D points: OpenCV=" << points_opencv.size()
-                    << ", Linear=" << points_linear.size() << "\n";
-        } else {
-            std::cout << "Comparing " << points_opencv.size() << " 3D points...\n";
+        // Perform Lucas-Kanade tracking
+        TrackEdgesWithOpticalFlow(
+            curr_left_pyramid[0],  // left image at time t
+            next_left_pyramid[0],  // left image at time t+1
+            edge_points_t,
+            edge_points_tp1,
+            status,
+            errors,
+            21,  // win_size
+            3    // max_level
+        );
 
-            double total_error = 0.0;
-            for (size_t i = 0; i < points_opencv.size(); ++i) {
-                const auto& pt1 = points_opencv[i];
-                const auto& pt2 = points_linear[i];
+        // [Optional] Process results: count how many were successfully tracked
+        int num_tracked = std::count(status.begin(), status.end(), 1);
+        std::cout << "Tracked " << num_tracked << " edge points from t to t+1\n";
 
-                double error = cv::norm(pt1 - pt2);
-                total_error += error;
+        cv::Mat flow_vis;
+        cv::cvtColor(curr_left_pyramid[0], flow_vis, cv::COLOR_GRAY2BGR);
 
-                std::cout << "Point " << i << ": OpenCV = [" << pt1 << "], "
-                        << "Linear = [" << pt2 << "], "
-                        << "Error = " << error << "\n";
+        for (size_t j = 0; j < edge_points_t.size(); ++j) {
+            if (status[j]) {
+                cv::Point2d p1 = edge_points_t[j];
+                cv::Point2d p2 = edge_points_tp1[j];
+                cv::arrowedLine(flow_vis, p1, p2, cv::Scalar(0, 255, 0), 1, cv::LINE_AA);
             }
-
-            std::cout << "Average triangulation error: "
-                    << (total_error / points_opencv.size()) << " units.\n";
         }
+
+        std::string flow_save_path = output_path + "/optical_flow_edges_" + std::to_string(i) + ".png";
+        cv::imwrite(flow_save_path, flow_vis);
+
+        // === Custom Lucas-Kanade Tracking (TrackEdges) ===
+
+        // Prepare output displacement vectors
+        std::vector<double> custom_du, custom_dv;
+
+        // Run your custom implementation
+        TrackEdges(
+            curr_left_pyramid[0],  // image at time t
+            next_left_pyramid[0],  // image at time t+1
+            edge_points_t,         // input points
+            21,                    // patch size (must match previous)
+            custom_du,             // x-displacements
+            custom_dv              // y-displacements
+        );
+
+        // Create visualization of flow using custom tracking
+        cv::Mat custom_flow_vis;
+        cv::cvtColor(curr_left_pyramid[0], custom_flow_vis, cv::COLOR_GRAY2BGR);
+
+        for (size_t j = 0; j < edge_points_t.size(); ++j) {
+            cv::Point2d p1 = edge_points_t[j];
+            cv::Point2d p2 = p1 + cv::Point2d(custom_du[j], custom_dv[j]);
+
+            // Only draw if the flow is finite and non-zero
+            if (std::isfinite(custom_du[j]) && std::isfinite(custom_dv[j]) &&
+                (std::abs(custom_du[j]) > 1e-3 || std::abs(custom_dv[j]) > 1e-3)) {
+                cv::arrowedLine(custom_flow_vis, p1, p2, cv::Scalar(0, 0, 255), 1, cv::LINE_AA);
+            }
+        }
+
+        std::string custom_flow_path = output_path + "/custom_optical_flow_edges_" + std::to_string(i) + ".png";
+        cv::imwrite(custom_flow_path, custom_flow_vis);
+
+        // === Compare OpenCV vs Custom Lucas-Kanade ===
+
+        double total_error = 0.0;
+        int valid_count = 0;
+        std::vector<double> per_point_error;
+
+        for (size_t j = 0; j < edge_points_t.size(); ++j) {
+            if (status[j] && std::isfinite(custom_du[j]) && std::isfinite(custom_dv[j])) {
+                // Get each tracked point
+                cv::Point2d p_opencv = edge_points_tp1[j];
+                cv::Point2d p_custom = edge_points_t[j] + cv::Point2d(custom_du[j], custom_dv[j]);
+
+                // Euclidean distance between the two results
+                double dx = p_opencv.x - p_custom.x;
+                double dy = p_opencv.y - p_custom.y;
+                double err = std::sqrt(dx * dx + dy * dy);
+
+                per_point_error.push_back(err);
+                total_error += err;
+                valid_count++;
+            }
+        }
+
+        double avg_error = (valid_count > 0) ? total_error / valid_count : 0.0;
+        std::cout << "[Optical Flow Comparison] Average error between OpenCV and custom LK: "
+                << avg_error << " pixels (over " << valid_count << " points)\n";
+
+        ////////////////////////////////TESTING 3D EDGES//////////////////////////////////////
+        // std::vector<OrientedPoint3D> oriented_points;
+
+        // for (size_t i = 0; i < points_opencv.size(); ++i) {
+        //     OrientedPoint3D op;
+        //     op.position = points_opencv[i];
+        //     op.orientation = orientations_3d[i];
+        //     oriented_points.push_back(op);
+        // }
+
+
+        // if (points_opencv.size() != points_linear.size()) {
+        //     std::cerr << "Mismatch in number of 3D points: OpenCV=" << points_opencv.size()
+        //             << ", Linear=" << points_linear.size() << "\n";
+        // } else {
+        //     std::cout << "Comparing " << points_opencv.size() << " 3D points...\n";
+
+        //     double total_error = 0.0;
+        //     for (size_t i = 0; i < points_opencv.size(); ++i) {
+        //         const auto& pt1 = points_opencv[i];
+        //         const auto& pt2 = points_linear[i];
+
+        //         double error = cv::norm(pt1 - pt2);
+        //         total_error += error;
+
+        //         std::cout << "Point " << i << ": OpenCV = [" << pt1 << "], "
+        //                 << "Linear = [" << pt2 << "], "
+        //                 << "Error = " << error << "\n";
+        //     }
+
+        //     std::cout << "Average triangulation error: "
+        //             << (total_error / points_opencv.size()) << " units.\n";
+        // }
 
         cv::Mat left_visualization, right_visualization;
         cv::cvtColor(left_edge_map, left_visualization, cv::COLOR_GRAY2BGR);
@@ -785,7 +887,9 @@ void Dataset::PerformEdgeBasedVO() {
         << std::fixed << std::setprecision(4) << avg_bct_precision * 100 << "\n";
 }
 
-StereoMatchResult Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, std::vector<cv::Point2d> right_edge_coords, std::vector<double> right_edge_orientations) {
+StereoMatchResult Dataset::DisplayMatches(const cv::Mat& left_image, const cv::Mat& right_image, 
+    std::vector<cv::Point2d> right_edge_coords, std::vector<double> right_edge_orientations) {
+
     ///////////////////////////////FORWARD DIRECTION///////////////////////////////
     std::vector<cv::Point2d> left_edge_coords;
     std::vector<cv::Point2d> ground_truth_right_edges;
@@ -1819,6 +1923,89 @@ void Dataset::BuildImagePyramids(
     cv::buildPyramid(next_right_image, next_right_pyramid, num_levels - 1);
 }
 
+void Dataset::ComputeImageGradient(const cv::Mat& input, cv::Mat& grad_x, cv::Mat& grad_y) {
+    CV_Assert(input.type() == CV_32F);
+
+    grad_x = cv::Mat::zeros(input.size(), CV_32F);
+    grad_y = cv::Mat::zeros(input.size(), CV_32F);
+
+    int rows = input.rows;
+    int cols = input.cols;
+
+    for (int y = 0; y < rows; ++y) {
+        for (int x = 0; x < cols; ++x) {
+            float Ix, Iy;
+
+            // Compute gradient in X direction
+            if (x == 0)
+                Ix = input.at<float>(y, x + 1) - input.at<float>(y, x);
+            else if (x == cols - 1)
+                Ix = input.at<float>(y, x) - input.at<float>(y, x - 1);
+            else
+                Ix = (input.at<float>(y, x + 1) - input.at<float>(y, x - 1)) * 0.5f;
+
+            // Compute gradient in Y direction
+            if (y == 0)
+                Iy = input.at<float>(y + 1, x) - input.at<float>(y, x);
+            else if (y == rows - 1)
+                Iy = input.at<float>(y, x) - input.at<float>(y - 1, x);
+            else
+                Iy = (input.at<float>(y + 1, x) - input.at<float>(y - 1, x)) * 0.5f;
+
+            grad_x.at<float>(y, x) = Ix;
+            grad_y.at<float>(y, x) = Iy;
+        }
+    }
+}
+
+void Dataset::TrackEdgesWithOpticalFlow(
+    const cv::Mat& prev_img,
+    const cv::Mat& next_img,
+    const std::vector<cv::Point2d>& prev_edges,
+    std::vector<cv::Point2d>& tracked_edges,
+    std::vector<uchar>& status,
+    std::vector<float>& errors,
+    int win_size,       // Now just an int
+    int max_level       // Pyramid depth
+) {
+    if (prev_img.empty() || next_img.empty()) {
+        std::cerr << "ERROR: Input images are empty!" << std::endl;
+        return;
+    }
+
+    if (prev_edges.empty()) {
+        std::cerr << "WARNING: No edges provided for optical flow tracking." << std::endl;
+        return;
+    }
+
+    std::vector<cv::Point2f> prev_pts_float, next_pts_float;
+    for (const auto& pt : prev_edges)
+        prev_pts_float.emplace_back(static_cast<float>(pt.x), static_cast<float>(pt.y));
+
+    // Termination: max 30 iterations OR error < 0.01
+    cv::TermCriteria termcrit(cv::TermCriteria::COUNT | cv::TermCriteria::EPS, 30, 0.01);
+
+    cv::calcOpticalFlowPyrLK(
+        prev_img,
+        next_img,
+        prev_pts_float,
+        next_pts_float,
+        status,
+        errors,
+        cv::Size(win_size, win_size),  // Constructed here
+        max_level,
+        termcrit,
+        0,
+        1e-4
+    );
+
+    tracked_edges.clear();
+    for (const auto& pt : next_pts_float)
+        tracked_edges.emplace_back(pt.x, pt.y);
+}
+
+
+
 std::vector<cv::Point3d> Dataset::LinearTriangulatePoints(
     const std::vector<std::pair<ConfirmedMatchEdge, ConfirmedMatchEdge>>& confirmed_matches
 ) {
@@ -2311,6 +2498,105 @@ void Dataset::CalculateGTRightEdge(const std::vector<cv::Point2d> &left_third_or
 
     csv_file.flush();
 }
+
+void Dataset::TrackEdges(
+    const cv::Mat& img1,                        // image at time t
+    const cv::Mat& img2,                        // image at time t+1
+    const std::vector<cv::Point2d>& points,     // input points
+    int patch_size,                             // window size
+    std::vector<double>& du,                    // x-displacements
+    std::vector<double>& dv                     // y-displacements
+) {
+    // Sanity check
+    if (patch_size % 2 == 0) {
+        std::cerr << "[TrackEdges] Patch size must be odd.\n";
+        return;
+    }
+
+    int w = patch_size / 2;
+    du.resize(points.size(), 0.0);
+    dv.resize(points.size(), 0.0);
+
+    // Convert to CV_32F if needed
+    cv::Mat img1f, img2f;
+    if (img1.type() != CV_32F)
+        img1.convertTo(img1f, CV_32F);
+    else
+        img1f = img1;
+
+    if (img2.type() != CV_32F)
+        img2.convertTo(img2f, CV_32F);
+    else
+        img2f = img2;
+
+    // Compute gradients and temporal difference
+    cv::Mat Ix, Iy;
+    ComputeImageGradient(img2f, Ix, Iy);
+    cv::Mat It = img1f - img2f;
+
+    // Loop over all points
+    for (size_t i = 0; i < points.size(); ++i) {
+        const cv::Point2d& pt = points[i];
+
+        std::vector<double> ix_vals, iy_vals, it_vals;
+        bool valid_patch = true;
+
+        for (int dy = -w; dy <= w; ++dy) {
+            for (int dx = -w; dx <= w; ++dx) {
+                cv::Point2d offset(dx, dy);
+                cv::Point2d sample_pt = pt + offset;
+
+                if (sample_pt.x < 1 || sample_pt.y < 1 ||
+                    sample_pt.x >= img1f.cols - 1 || sample_pt.y >= img1f.rows - 1) {
+                    valid_patch = false;
+                    break;
+                }
+
+                double ix = Bilinear_Interpolation(Ix, sample_pt);
+                double iy = Bilinear_Interpolation(Iy, sample_pt);
+                double it = Bilinear_Interpolation(It, sample_pt);
+
+                if (std::isnan(ix) || std::isnan(iy) || std::isnan(it)) {
+                    valid_patch = false;
+                    break;
+                }
+
+                ix_vals.push_back(ix);
+                iy_vals.push_back(iy);
+                it_vals.push_back(it);
+            }
+            if (!valid_patch) break;
+        }
+
+        if (!valid_patch || ix_vals.empty()) {
+            du[i] = 0.0;
+            dv[i] = 0.0;
+            continue;
+        }
+
+        // Solve least squares: A * [du dv]' = -b
+        cv::Mat A(static_cast<int>(ix_vals.size()), 2, CV_64F);
+        cv::Mat b(static_cast<int>(it_vals.size()), 1, CV_64F);
+
+        for (int j = 0; j < ix_vals.size(); ++j) {
+            A.at<double>(j, 0) = ix_vals[j];
+            A.at<double>(j, 1) = iy_vals[j];
+            b.at<double>(j, 0) = -it_vals[j];
+        }
+
+        cv::Mat dP;
+        bool success = cv::solve(A.t() * A, A.t() * b, dP, cv::DECOMP_CHOLESKY);
+
+        if (success && dP.rows == 2) {
+            du[i] = dP.at<double>(0, 0);
+            dv[i] = dP.at<double>(1, 0);
+        } else {
+            du[i] = 0.0;
+            dv[i] = 0.0;
+        }
+    }
+}
+
 
 void Dataset::CalculateGTLeftEdge(const std::vector<cv::Point2d>& right_third_order_edges_locations,const std::vector<double>& right_third_order_edges_orientation,const cv::Mat& disparity_map_right_reference,const cv::Mat& left_image,const cv::Mat& right_image) {
     reverse_gt_data.clear();
