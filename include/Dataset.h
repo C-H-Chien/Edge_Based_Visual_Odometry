@@ -10,6 +10,7 @@
 #include <Eigen/Geometry>
 #include <yaml-cpp/yaml.h>
 #include <opencv2/opencv.hpp>
+
 #include "definitions.h"
 #include "Frame.h"
 #include "utility.h"

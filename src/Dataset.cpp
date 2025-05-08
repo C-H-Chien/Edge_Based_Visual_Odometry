@@ -7,7 +7,6 @@
 #include <opencv2/opencv.hpp>
 #include <Eigen/Core>
 #include <Eigen/Dense>
-#include <glog/logging.h>
 #include <time.h>
 #include <filesystem>
 #include <sys/time.h>
@@ -15,10 +14,23 @@
 #include <unordered_set>
 #include <vector>
 #include <chrono>
-#include "Dataset.h"
-#include "definitions.h"
 #include <utility> 
 #include <cmath>
+
+#include "Dataset.h"
+#include "definitions.h"
+
+#if USE_GLOGS
+#include <glog/logging.h>
+#endif
+
+#if USE_CPP17
+#include <filesystem>
+#else
+#include <boost/filesystem.hpp>
+#endif
+
+
 cv::Mat merged_visualization_global;
 
 // =======================================================================================================
@@ -177,10 +189,10 @@ void Dataset::write_ncc_vals_to_files( int img_index ) {
 }
 
 void Dataset::PerformEdgeBasedVO() {
-    int num_pairs = 1;
+    int num_pairs = 3;
     std::vector<std::pair<cv::Mat, cv::Mat>> image_pairs;
     std::vector<cv::Mat> left_ref_disparity_maps;
-    std::vector<cv::Mat> right_ref_disparity_maps;
+    // std::vector<cv::Mat> right_ref_disparity_maps;
     std::vector<double> max_disparity_values;
 
     std::vector<double> per_image_avg_before_epi;
@@ -225,20 +237,22 @@ void Dataset::PerformEdgeBasedVO() {
         std::string stereo_pairs_path = dataset_path + "/" + sequence_name + "/stereo_pairs";
         image_pairs = LoadETH3DImages(stereo_pairs_path, num_pairs);
         left_ref_disparity_maps = LoadETH3DLeftReferenceMaps(stereo_pairs_path, num_pairs);
-        right_ref_disparity_maps = LoadETH3DRightReferenceMaps(stereo_pairs_path, num_pairs);
+        // right_ref_disparity_maps = LoadETH3DRightReferenceMaps(stereo_pairs_path, num_pairs);
     }
 
     auto start_time = std::chrono::high_resolution_clock::now();
 
     LOG_INFO("Start looping over all image pairs");
 
+    std::cout << "There are " << image_pairs.size() << " image pairs" << std::endl;
+
     //Figure out a solution for this (will skip the last image pair)
-    for (size_t i = 0; i + 1 < image_pairs.size(); ++i) {
+    for (size_t i = 0; i < image_pairs.size()-1; ++i) {
         const cv::Mat& curr_left_img = image_pairs[i].first;
         const cv::Mat& curr_right_img = image_pairs[i].second;
 
         const cv::Mat& left_ref_map = left_ref_disparity_maps[i]; 
-        const cv::Mat& right_ref_map = right_ref_disparity_maps[i];
+        // const cv::Mat& right_ref_map = right_ref_disparity_maps[i];
 
         const cv::Mat& next_left_img = image_pairs[i + 1].first;
         const cv::Mat& next_right_img = image_pairs[i + 1].second;
@@ -261,7 +275,6 @@ void Dataset::PerformEdgeBasedVO() {
 
         ncc_one_vs_err.clear();
         ncc_two_vs_err.clear();
-        {
 
         std::cout << "Image Pair #" << i << "\n";
         cv::Mat left_calib = (cv::Mat_<double>(3, 3) << left_intr[0], 0, left_intr[2], 0, left_intr[1], left_intr[3], 0, 0, 1);
@@ -310,7 +323,7 @@ void Dataset::PerformEdgeBasedVO() {
         }
 
         CalculateGTRightEdge(left_third_order_edges_locations, left_third_order_edges_orientation, left_ref_map, left_edge_map, right_edge_map);
-        CalculateGTLeftEdge(right_third_order_edges_locations, right_third_order_edges_orientation, right_ref_map, left_edge_map, right_edge_map);
+        // CalculateGTLeftEdge(right_third_order_edges_locations, right_third_order_edges_orientation, right_ref_map, left_edge_map, right_edge_map);
 
         StereoMatchResult match_result = DisplayMatches(
             left_undistorted,
@@ -319,6 +332,7 @@ void Dataset::PerformEdgeBasedVO() {
             right_third_order_edges_orientation
         );
 
+#if 0
         std::vector<cv::Point3d> points_opencv = Calculate3DPoints(match_result.confirmed_matches);
         std::vector<cv::Point3d> points_linear = LinearTriangulatePoints(match_result.confirmed_matches);
         std::vector<Eigen::Vector3d> orientations_3d = Calculate3DOrientations(match_result.confirmed_matches);
@@ -355,7 +369,9 @@ void Dataset::PerformEdgeBasedVO() {
             std::cout << "Average triangulation error: "
                     << (total_error / points_opencv.size()) << " units.\n";
         }
+#endif
 
+#if DISPLAY_STERO_EDGE_MATCHES
         cv::Mat left_visualization, right_visualization;
         cv::cvtColor(left_edge_map, left_visualization, cv::COLOR_GRAY2BGR);
         cv::cvtColor(right_edge_map, right_visualization, cv::COLOR_GRAY2BGR);
@@ -382,7 +398,7 @@ void Dataset::PerformEdgeBasedVO() {
 
         std::string save_path = output_path + "/edge_matches_image" + std::to_string(i) + ".png";
         cv::imwrite(save_path, merged_visualization);
-
+#endif
         const RecallMetrics& forward_metrics = match_result.forward_match.recall_metrics;
         all_forward_recall_metrics.push_back(forward_metrics);
 
@@ -432,9 +448,7 @@ void Dataset::PerformEdgeBasedVO() {
         per_image_avg_after_lowe.push_back(avg_after_lowe);
 
         per_image_avg_before_bct.push_back(match_result.bidirectional_metrics.matches_before_bct);
-        per_image_avg_after_bct.push_back(match_result.bidirectional_metrics.matches_after_bct);
-
-        }                                
+        per_image_avg_after_bct.push_back(match_result.bidirectional_metrics.matches_after_bct);                              
     }
 
     double total_epi_recall = 0.0;
@@ -522,7 +536,7 @@ void Dataset::PerformEdgeBasedVO() {
     double avg_total_time = (total_images > 0) ? total_image_time / total_images : 0.0;
     double avg_bct_time = (total_images > 0) ? total_bct_time / total_images : 0.0;
 
-    std::string edge_stat_dir = output_path + "/edge stats";
+    std::string edge_stat_dir = output_path + "/edge_stats";
     std::filesystem::create_directories(edge_stat_dir);
 
     std::ofstream recall_csv(edge_stat_dir + "/recall_metrics.csv");
@@ -904,7 +918,9 @@ StereoMatchResult Dataset::DisplayMatches(const cv::Mat& left_image, const cv::M
 
         const auto& right_contributing_edges = patch_match_forward.contributing_edges;
         const auto& right_contributing_orientations = patch_match_forward.contributing_orientations;
+        bool break_flag = false;
         for (size_t i = 0; i < right_contributing_edges.size(); ++i) {
+            break_flag = false;
             const cv::Point2d& right_position = right_contributing_edges[i];
             const double right_orientation = right_contributing_orientations[i];
 
@@ -912,18 +928,19 @@ StereoMatchResult Dataset::DisplayMatches(const cv::Mat& left_image, const cv::M
                 if (cv::norm(rev_right_edge.position - right_position) <= match_tolerance) {
 
                     for (const auto& rev_contributing_left : patch_match_rev.contributing_edges) {
-                        if (cv::norm(rev_contributing_left - left_position) <= match_tolerance) {
-                            
-                        ConfirmedMatchEdge left_confirmed{left_position, left_orientation};
-                        ConfirmedMatchEdge right_confirmed{right_position, right_orientation};
-                        confirmed_matches.emplace_back(left_confirmed, right_confirmed);
-                        goto next_left_edge;
+                        if (cv::norm(rev_contributing_left - left_position) <= match_tolerance) { 
+                            ConfirmedMatchEdge left_confirmed{left_position, left_orientation};
+                            ConfirmedMatchEdge right_confirmed{right_position, right_orientation};
+                            confirmed_matches.emplace_back(left_confirmed, right_confirmed);
+                            break_flag = true;
+                            break;
                         }
                     }
                 }
+                if (break_flag) break;
             }
+            if (break_flag) break;
         }
-        next_left_edge:;
     }
 
     auto bct_end = std::chrono::high_resolution_clock::now();
@@ -950,6 +967,7 @@ StereoMatchResult Dataset::DisplayMatches(const cv::Mat& left_image, const cv::M
     return StereoMatchResult{forward_match, reverse_match, confirmed_matches, bidirectional_metrics};
 }
 
+//> MARK: Main Edge Pairing
 EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& selected_primary_edges, const std::vector<double>& selected_primary_orientations, const std::vector<cv::Point2d>& secondary_edge_coords, 
     const std::vector<double>& secondary_edge_orientations, const std::vector<cv::Mat>& primary_patch_set_one, const std::vector<cv::Mat>& primary_patch_set_two, const std::vector<Eigen::Vector3d>& epipolar_lines_secondary, 
     const cv::Mat& secondary_image, const std::vector<cv::Point2d>& selected_ground_truth_edges) {
@@ -1571,24 +1589,12 @@ EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& select
     //       << std::fixed << std::setprecision(2)
     //       << lowe_recall * 100 << "%" << std::endl;
 
-    double per_image_epi_precision = (epi_edges_evaluated > 0)
-    ? (per_edge_epi_precision / epi_edges_evaluated)
-    : 0.0;
-    double per_image_disp_precision = (disp_edges_evaluated > 0)
-    ? (per_edge_disp_precision / disp_edges_evaluated)
-    : 0.0;
-    double per_image_shift_precision = (shift_edges_evaluated > 0)
-    ? (per_edge_shift_precision / shift_edges_evaluated)
-    : 0.0;
-    double per_image_clust_precision = (clust_edges_evaluated > 0)
-    ? (per_edge_clust_precision / clust_edges_evaluated)
-    : 0.0;
-    double per_image_ncc_precision = (ncc_edges_evaluated > 0)
-    ? (per_edge_ncc_precision / ncc_edges_evaluated)
-    : 0.0;
-    double per_image_lowe_precision = (lowe_edges_evaluated > 0)
-    ? (per_edge_lowe_precision / lowe_edges_evaluated)
-    : 0.0;
+    double per_image_epi_precision   = (epi_edges_evaluated > 0)   ? (per_edge_epi_precision / epi_edges_evaluated)     : (0.0);
+    double per_image_disp_precision  = (disp_edges_evaluated > 0)  ? (per_edge_disp_precision / disp_edges_evaluated)   : (0.0);
+    double per_image_shift_precision = (shift_edges_evaluated > 0) ? (per_edge_shift_precision / shift_edges_evaluated) : (0.0);
+    double per_image_clust_precision = (clust_edges_evaluated > 0) ? (per_edge_clust_precision / clust_edges_evaluated) : (0.0);
+    double per_image_ncc_precision   = (ncc_edges_evaluated > 0)   ? (per_edge_ncc_precision / ncc_edges_evaluated)     : (0.0);
+    double per_image_lowe_precision  = (lowe_edges_evaluated > 0)  ? (per_edge_lowe_precision / lowe_edges_evaluated)   : (0.0);
 
     // std::cout << "Epipolar Distance Precision: " 
     //     << std::fixed << std::setprecision(2) 
@@ -1610,30 +1616,14 @@ EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& select
     //     << per_image_lowe_precision * 100 << "%" << std::endl;
 
 
-    double per_image_epi_time = (time_epi_edges_evaluated > 0)
-    ? (time_epi / time_epi_edges_evaluated)
-    : 0.0;
-    double per_image_disp_time = (time_disp_edges_evaluated > 0)
-    ? (time_disp / time_disp_edges_evaluated)
-    : 0.0;
-    double per_image_shift_time = (time_shift_edges_evaluated > 0)
-    ? (time_shift / time_shift_edges_evaluated)
-    : 0.0;
-    double per_image_clust_time= (time_clust_edges_evaluated > 0)
-    ? (time_cluster / time_clust_edges_evaluated)
-    : 0.0;
-    double per_image_patch_time = (time_patch_edges_evaluated > 0)
-    ? (time_patch / time_patch_edges_evaluated)
-    : 0.0;
-    double per_image_ncc_time = (time_ncc_edges_evaluated > 0)
-    ? (time_ncc / time_ncc_edges_evaluated)
-    : 0.0;
-    double per_image_lowe_time = (time_lowe_edges_evaluated> 0)
-    ? (time_lowe / time_lowe_edges_evaluated)
-    : 0.0;
-    double per_image_total_time = (selected_primary_edges.size() > 0)
-    ? (total_time / selected_primary_edges.size())
-    : 0.0;
+    double per_image_epi_time = (time_epi_edges_evaluated > 0) ? (time_epi / time_epi_edges_evaluated) : (0.0);
+    double per_image_disp_time = (time_disp_edges_evaluated > 0) ? (time_disp / time_disp_edges_evaluated) : 0.0;
+    double per_image_shift_time = (time_shift_edges_evaluated > 0) ? (time_shift / time_shift_edges_evaluated) : 0.0;
+    double per_image_clust_time= (time_clust_edges_evaluated > 0) ? (time_cluster / time_clust_edges_evaluated) : 0.0;
+    double per_image_patch_time = (time_patch_edges_evaluated > 0) ? (time_patch / time_patch_edges_evaluated) : 0.0;
+    double per_image_ncc_time = (time_ncc_edges_evaluated > 0) ? (time_ncc / time_ncc_edges_evaluated) : 0.0;
+    double per_image_lowe_time = (time_lowe_edges_evaluated> 0) ? (time_lowe / time_lowe_edges_evaluated) : 0.0;
+    double per_image_total_time = (selected_primary_edges.size() > 0) ? (total_time / selected_primary_edges.size()) : 0.0;
 
     return EdgeMatchResult {
         RecallMetrics {
@@ -2466,41 +2456,41 @@ std::vector<cv::Mat> Dataset::LoadETH3DLeftReferenceMaps(const std::string &ster
     return disparity_maps;
 }
 
-std::vector<cv::Mat> Dataset::LoadETH3DRightReferenceMaps(const std::string &stereo_pairs_path, int num_maps) {
-    std::vector<cv::Mat> disparity_maps;
-    std::vector<std::string> stereo_folders;
+// std::vector<cv::Mat> Dataset::LoadETH3DRightReferenceMaps(const std::string &stereo_pairs_path, int num_maps) {
+//     std::vector<cv::Mat> disparity_maps;
+//     std::vector<std::string> stereo_folders;
 
-    for (const auto &entry : std::filesystem::directory_iterator(stereo_pairs_path)) {
-        if (entry.is_directory()) {
-            stereo_folders.push_back(entry.path().string());
-        }
-    }
+//     for (const auto &entry : std::filesystem::directory_iterator(stereo_pairs_path)) {
+//         if (entry.is_directory()) {
+//             stereo_folders.push_back(entry.path().string());
+//         }
+//     }
 
-    std::sort(stereo_folders.begin(), stereo_folders.end());
+//     std::sort(stereo_folders.begin(), stereo_folders.end());
 
-    for (int i = 0; i < std::min(num_maps, static_cast<int>(stereo_folders.size())); i++) {
-        std::string folder_path = stereo_folders[i];
-        std::string disparity_csv_path = folder_path + "/disparity_map_right.csv";
-        std::string disparity_bin_path = folder_path + "/disparity_map_right.bin";
+//     for (int i = 0; i < std::min(num_maps, static_cast<int>(stereo_folders.size())); i++) {
+//         std::string folder_path = stereo_folders[i];
+//         std::string disparity_csv_path = folder_path + "/disparity_map_right.csv";
+//         std::string disparity_bin_path = folder_path + "/disparity_map_right.bin";
 
-        cv::Mat disparity_map;
+//         cv::Mat disparity_map;
 
-        if (std::filesystem::exists(disparity_bin_path)) {
-            disparity_map = ReadDisparityFromBinary(disparity_bin_path);
-        } else {
-            disparity_map = LoadDisparityFromCSV(disparity_csv_path);
-            if (!disparity_map.empty()) {
-                WriteDisparityToBinary(disparity_bin_path, disparity_map);
-            }
-        }
+//         if (std::filesystem::exists(disparity_bin_path)) {
+//             disparity_map = ReadDisparityFromBinary(disparity_bin_path);
+//         } else {
+//             disparity_map = LoadDisparityFromCSV(disparity_csv_path);
+//             if (!disparity_map.empty()) {
+//                 WriteDisparityToBinary(disparity_bin_path, disparity_map);
+//             }
+//         }
 
-        if (!disparity_map.empty()) {
-            disparity_maps.push_back(disparity_map);
-        }
-    }
+//         if (!disparity_map.empty()) {
+//             disparity_maps.push_back(disparity_map);
+//         }
+//     }
 
-    return disparity_maps;
-}
+//     return disparity_maps;
+// }
 
 void Dataset::WriteDisparityToBinary(const std::string& filepath, const cv::Mat& disparity_map) {
     std::ofstream ofs(filepath, std::ios::binary);
