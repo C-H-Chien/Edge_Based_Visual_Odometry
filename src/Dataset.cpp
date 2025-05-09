@@ -65,6 +65,13 @@ cv::Scalar PickUniqueColor(int index, int total) {
 }
 
 Dataset::Dataset(YAML::Node config_map, bool use_GCC_filter) : config_file(config_map), compute_grad_depth(use_GCC_filter) {
+
+#if USE_DEFINED_NUM_OF_CORES
+    omp_threads = USE_NUM_CORES_FOR_OMP;
+#else
+    omp_threads = omp_get_num_procs();
+#endif
+
    dataset_path = config_file["dataset_dir"].as<std::string>();
    output_path = config_file["output_dir"].as<std::string>();
    sequence_name = config_file["sequence_name"].as<std::string>();
@@ -189,7 +196,7 @@ void Dataset::write_ncc_vals_to_files( int img_index ) {
 }
 
 void Dataset::PerformEdgeBasedVO() {
-    int num_pairs = 3;
+    int num_pairs = 10000;
     std::vector<std::pair<cv::Mat, cv::Mat>> image_pairs;
     std::vector<cv::Mat> left_ref_disparity_maps;
     // std::vector<cv::Mat> right_ref_disparity_maps;
@@ -994,34 +1001,29 @@ EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& select
     std::vector<int> lowe_input_counts;
     std::vector<int> lowe_output_counts;
 
-    int epi_true_positive = 0;
-    int epi_false_negative = 0;
-    int epi_true_negative = 0;
+    double total_time;
 
-    int disp_true_positive = 0;
-    int disp_false_negative = 0;
+    //> CH: this is a global structure of final_matches
+    std::vector<std::pair<SourceEdge, EdgeMatch>> final_matches;
 
-    int shift_true_positive = 0;
-    int shift_false_negative = 0;
+    //> CH: this is local structure of final matches
+    std::vector< std::vector<std::pair<SourceEdge, EdgeMatch>> > local_final_matches(omp_get_max_threads());
 
-    int cluster_true_positive = 0;
-    int cluster_false_negative = 0;
-    int cluster_true_negative = 0;
-
-    int ncc_true_positive = 0;
-    int ncc_false_negative = 0;
-
-    int lowe_true_positive = 0;
-    int lowe_false_negative = 0;
-
-    double per_edge_epi_precision = 0.0;
-    double per_edge_disp_precision = 0.0;
-    double per_edge_shift_precision = 0.0;
-    double per_edge_clust_precision = 0.0;
-    double per_edge_ncc_precision = 0.0;
-    double per_edge_lowe_precision = 0.0;
-
-    double selected_max_disparity = 23.0063;
+    //> CH: Local structures of all counts
+    std::vector< std::vector<int> > local_epi_input_counts(omp_get_max_threads());
+    std::vector< std::vector<int> > local_epi_output_counts(omp_get_max_threads());
+    std::vector< std::vector<int> > local_disp_input_counts(omp_get_max_threads());
+    std::vector< std::vector<int> > local_disp_output_counts(omp_get_max_threads());
+    std::vector< std::vector<int> > local_shift_input_counts(omp_get_max_threads());
+    std::vector< std::vector<int> > local_shift_output_counts(omp_get_max_threads());
+    std::vector< std::vector<int> > local_clust_input_counts(omp_get_max_threads());
+    std::vector< std::vector<int> > local_clust_output_counts(omp_get_max_threads());
+    std::vector< std::vector<int> > local_patch_input_counts(omp_get_max_threads());
+    std::vector< std::vector<int> > local_patch_output_counts(omp_get_max_threads());
+    std::vector< std::vector<int> > local_ncc_input_counts(omp_get_max_threads());
+    std::vector< std::vector<int> > local_ncc_output_counts(omp_get_max_threads());
+    std::vector< std::vector<int> > local_lowe_input_counts(omp_get_max_threads());
+    std::vector< std::vector<int> > local_lowe_output_counts(omp_get_max_threads());
 
     int time_epi_edges_evaluated = 0;
     int time_disp_edges_evaluated = 0;
@@ -1030,15 +1032,6 @@ EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& select
     int time_patch_edges_evaluated = 0;
     int time_ncc_edges_evaluated = 0;
     int time_lowe_edges_evaluated = 0;
-
-
-    int epi_edges_evaluated = 0;
-    int disp_edges_evaluated = 0;
-    int shift_edges_evaluated = 0;
-    int clust_edges_evaluated = 0;
-    int ncc_edges_evaluated = 0;
-    int lowe_edges_evaluated = 0;
-
     double time_epi = 0.0;
     double time_disp = 0.0;
     double time_shift = 0.0;
@@ -1047,13 +1040,46 @@ EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& select
     double time_ncc = 0.0;
     double time_lowe = 0.0;
 
+    //> These are global variables for reduction sum
+    double per_edge_epi_precision = 0.0;
+    double per_edge_disp_precision = 0.0;
+    double per_edge_shift_precision = 0.0;
+    double per_edge_clust_precision = 0.0;
+    double per_edge_ncc_precision = 0.0;
+    double per_edge_lowe_precision = 0.0;
+    int epi_true_positive = 0;
+    int epi_false_negative = 0;
+    int epi_true_negative = 0;
+    int disp_true_positive = 0;
+    int disp_false_negative = 0;
+    int shift_true_positive = 0;
+    int shift_false_negative = 0;
+    int cluster_true_positive = 0;
+    int cluster_false_negative = 0;
+    int cluster_true_negative = 0;
+    int ncc_true_positive = 0;
+    int ncc_false_negative = 0;
+    int lowe_true_positive = 0;
+    int lowe_false_negative = 0;
+    int epi_edges_evaluated = 0;
+    int disp_edges_evaluated = 0;
+    int shift_edges_evaluated = 0;
+    int clust_edges_evaluated = 0;
+    int ncc_edges_evaluated = 0;
+    int lowe_edges_evaluated = 0;
+
+#pragma omp parallel
+{
+    int thread_id = omp_get_thread_num();    
+
     cv::Point2d ground_truth_edge;
 
-    std::vector<std::pair<SourceEdge, EdgeMatch>> final_matches;
-
     //MAKE SURE TO UPDATE THIS ACCORDINGLY
-    int skip = (!selected_ground_truth_edges.empty()) ? 100 : 1;
+    // int skip = (!selected_ground_truth_edges.empty()) ? 100 : 1;
+    const int skip = 1;
 
+    //> Start looping over left edges
+    #pragma omp for schedule(static, omp_threads) reduction(+: epi_true_positive, epi_false_negative, epi_true_negative, disp_true_positive, disp_false_negative, shift_true_positive, shift_false_negative, cluster_true_positive, cluster_false_negative, cluster_true_negative, ncc_true_positive, ncc_false_negative, lowe_true_positive, lowe_false_negative, per_edge_epi_precision, per_edge_disp_precision, per_edge_shift_precision, per_edge_clust_precision, per_edge_ncc_precision, per_edge_lowe_precision, epi_edges_evaluated, disp_edges_evaluated, shift_edges_evaluated, clust_edges_evaluated, ncc_edges_evaluated, lowe_edges_evaluated)
     for (size_t i = 0; i < selected_primary_edges.size(); i += skip) {
         const auto& primary_edge = selected_primary_edges[i];
         const auto& primary_orientation = selected_primary_orientations[i];
@@ -1088,7 +1114,9 @@ EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& select
         }
 
         ///////////////////////////////EPIPOLAR DISTANCE THRESHOLD///////////////////////////////
+#if MEASURE_TIMINGS
         auto start_epi = std::chrono::high_resolution_clock::now();
+#endif
 
         std::pair<std::vector<cv::Point2d>, std::vector<double>> secondary_candidates_data = ExtractEpipolarEdges(epipolar_line, secondary_edge_coords, secondary_edge_orientations, 0.5);
         std::vector<cv::Point2d> secondary_candidate_edges = secondary_candidates_data.first;
@@ -1097,11 +1125,15 @@ EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& select
         std::pair<std::vector<cv::Point2d>, std::vector<double>> test_secondary_candidates_data = ExtractEpipolarEdges(epipolar_line, secondary_edge_coords, secondary_edge_orientations, 3);
         std::vector<cv::Point2d> test_secondary_candidate_edges = test_secondary_candidates_data.first;
 
-        epi_input_counts.push_back(secondary_edge_coords.size());
+        // epi_input_counts.push_back(secondary_edge_coords.size());
+        local_epi_input_counts[thread_id].push_back(secondary_edge_coords.size());
 
+#if MEASURE_TIMINGS
         time_epi_edges_evaluated++;
         auto end_epi = std::chrono::high_resolution_clock::now();
         time_epi += std::chrono::duration<double, std::milli>(end_epi - start_epi).count();
+#endif
+        //> MARK: Epipolar Distance
         ///////////////////////////////EPIPOLAR DISTANCE THRESHOLD RECALL//////////////////////////
         if(!selected_ground_truth_edges.empty()){
             int epi_precision_numerator = 0;
@@ -1140,9 +1172,12 @@ EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& select
             }
         }
         ///////////////////////////////MAXIMUM DISPARITY THRESHOLD//////////////////////////
+#if MEASURE_TIMINGS
         auto start_disp = std::chrono::high_resolution_clock::now();
+#endif
         
-        epi_output_counts.push_back(secondary_candidate_edges.size());
+        // epi_output_counts.push_back(secondary_candidate_edges.size());
+        local_epi_output_counts[thread_id].push_back(secondary_candidate_edges.size());
 
         std::vector<cv::Point2d> filtered_secondary_edge_coords;
         std::vector<double> filtered_secondary_edge_orientations;
@@ -1152,8 +1187,8 @@ EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& select
 
             double disparity = (!selected_ground_truth_edges.empty()) ? (primary_edge.x - secondary_edge.x) : (secondary_edge.x - primary_edge.x);
 
-            bool within_horizontal = (disparity >= 0) && (disparity <= selected_max_disparity);
-            bool within_vertical = std::abs(secondary_edge.y - primary_edge.y) <= selected_max_disparity;
+            bool within_horizontal = (disparity >= 0) && (disparity <= MAX_DISPARITY);
+            bool within_vertical = std::abs(secondary_edge.y - primary_edge.y) <= MAX_DISPARITY;
 
             if (within_horizontal && within_vertical) {
                 filtered_secondary_edge_coords.push_back(secondary_edge);
@@ -1161,12 +1196,15 @@ EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& select
             }
         }
 
-        disp_input_counts.push_back(secondary_candidate_edges.size());
+        // disp_input_counts.push_back(secondary_candidate_edges.size());
+        local_disp_input_counts[thread_id].push_back(secondary_candidate_edges.size());
 
+#if MEASURE_TIMINGS
         time_disp_edges_evaluated++;
-
         auto end_disp = std::chrono::high_resolution_clock::now();
         time_disp += std::chrono::duration<double, std::milli>(end_disp - start_disp).count();
+#endif
+        //> MARK: Maximum Disparity
         ///////////////////////////////MAXIMUM DISPARITY THRESHOLD RECALL//////////////////////////
         if (!selected_ground_truth_edges.empty()) {
             int disp_precision_numerator = 0;
@@ -1192,9 +1230,12 @@ EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& select
             }
         }
         ///////////////////////////////EPIPOLAR SHIFT THRESHOLD//////////////////////////
+#if MEASURE_TIMINGS
         auto start_shift = std::chrono::high_resolution_clock::now();
+#endif
 
-        disp_output_counts.push_back(filtered_secondary_edge_coords.size());
+        // disp_output_counts.push_back(filtered_secondary_edge_coords.size());
+        local_disp_output_counts[thread_id].push_back(filtered_secondary_edge_coords.size());
 
         std::vector<cv::Point2d> shifted_secondary_edge_coords;
         std::vector<double> shifted_secondary_edge_orientations;
@@ -1210,12 +1251,15 @@ EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& select
             }
         }
 
-        shift_input_counts.push_back(filtered_secondary_edge_coords.size());
+        // shift_input_counts.push_back(filtered_secondary_edge_coords.size());
+        local_shift_input_counts[thread_id].push_back(filtered_secondary_edge_coords.size());
 
+#if MEASURE_TIMINGS
         time_shift_edges_evaluated++;
-
         auto end_shift = std::chrono::high_resolution_clock::now();
         time_shift += std::chrono::duration<double, std::milli>(end_shift - start_shift).count();
+#endif
+        //> MARK: Epipolar Shift
         ///////////////////////////////EPIPOLAR SHIFT THRESHOLD RECALL//////////////////////////
         if (!selected_ground_truth_edges.empty()) {
             int shift_precision_numerator = 0;
@@ -1241,9 +1285,12 @@ EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& select
             }
         }
         ///////////////////////////////EPIPOLAR CLUSTER THRESHOLD//////////////////////////
+#if MEASURE_TIMINGS
         auto start_cluster = std::chrono::high_resolution_clock::now();
+#endif
 
-        shift_output_counts.push_back(shifted_secondary_edge_coords.size());
+        // shift_output_counts.push_back(shifted_secondary_edge_coords.size());
+        local_shift_output_counts[thread_id].push_back(shifted_secondary_edge_coords.size());
 
         std::vector<std::pair<std::vector<cv::Point2d>, std::vector<double>>> clusters = ClusterEpipolarShiftedEdges(shifted_secondary_edge_coords, shifted_secondary_edge_orientations);
         std::vector<EdgeCluster> cluster_centers;
@@ -1277,12 +1324,15 @@ EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& select
             cluster_centers.push_back(cluster);
         }
 
-        clust_input_counts.push_back(shifted_secondary_edge_coords.size());
+        // clust_input_counts.push_back(shifted_secondary_edge_coords.size());
+        local_clust_input_counts[thread_id].push_back(shifted_secondary_edge_coords.size());
 
+#if MEASURE_TIMINGS
         time_clust_edges_evaluated++;
-
         auto end_cluster = std::chrono::high_resolution_clock::now();
         time_cluster += std::chrono::duration<double, std::milli>(end_cluster - start_cluster).count();
+#endif
+        //> MARK: Clustering
         ///////////////////////////////EPIPOLAR CLUSTER THRESHOLD RECALL//////////////////////////
         if (!selected_ground_truth_edges.empty()) {
             int clust_precision_numerator = 0;
@@ -1308,9 +1358,12 @@ EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& select
             }
         }
         ///////////////////////////////EXTRACT PATCHES THRESHOLD////////////////////////////////////////////
+#if MEASURE_TIMINGS
         auto start_patch = std::chrono::high_resolution_clock::now();
+#endif
 
-        clust_output_counts.push_back(cluster_centers.size());
+        // clust_output_counts.push_back(cluster_centers.size());
+        local_clust_output_counts[thread_id].push_back(cluster_centers.size());
 
         std::vector<cv::Point2d> cluster_coords;
         std::vector<double> cluster_orientations;
@@ -1343,21 +1396,22 @@ EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& select
             secondary_patch_set_two
         );
 
-        patch_input_counts.push_back(cluster_centers.size());
+        // patch_input_counts.push_back(cluster_centers.size());
+        local_patch_input_counts[thread_id].push_back(cluster_centers.size());
 
+#if MEASURE_TIMINGS
         time_patch_edges_evaluated++;
-
         auto end_patch = std::chrono::high_resolution_clock::now();
         time_patch += std::chrono::duration<double, std::milli>(end_patch - start_patch).count();
+        //> MARK: NCC
        ///////////////////////////////NCC THRESHOLD/////////////////////////////////////////////////////
        auto start_ncc = std::chrono::high_resolution_clock::now();
+#endif
 
-       patch_output_counts.push_back(filtered_cluster_centers.size());
+    //    patch_output_counts.push_back(filtered_cluster_centers.size());
+       local_patch_output_counts[thread_id].push_back(filtered_cluster_centers.size());
+
        int ncc_precision_numerator = 0;
-
-       double ncc_threshold_strong_both_sides = 0.5;
-       double ncc_threshold_weak_both_sides = 0.25;
-       double ncc_threshold_strong_one_side = 0.65;
 
        bool ncc_match_found = false;
        std::vector<EdgeMatch> passed_ncc_matches;
@@ -1373,7 +1427,6 @@ EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& select
 
                double score_one = std::min(ncc_one, ncc_two);
                double score_two = std::min(ncc_three, ncc_four);
-
                double final_score = std::max(score_one, score_two);
 
 #if DEBUG_COLLECT_NCC_AND_ERR
@@ -1383,7 +1436,7 @@ EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& select
                ncc_one_vs_err.push_back(pair_ncc_one_err);
                ncc_two_vs_err.push_back(pair_ncc_two_err);
 #endif
-               if (ncc_one >= ncc_threshold_strong_both_sides && ncc_two >= ncc_threshold_strong_both_sides) {
+               if (ncc_one >= NCC_THRESH_STRONG_BOTH_SIDES && ncc_two >= NCC_THRESH_STRONG_BOTH_SIDES) {
                     EdgeMatch info;
                     info.coord = filtered_cluster_centers[i].center_coord;
                     info.orientation = filtered_cluster_centers[i].center_orientation;
@@ -1396,11 +1449,10 @@ EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& select
                         if (cv::norm(filtered_cluster_centers[i].center_coord - ground_truth_edge) <= 3.0) {
                             ncc_match_found = true;
                             ncc_precision_numerator++;
-                            //    break;
                         }
                     }
                }
-               else if (ncc_one >= ncc_threshold_strong_one_side || ncc_two >= ncc_threshold_strong_one_side) {
+               else if (ncc_one >= NCC_THRESH_STRONG_ONE_SIDE || ncc_two >= NCC_THRESH_STRONG_ONE_SIDE) {
                     EdgeMatch info;
                     info.coord = filtered_cluster_centers[i].center_coord;
                     info.orientation = filtered_cluster_centers[i].center_orientation;
@@ -1413,11 +1465,10 @@ EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& select
                         if (cv::norm(filtered_cluster_centers[i].center_coord - ground_truth_edge) <= 3.0) {
                             ncc_match_found = true;
                             ncc_precision_numerator++;
-                            //    break;
                         }
                     }
                }
-               else if (ncc_one >= ncc_threshold_weak_both_sides && ncc_two >= ncc_threshold_weak_both_sides && filtered_cluster_centers.size() == 1) {
+               else if (ncc_one >= NCC_THRESH_WEAK_BOTH_SIDES && ncc_two >= NCC_THRESH_WEAK_BOTH_SIDES && filtered_cluster_centers.size() == 1) {
                     EdgeMatch info;
                     info.coord = filtered_cluster_centers[i].center_coord;
                     info.orientation = filtered_cluster_centers[i].center_orientation;
@@ -1430,7 +1481,6 @@ EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& select
                         if (cv::norm(filtered_cluster_centers[i].center_coord - ground_truth_edge) <= 3.0) {
                             ncc_match_found = true;
                             ncc_precision_numerator++;
-                            //    break;
                         }
                     }
                }
@@ -1447,17 +1497,23 @@ EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& select
            per_edge_ncc_precision += static_cast<double>(ncc_precision_numerator) / passed_ncc_matches.size();
            ncc_edges_evaluated++;
        }
-       ncc_input_counts.push_back(filtered_cluster_centers.size());
-       ncc_output_counts.push_back(passed_ncc_matches.size());
+    //    ncc_input_counts.push_back(filtered_cluster_centers.size());
+    //    ncc_output_counts.push_back(passed_ncc_matches.size());
 
-       time_ncc_edges_evaluated++;
+       local_ncc_input_counts[thread_id].push_back(filtered_cluster_centers.size());
+       local_ncc_output_counts[thread_id].push_back(passed_ncc_matches.size());
 
+#if MEASURE_TIMINGS
+        time_ncc_edges_evaluated++;
         auto end_ncc = std::chrono::high_resolution_clock::now();
         time_ncc += std::chrono::duration<double, std::milli>(end_ncc - start_ncc).count();
+        //> MARK: Lowe's Ratio Test
         ///////////////////////////////LOWES RATIO TEST//////////////////////////////////////////////
         auto start_lowe = std::chrono::high_resolution_clock::now();
+#endif
+        // lowe_input_counts.push_back(passed_ncc_matches.size());
+        local_lowe_input_counts[thread_id].push_back(passed_ncc_matches.size());
 
-        lowe_input_counts.push_back(passed_ncc_matches.size());
         int lowe_precision_numerator = 0;
 
         EdgeMatch best_match;
@@ -1493,12 +1549,15 @@ EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& select
                     }
                 }
                 SourceEdge source_edge {primary_edge, primary_orientation};
-                final_matches.emplace_back(source_edge, best_match);
-                lowe_output_counts.push_back(1);
+                // final_matches.emplace_back(source_edge, best_match);
+                local_final_matches[thread_id].emplace_back(source_edge, best_match);
+                // lowe_output_counts.push_back(1);
+                local_lowe_output_counts[thread_id].push_back(1);
             }
             else {
                 lowe_false_negative++;
-                lowe_output_counts.push_back(0);
+                // lowe_output_counts.push_back(0);
+                local_lowe_output_counts[thread_id].push_back(0);
             }
         }   
         else if (passed_ncc_matches.size() == 1){
@@ -1514,26 +1573,33 @@ EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& select
             }
             
             SourceEdge source_edge {primary_edge, primary_orientation};
-            final_matches.emplace_back(source_edge, best_match);
-            lowe_output_counts.push_back(1);
+            // final_matches.emplace_back(source_edge, best_match);
+            local_final_matches[thread_id].emplace_back(source_edge, best_match);
+            // lowe_output_counts.push_back(1);
+            local_lowe_output_counts[thread_id].push_back(1);
         }
         else {
             lowe_false_negative++;
-            lowe_output_counts.push_back(0); 
+            // lowe_output_counts.push_back(0); 
+            local_lowe_output_counts[thread_id].push_back(0);
         }
         per_edge_lowe_precision += (static_cast<double>(lowe_precision_numerator) > 0) ? 1.0: 0.0;
         
         if (!passed_ncc_matches.empty()) {
             lowe_edges_evaluated++;
         }
-
+#if MEASURE_TIMINGS
         time_lowe_edges_evaluated++;
-
         auto end_lowe = std::chrono::high_resolution_clock::now();
         time_lowe += std::chrono::duration<double, std::milli>(end_lowe - start_lowe).count();
-    }   
+#endif
+    }   //> MARK: end of looping over left edges   
+}
+
+#if MEASURE_TIMINGS
     auto total_end = std::chrono::high_resolution_clock::now();
-    double total_time = std::chrono::duration<double, std::milli>(total_end - total_start).count();
+    total_time = std::chrono::duration<double, std::milli>(total_end - total_start).count();
+#endif
     
     double epi_distance_recall = 0.0;
     if ((epi_true_positive + epi_false_negative) > 0) {
@@ -1565,29 +1631,12 @@ EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& select
         lowe_recall = static_cast<double>(lowe_true_positive) / (lowe_true_positive + lowe_false_negative);
     }
 
-    // std::cout << "Epipolar Distance Recall: " 
-    //         << std::fixed << std::setprecision(2) 
-    //         << epi_distance_recall * 100 << "%" << std::endl;
-
-    // std::cout << "Max Disparity Threshold Recall: "
-    //       << std::fixed << std::setprecision(2)
-    //       << max_disparity_recall * 100 << "%" << std::endl;
-
-    // std::cout << "Epipolar Shift Threshold Recall: "
-    //       << std::fixed << std::setprecision(2)
-    //       << epi_shift_recall * 100 << "%" << std::endl;
-
-    // std::cout << "Epipolar Cluster Threshold Recall: "
-    //       << std::fixed << std::setprecision(2)
-    //       << epi_cluster_recall * 100 << "%" << std::endl;
-
-    // std::cout << "NCC Threshold Recall: "
-    //       << std::fixed << std::setprecision(2)
-    //       << ncc_recall * 100 << "%" << std::endl;
-
-    // std::cout << "LRT Threshold Recall: "
-    //       << std::fixed << std::setprecision(2)
-    //       << lowe_recall * 100 << "%" << std::endl;
+    // std::cout << "Epipolar Distance Recall: " << std::fixed << std::setprecision(2) << epi_distance_recall * 100 << "%" << std::endl;
+    // std::cout << "Max Disparity Threshold Recall: " << std::fixed << std::setprecision(2) << max_disparity_recall * 100 << "%" << std::endl;
+    // std::cout << "Epipolar Shift Threshold Recall: " << std::fixed << std::setprecision(2) << epi_shift_recall * 100 << "%" << std::endl;
+    // std::cout << "Epipolar Cluster Threshold Recall: " << std::fixed << std::setprecision(2) << epi_cluster_recall * 100 << "%" << std::endl;
+    // std::cout << "NCC Threshold Recall: " << std::fixed << std::setprecision(2) << ncc_recall * 100 << "%" << std::endl; 
+    // std::cout << "LRT Threshold Recall: " << std::fixed << std::setprecision(2) << lowe_recall * 100 << "%" << std::endl;
 
     double per_image_epi_precision   = (epi_edges_evaluated > 0)   ? (per_edge_epi_precision / epi_edges_evaluated)     : (0.0);
     double per_image_disp_precision  = (disp_edges_evaluated > 0)  ? (per_edge_disp_precision / disp_edges_evaluated)   : (0.0);
@@ -1615,15 +1664,34 @@ EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& select
     //     << std::fixed << std::setprecision(2) 
     //     << per_image_lowe_precision * 100 << "%" << std::endl;
 
-
     double per_image_epi_time = (time_epi_edges_evaluated > 0) ? (time_epi / time_epi_edges_evaluated) : (0.0);
     double per_image_disp_time = (time_disp_edges_evaluated > 0) ? (time_disp / time_disp_edges_evaluated) : 0.0;
     double per_image_shift_time = (time_shift_edges_evaluated > 0) ? (time_shift / time_shift_edges_evaluated) : 0.0;
-    double per_image_clust_time= (time_clust_edges_evaluated > 0) ? (time_cluster / time_clust_edges_evaluated) : 0.0;
+    double per_image_clust_time = (time_clust_edges_evaluated > 0) ? (time_cluster / time_clust_edges_evaluated) : 0.0;
     double per_image_patch_time = (time_patch_edges_evaluated > 0) ? (time_patch / time_patch_edges_evaluated) : 0.0;
     double per_image_ncc_time = (time_ncc_edges_evaluated > 0) ? (time_ncc / time_ncc_edges_evaluated) : 0.0;
     double per_image_lowe_time = (time_lowe_edges_evaluated> 0) ? (time_lowe / time_lowe_edges_evaluated) : 0.0;
     double per_image_total_time = (selected_primary_edges.size() > 0) ? (total_time / selected_primary_edges.size()) : 0.0;
+
+    //> CH: stack all local_final_matches to a global final_matches
+    for (const auto& local_matches: local_final_matches) {
+        final_matches.insert(final_matches.end(), local_matches.begin(), local_matches.end());
+    }
+
+    for (const auto& local_counts: local_epi_input_counts)  epi_input_counts.insert(epi_input_counts.end(), local_counts.begin(), local_counts.end());
+    for (const auto& local_counts: local_epi_output_counts) epi_output_counts.insert(epi_output_counts.end(), local_counts.begin(), local_counts.end());
+    for (const auto& local_counts: local_disp_input_counts) disp_input_counts.insert(disp_input_counts.end(), local_counts.begin(), local_counts.end());
+    for (const auto& local_counts: local_disp_output_counts) disp_output_counts.insert(disp_output_counts.end(), local_counts.begin(), local_counts.end());
+    for (const auto& local_counts: local_shift_input_counts) shift_input_counts.insert(shift_input_counts.end(), local_counts.begin(), local_counts.end());
+    for (const auto& local_counts: local_shift_output_counts) shift_output_counts.insert(shift_output_counts.end(), local_counts.begin(), local_counts.end());
+    for (const auto& local_counts: local_clust_input_counts) clust_input_counts.insert(clust_input_counts.end(), local_counts.begin(), local_counts.end());
+    for (const auto& local_counts: local_clust_output_counts) clust_output_counts.insert(clust_output_counts.end(), local_counts.begin(), local_counts.end());
+    for (const auto& local_counts: local_patch_input_counts) patch_input_counts.insert(patch_input_counts.end(), local_counts.begin(), local_counts.end());
+    for (const auto& local_counts: local_patch_output_counts) patch_output_counts.insert(patch_output_counts.end(), local_counts.begin(), local_counts.end());
+    for (const auto& local_counts: local_ncc_input_counts) ncc_input_counts.insert(ncc_input_counts.end(), local_counts.begin(), local_counts.end());
+    for (const auto& local_counts: local_ncc_output_counts) ncc_output_counts.insert(ncc_output_counts.end(), local_counts.begin(), local_counts.end());
+    for (const auto& local_counts: local_lowe_input_counts) lowe_input_counts.insert(lowe_input_counts.end(), local_counts.begin(), local_counts.end());
+    for (const auto& local_counts: local_lowe_output_counts) lowe_output_counts.insert(lowe_output_counts.end(), local_counts.begin(), local_counts.end());
 
     return EdgeMatchResult {
         RecallMetrics {

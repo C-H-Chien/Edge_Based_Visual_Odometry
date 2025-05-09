@@ -154,6 +154,7 @@ public:
 
 private:
    YAML::Node config_file;
+   int omp_threads;
 
    std::string dataset_type;
    std::string dataset_path;
