@@ -206,35 +206,11 @@ private:
     const std::vector<std::pair<ConfirmedMatchEdge, ConfirmedMatchEdge>>& confirmed_matches); 
 
     void BuildImagePyramids(
-    const cv::Mat& curr_left_image,
-    const cv::Mat& curr_right_image,
-    const cv::Mat& next_left_image,
-    const cv::Mat& next_right_image,
+    const cv::Mat& image_one,
+    const cv::Mat& image_two,
     int num_levels,
-    std::vector<cv::Mat>& curr_left_pyramid,
-    std::vector<cv::Mat>& curr_right_pyramid,
-    std::vector<cv::Mat>& next_left_pyramid,
-    std::vector<cv::Mat>& next_right_pyramid);
-
-    void ComputeImageGradient(const cv::Mat& input, cv::Mat& grad_x, cv::Mat& grad_y);
-
-    void TrackEdges(
-    const cv::Mat& img1,                        // image at time t
-    const cv::Mat& img2,                        // image at time t+1
-    const std::vector<cv::Point2d>& points,     // points to track
-    int patch_size,                             // patch size (odd)
-    std::vector<double>& du,                    // x displacements
-    std::vector<double>& dv);
-
-    void TrackEdgesWithOpticalFlow(
-    const cv::Mat& prev_img,
-    const cv::Mat& next_img,
-    const std::vector<cv::Point2d>& prev_edges,
-    std::vector<cv::Point2d>& tracked_edges,
-    std::vector<uchar>& status,
-    std::vector<float>& errors,
-    int win_size,
-    int max_level);
+    std::vector<cv::Mat>& pyramid_one,
+    std::vector<cv::Mat>& pyramid_two);
 
     std::vector<cv::Point3d> LinearTriangulatePoints(
     const std::vector<std::pair<ConfirmedMatchEdge, ConfirmedMatchEdge>>& confirmed_matches
