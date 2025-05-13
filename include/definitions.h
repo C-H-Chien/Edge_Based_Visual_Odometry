@@ -1,12 +1,37 @@
 //> Macro definitions
 #define USE_GLOGS                       (false)
 
-//> Number of CPU cores to process
-#define NUM_OF_CPU_CORES                (6)
+#define USE_CPP17                       (true)
+
+//> OpenMP settings
+#define ACTIVATE_OPENCV_SUPPORT         (true)
+#define USE_DEFINED_NUM_OF_CORES        (false)
+#if USE_DEFINED_NUM_OF_CORES
+#define USE_NUM_CORES_FOR_OMP           (8)
+#endif
+
+//> Stereo edge matching settings
+#define EPIP_TENGENCY_ORIENT_THRESH     (12)    //> in degrees
+#define EPIP_TENGENCY_PROXIM_THRESH     (4)     //> in pixels
+#define MAX_DISPARITY                   (23.0063)
+#define EDGE_CLUSTER_THRESH             (0.3)   //> in pixels
+#define ORTHOGONAL_SHIFT_MAG            (5)     //> in pixels
+#define PATCH_SIZE                      (7)     //> in pixels
+#define NCC_THRESH_STRONG_BOTH_SIDES    (0.5)
+#define NCC_THRESH_WEAK_BOTH_SIDES      (0.25)
+#define NCC_THRESH_STRONG_ONE_SIDE      (0.65)
+#define MATCH_TOL                       (3)     //> in pixels
+
+#define MEASURE_TIMINGS                 (false)
+#define DISPLAY_STERO_EDGE_MATCHES      (false)
 
 //> Define output file folder
-#define OUTPUT_WRITE_PATH               std::string("Output_Results/")
+#define OUTPUT_WRITE_PATH               std::string("../output_files/")
 #define OUTPUT_DATA_TYPE                std::string("TUM")  //> Either TUM or KITTI
+
+//> For quick processing
+#define WRITE_TOED_EDGES                (true)
+#define READ_TOED_EDGES_FROM_FILES      (false)
 
 //> Use for the TUM type dataset
 #define ASSOCIATION_FILE_NAME           std::string("associate.txt")
@@ -21,6 +46,9 @@
 
 //> DEBUGGING PURPOSE
 #define SHOW_YAML_FILE_DATA             (false)
+#define DEBUG_FALSE_NEGATIVES           (false)
+#define DEBUG_COLLECT_NCC_AND_ERR       (false)
+//> ----------------------------------------------
 #define WRITE_FEATURES_TO_FILE          (false)
 #define WRITE_CORRESPONDENCES_TO_FILE   (false)
 #define OPENCV_DISPLAY_FEATURES         (false)

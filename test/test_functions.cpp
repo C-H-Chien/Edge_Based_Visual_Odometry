@@ -262,6 +262,17 @@ int get_Hypothesis_Support_Reproject_from_3D_Points( std::vector<Eigen::Vector3d
     return Num_Of_Inlier_Support;
 }
 
+double ComputeNCC(const cv::Mat patch_one, const cv::Mat patch_two){
+    double mean_one = (cv::mean(patch_one))[0];
+    double mean_two = (cv::mean(patch_two))[0];
+    double sum_of_squared_one  = (cv::sum((patch_one - mean_one).mul(patch_one - mean_one))).val[0];
+    double sum_of_squared_two  = (cv::sum((patch_two - mean_two).mul(patch_two - mean_two))).val[0];
+
+    cv::Mat norm_one = (patch_one - mean_one) / sqrt(sum_of_squared_one);
+    cv::Mat norm_two = (patch_two - mean_two) / sqrt(sum_of_squared_two);
+    return norm_one.dot(norm_two);
+}
+
 template< typename T >
 void write_cvMat_to_File( std::string file_Path, cv::Mat Input_Mat ) {
     std::ofstream Test_File_Write_Stream;
@@ -316,8 +327,48 @@ cv::Point2d Epipolar_Shift(
 
 int main(int argc, char **argv) {
 
+#define TEST_OPENCV_OPERATION               (true)
+#define TEST_NCC                            (true)
+#define TEST_GAUSSIAN_DERIVATIVE_KERNEL     (false)
+#define TEST_DEPTH_MAP                      (false)
+#define TEST_GRADIENT_DEPTHS                (false)
+#define TEST_SVD_EIGEN_MATRIX               (false)
+#define TEST_RELATIVE_POSE                  (false)
+#define TEST_GCC_CONSTRAINT                 (false)
+
     Utility utility_tool;
 
+#if TEST_OPENCV_OPERATION
+    //> [TEST] matrix operation using OpenCV's built-in function
+    cv::Mat patch1 = (cv::Mat_<double>(7, 7) << 
+        192, 195, 189, 183, 187, 184, 190,
+        187, 185, 185, 186, 188, 188, 189,
+        184, 183, 186, 187, 191, 190, 193,
+        185, 184, 188, 188, 192, 190, 192,
+        190, 188, 187, 190, 190, 192, 192,
+        193, 191, 189, 192, 190, 192, 193,
+        194, 193, 192, 194, 192, 193, 194);
+    cv::Mat patch2 = (cv::Mat_<double>(7, 7) << 
+        193, 190, 189, 189, 191, 191, 192,
+        188, 188, 185, 182, 184, 185, 191,
+        181, 181, 186, 185, 185, 186, 189,
+        180, 187, 190, 185, 186, 191, 196,
+        186, 187, 185, 186, 187, 187, 189,
+        191, 188, 188, 190, 189, 191, 195,
+        190, 187, 190, 192, 191, 192, 196);
+
+    //> (i) element-wise multiplication
+    cv::Mat patch_ele_mul = patch1.mul(patch2);
+    std::cout << "element-wise multiplication of two patches: " << patch_ele_mul << std::endl;
+    //> (ii) Calculate the dot product
+    double patch_dot_prod = patch1.dot(patch2);
+    std::cout << "dot product of two patches: " << patch_dot_prod << std::endl;
+#endif
+#if TEST_NCC
+    double ncc = ComputeNCC(patch1, patch2);
+    std::cout << "NCC of two patches: " << ncc << std::endl;
+#endif
+#if TEST_GAUSSIAN_DERIVATIVE_KERNEL
     //> [TEST] Gaussian derivative kernel
     cv::Mat Gx_2d, Gy_2d;
     Gx_2d = cv::Mat::ones(GAUSSIAN_KERNEL_WINDOW_LENGTH, GAUSSIAN_KERNEL_WINDOW_LENGTH, CV_64F);
@@ -326,7 +377,8 @@ int main(int argc, char **argv) {
     std::cout << "Size of Gx_2d and Gy_2d: (" << Gx_2d.rows << ", " << Gx_2d.cols << ")" << std::endl;
     std::string write_Gx_2d_File_Name = std::string("../") + OUTPUT_WRITE_PATH + std::string("Test_Gx_2d.txt");
     write_cvMat_to_File<double>(write_Gx_2d_File_Name, Gx_2d);
-
+#endif
+#if TEST_DEPTH_MAP
     //> [TEST] Depth map
     cv::Mat depth_Map;
     std::string Current_Depth_Path = std::string("/home/chchien/datasets/TUM-RGBD/rgbd_dataset_freiburg1_desk/depth/1305031453.374112.png");
@@ -337,7 +389,8 @@ int main(int argc, char **argv) {
     depth_Map /= 5000.0;
     std::string write_Depth_Map_File_Name = std::string("../") + OUTPUT_WRITE_PATH + std::string("Test_Depth_Map.txt");
     write_cvMat_to_File<double>(write_Depth_Map_File_Name, depth_Map);
-
+#endif
+#if TEST_GRADIENT_DEPTHS
     //> [TEST] Gradient depths
     cv::Mat grad_Depth_xi_ = cv::Mat::ones(depth_Map.rows, depth_Map.cols, CV_64F);
     cv::Mat grad_Depth_eta_ = cv::Mat::ones(depth_Map.rows, depth_Map.cols, CV_64F);
@@ -349,22 +402,23 @@ int main(int argc, char **argv) {
     write_cvMat_to_File<double>(write_Gradient_Depth_Map_xi_File_Name, grad_Depth_xi_);
     std::string write_Gradient_Depth_Map_eta_File_Name = std::string("../") + OUTPUT_WRITE_PATH + std::string("Test_Gradient_Depth_eta.txt");
     write_cvMat_to_File<double>(write_Gradient_Depth_Map_eta_File_Name, grad_Depth_eta_);
-
+#endif
 
     //> [TEST] uniform random number generation
     // LOG_TEST("Uniform random number generator");
     // int rnd_sample = utility_tool.Uniform_Random_Number_Generator(0, 300);
     // std::cout << "random sample = " << rnd_sample << std::endl;
-
+#if TEST_SVD_EIGEN_MATRIX
     //> [TEST] SVD of a Eigen::Matrix3d
-    // Eigen::Matrix3d Cov_Matrix;
-    // Cov_Matrix << 0.026752725823350, -0.009332331250622,  0.013799044199878, \
-    //              -0.014336743930935,  0.005001181722651, -0.007394886206797, \
-    //              -0.065749089150475,  0.022935691990062, -0.033913351233064;
-    // Eigen::JacobiSVD<Eigen::Matrix3d> svd( Cov_Matrix, Eigen::ComputeFullU | Eigen::ComputeFullV );
-    // Eigen::Matrix3d Recover_Cov_Matrix = svd.matrixU() * svd.singularValues().asDiagonal() * svd.matrixV().transpose();
-    // std::cout << "[TEST] Residual of SVD:" << std::endl << Cov_Matrix - Recover_Cov_Matrix << std::endl;
-
+    Eigen::Matrix3d Cov_Matrix;
+    Cov_Matrix << 0.026752725823350, -0.009332331250622,  0.013799044199878, \
+                 -0.014336743930935,  0.005001181722651, -0.007394886206797, \
+                 -0.065749089150475,  0.022935691990062, -0.033913351233064;
+    Eigen::JacobiSVD<Eigen::Matrix3d> svd( Cov_Matrix, Eigen::ComputeFullU | Eigen::ComputeFullV );
+    Eigen::Matrix3d Recover_Cov_Matrix = svd.matrixU() * svd.singularValues().asDiagonal() * svd.matrixV().transpose();
+    std::cout << "[TEST] Residual of SVD:" << std::endl << Cov_Matrix - Recover_Cov_Matrix << std::endl;
+#endif
+#if TEST_RELATIVE_POSE
     //> [TEST] relative rotation and translation
     Eigen::Vector3d curr_p1 = {-0.128738158692995,   0.188985781154671,   1.120163380809315};
     Eigen::Vector3d curr_p2 = { 0.406403095034157,   0.365184359243770,   0.890583764648437};
@@ -413,7 +467,8 @@ int main(int argc, char **argv) {
     Eigen::Vector3d Rel_Transl = Centroid_Curr - Rel_Rot * Centroid_Prev;  
     std::cout << Rel_Rot << std::endl << std::endl;
     std::cout << Rel_Transl << std::endl;
-
+#endif
+#if TEST_GCC_CONSTRAINT
     //> [TEST] GDC constraint computation
     std::string test_data_path = "../test/test_data/";
     test_Data_Reader data_reader(test_data_path);
@@ -468,7 +523,7 @@ int main(int argc, char **argv) {
     int Num_Of_Inliers = get_Hypothesis_Support_Reproject_from_3D_Points( data_reader.test_Prev_3D_Gamma, data_reader.test_Curr_2D_gamma, \
                                                                           Estimated_Rel_Rot, Estimated_Rel_Transl, K );
     std::cout << "Number of inliers = " << Num_Of_Inliers << std::endl;
-
+#endif
     // std::cout << "- Current frame 3D points:" << std::endl;
     // for (int i = 0; i < 10; i++) std::cout << (data_reader.test_Curr_3D_Gamma[i])(0) << "\t" << (data_reader.test_Curr_3D_Gamma[i])(1) << "\t" << (data_reader.test_Curr_3D_Gamma[i])(2) << std::endl;
     // std::cout << "- Previous frame 3D points:" << std::endl;
