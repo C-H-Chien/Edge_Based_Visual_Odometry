@@ -317,6 +317,8 @@ private:
 
    //> CH: shared pointer to the class of third-order edge detector
    std::shared_ptr< ThirdOrderEdgeDetectionCPU > TOED = nullptr;
+
+   std::vector< cv::Point2d > ground_truth_right_edges_after_lowe;
 };
 
 

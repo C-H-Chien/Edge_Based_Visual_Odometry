@@ -196,7 +196,7 @@ void Dataset::write_ncc_vals_to_files( int img_index ) {
 }
 
 void Dataset::PerformEdgeBasedVO() {
-    int num_pairs = 10000;
+    int num_pairs = 100000;
     std::vector<std::pair<cv::Mat, cv::Mat>> image_pairs;
     std::vector<cv::Mat> left_ref_disparity_maps;
     // std::vector<cv::Mat> right_ref_disparity_maps;
@@ -282,6 +282,7 @@ void Dataset::PerformEdgeBasedVO() {
 
         ncc_one_vs_err.clear();
         ncc_two_vs_err.clear();
+        ground_truth_right_edges_after_lowe.clear();
 
         std::cout << "Image Pair #" << i << "\n";
         cv::Mat left_calib = (cv::Mat_<double>(3, 3) << left_intr[0], 0, left_intr[2], 0, left_intr[1], left_intr[3], 0, 0, 1);
@@ -914,11 +915,12 @@ StereoMatchResult Dataset::DisplayMatches(const cv::Mat& left_image, const cv::M
     std::vector<std::pair<ConfirmedMatchEdge, ConfirmedMatchEdge>> confirmed_matches;
 
     int matches_before_bct = static_cast<int>(forward_match.edge_to_cluster_matches.size());
-
-    const double match_tolerance = 3;
+    std::cout << "Number of matches before BCT: " << matches_before_bct << std::endl;
 
     auto bct_start = std::chrono::high_resolution_clock::now();
 
+    int forward_left_index = 0;
+    int bct_true_positive = 0;
     for (const auto& [left_oriented_edge, patch_match_forward] : forward_match.edge_to_cluster_matches) {
         const cv::Point2d& left_position = left_oriented_edge.position;
         const double left_orientation = left_oriented_edge.orientation;
@@ -932,13 +934,18 @@ StereoMatchResult Dataset::DisplayMatches(const cv::Mat& left_image, const cv::M
             const double right_orientation = right_contributing_orientations[i];
 
             for (const auto& [rev_right_edge, patch_match_rev] : reverse_match.edge_to_cluster_matches) {
-                if (cv::norm(rev_right_edge.position - right_position) <= match_tolerance) {
+                if (cv::norm(rev_right_edge.position - right_position) <= MATCH_TOL) {
 
                     for (const auto& rev_contributing_left : patch_match_rev.contributing_edges) {
-                        if (cv::norm(rev_contributing_left - left_position) <= match_tolerance) { 
+                        if (cv::norm(rev_contributing_left - left_position) <= MATCH_TOL) { 
                             ConfirmedMatchEdge left_confirmed{left_position, left_orientation};
                             ConfirmedMatchEdge right_confirmed{right_position, right_orientation};
                             confirmed_matches.emplace_back(left_confirmed, right_confirmed);
+
+                            cv::Point2d GT_right_edge_location = ground_truth_right_edges_after_lowe[forward_left_index];
+                            if (cv::norm(right_position - GT_right_edge_location) <= MATCH_TOL) {
+                                bct_true_positive++;
+                            }
                             break_flag = true;
                             break;
                         }
@@ -948,7 +955,20 @@ StereoMatchResult Dataset::DisplayMatches(const cv::Mat& left_image, const cv::M
             }
             if (break_flag) break;
         }
+        forward_left_index++;
     }
+
+    // //> Measure the recall of bidirectional consistency test
+    // int bct_true_positive = 0;
+    // for (int i = 0; i < confirmed_matches.size(); i++) {
+    //     ConfirmedMatchEdge right_confirmed = confirmed_matches[i].second;
+    //     cv::Point2d right_edge_location = right_confirmed.position;
+    //     cv::Point2d GT_right_edge_location = ground_truth_right_edges_after_lowe[i];
+    //     if (cv::norm(right_edge_location - GT_right_edge_location) <= MATCH_TOL) {
+    //         bct_true_positive++;
+    //     }
+    // }
+    std::cout << "BCT true positives: " << bct_true_positive << std::endl;
 
     auto bct_end = std::chrono::high_resolution_clock::now();
     double total_time_bct = std::chrono::duration<double, std::milli>(bct_end - bct_start).count();
@@ -956,13 +976,18 @@ StereoMatchResult Dataset::DisplayMatches(const cv::Mat& left_image, const cv::M
     double per_image_bct_time = (matches_before_bct > 0) ? total_time_bct / matches_before_bct : 0.0;
 
     int matches_after_bct = static_cast<int>(confirmed_matches.size());
+    std::cout << "Number of matches after BCT: " << matches_after_bct << std::endl;
+    std::cout << "Number of stacked GT right edges: " << ground_truth_right_edges_after_lowe.size() << std::endl;
 
-    double per_image_bct_precision = (matches_before_bct > 0) ? static_cast<double>(matches_after_bct) / matches_before_bct: 0.0;
+    // double per_image_bct_precision = (matches_before_bct > 0) ? static_cast<double>(matches_after_bct) / matches_before_bct: 0.0;
+    double per_image_bct_precision = (matches_before_bct > 0) ? bct_true_positive / (double)(matches_after_bct) : 0.0;
+    std::cout << "BCT precision = " << per_image_bct_precision << std::endl;
 
     int bct_denonimator = forward_match.recall_metrics.lowe_true_positive + forward_match.recall_metrics.lowe_false_negative;
-    int bct_true_positives = static_cast<int>(confirmed_matches.size());
+    // int bct_true_positives = static_cast<int>(confirmed_matches.size());
 
-    double bct_recall = (bct_denonimator > 0) ? static_cast<double>(bct_true_positives) / bct_denonimator : 0.0;
+    double bct_recall = (bct_denonimator > 0) ? bct_true_positive / (double)(bct_denonimator) : 0.0;
+    std::cout << "BCT recall = " << bct_recall << std::endl;
 
     BidirectionalMetrics bidirectional_metrics;
     bidirectional_metrics.matches_before_bct = matches_before_bct;
@@ -1024,6 +1049,9 @@ EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& select
     std::vector< std::vector<int> > local_ncc_output_counts(omp_get_max_threads());
     std::vector< std::vector<int> > local_lowe_input_counts(omp_get_max_threads());
     std::vector< std::vector<int> > local_lowe_output_counts(omp_get_max_threads());
+
+    //> CH: Local structures for GT right edge after Lowe's ratio test
+    std::vector< std::vector< cv::Point2d > > local_GT_right_edges_after_lowe(omp_get_max_threads());
 
     int time_epi_edges_evaluated = 0;
     int time_disp_edges_evaluated = 0;
@@ -1540,6 +1568,7 @@ EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& select
 
             if (lowe_ratio < 1) {
                 if (!selected_ground_truth_edges.empty()) {
+                    local_GT_right_edges_after_lowe[thread_id].push_back(ground_truth_edge);
                     if (cv::norm(best_match.coord - ground_truth_edge) <= 3.0) {
                         lowe_precision_numerator++;
                         lowe_true_positive++;
@@ -1564,6 +1593,7 @@ EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& select
             best_match = passed_ncc_matches[0];
 
             if (!selected_ground_truth_edges.empty()) {
+                local_GT_right_edges_after_lowe[thread_id].push_back(ground_truth_edge);
                 if (cv::norm(best_match.coord - ground_truth_edge) <= 3.0) {
                     lowe_precision_numerator++;
                     lowe_true_positive++;
@@ -1692,6 +1722,10 @@ EdgeMatchResult Dataset::CalculateMatches(const std::vector<cv::Point2d>& select
     for (const auto& local_counts: local_ncc_output_counts) ncc_output_counts.insert(ncc_output_counts.end(), local_counts.begin(), local_counts.end());
     for (const auto& local_counts: local_lowe_input_counts) lowe_input_counts.insert(lowe_input_counts.end(), local_counts.begin(), local_counts.end());
     for (const auto& local_counts: local_lowe_output_counts) lowe_output_counts.insert(lowe_output_counts.end(), local_counts.begin(), local_counts.end());
+
+    for (const auto& local_GT_right_edges_stack : local_GT_right_edges_after_lowe) {
+        ground_truth_right_edges_after_lowe.insert(ground_truth_right_edges_after_lowe.end(), local_GT_right_edges_stack.begin(), local_GT_right_edges_stack.end());
+    }
 
     return EdgeMatchResult {
         RecallMetrics {
